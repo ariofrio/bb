@@ -179,6 +179,7 @@ export function ThreadDetailHeader({
           className={cn(
             "relative min-w-0 text-sm font-normal transition-colors",
             isEditing ? "overflow-visible" : "truncate",
+            !isEditing && !beginPaneDrag && "select-text",
             isSplitPaneHeader &&
               !isFocused &&
               dimsInactiveSplits &&
