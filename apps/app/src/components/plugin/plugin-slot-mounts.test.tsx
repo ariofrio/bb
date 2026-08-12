@@ -1311,6 +1311,9 @@ describe("PluginNavSidebarItems + PluginPanelView", () => {
     );
     fireEvent.click(screen.getByText("Demo board"));
     expect(screen.getByText("board panel body")).toBeDefined();
+    expect(
+      screen.getByTestId("plugin-panel-body").classList.contains("select-text"),
+    ).toBe(true);
   });
 
   it("releases the plugin stylesheet when navigation unmounts the panel route", async () => {
