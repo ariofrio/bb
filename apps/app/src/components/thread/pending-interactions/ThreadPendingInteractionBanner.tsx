@@ -284,7 +284,7 @@ function buildApprovalSubject({
             <pre
               className={cn(
                 getDetailScrollMaxHeightClass("base"),
-                "overflow-auto whitespace-pre px-3 py-2 font-mono text-xs leading-relaxed text-foreground",
+                "select-text overflow-auto whitespace-pre px-3 py-2 font-mono text-xs leading-relaxed text-foreground",
               )}
             >
               $ {command}

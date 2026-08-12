@@ -233,7 +233,7 @@ function AgentRows({
                   Run this in a terminal, then come back:
                 </p>
                 <div className="flex items-center gap-2">
-                  <code className="flex-1 truncate rounded-md border border-border bg-card px-2.5 py-1.5 font-mono text-xs">
+                  <code className="flex-1 select-text truncate rounded-md border border-border bg-card px-2.5 py-1.5 font-mono text-xs">
                     {agent.loginCommand}
                   </code>
                   <Button

@@ -183,6 +183,9 @@ describe("FilePreview", () => {
     );
 
     await waitFor(() => expect(pierreMock.state.statsCallback).not.toBeNull());
+    expect(
+      screen.getByTestId("pierre-file").closest(".select-text"),
+    ).not.toBeNull();
     const renderCountBeforeStatsChange = Number(
       screen.getByTestId("pierre-file").dataset.renderCount,
     );
@@ -333,6 +336,11 @@ describe("FilePreview", () => {
     expect(
       screen.getByRole("table", { name: "customers.csv CSV preview" }),
     ).not.toBeNull();
+    expect(
+      screen
+        .getByRole("table", { name: "customers.csv CSV preview" })
+        .classList.contains("select-text"),
+    ).toBe(true);
     expect(screen.getByRole("columnheader", { name: "Name" })).not.toBeNull();
     expect(screen.getByRole("columnheader", { name: "Note" })).not.toBeNull();
     expect(screen.getByRole("cell", { name: "Ada, Lovelace" })).not.toBeNull();

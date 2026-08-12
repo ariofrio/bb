@@ -217,7 +217,7 @@ function AddMachineDialogContent({
           </div>
         ) : command !== null ? (
           <div className="space-y-2">
-            <pre className="overflow-x-auto whitespace-pre-wrap break-all rounded-md border border-border bg-muted/40 p-3 font-mono text-xs text-foreground">
+            <pre className="select-text overflow-x-auto whitespace-pre-wrap break-all rounded-md border border-border bg-muted/40 p-3 font-mono text-xs text-foreground">
               {command}
             </pre>
             <div className="flex items-center gap-2">

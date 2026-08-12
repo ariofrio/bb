@@ -30,6 +30,16 @@ afterEach(() => {
 });
 
 describe("MarkdownPreview", () => {
+  it("opts rendered content into native text selection", () => {
+    const { container } = render(
+      <MarkdownPreview content="Selectable rendered content" />,
+    );
+
+    expect(container.firstElementChild?.classList.contains("select-text")).toBe(
+      true,
+    );
+  });
+
   it("observes content width only when the preview renders a table", () => {
     const observed: Element[] = [];
     class ResizeObserverMock {

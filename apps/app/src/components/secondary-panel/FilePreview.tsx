@@ -934,7 +934,7 @@ function CsvFilePreview({ file, onSelectionAddToChat }: CsvFilePreviewProps) {
             see app.css overscroll notes) or scroll an ancestor. */}
         <div className="persistent-scrollbar min-h-0 overflow-auto overscroll-contain rounded-md border border-border bg-background">
           <table
-            className="min-w-full table-fixed border-separate border-spacing-0 font-mono text-xs leading-5"
+            className="min-w-full table-fixed select-text border-separate border-spacing-0 font-mono text-xs leading-5"
             aria-label={`${file.name} CSV preview`}
             style={{ width: tableWidth }}
           >
@@ -1330,7 +1330,7 @@ function FilePreviewCode({
   return (
     <div
       ref={containerRef}
-      className="min-h-0 flex-auto"
+      className="min-h-0 flex-auto select-text"
       style={FILE_PREVIEW_VIEW_STYLE}
       data-file-preview-line-number={targetLineNumber ?? undefined}
       onPointerDownCapture={lineSelectionActions.onPointerDownCapture}

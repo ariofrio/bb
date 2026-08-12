@@ -96,7 +96,7 @@ export function PluginPanelView(props: PluginPanelViewProps = {}) {
   // route padding. Plugins opt into their own padding and scrolling.
   return (
     <div
-      className="-m-4 flex min-h-0 flex-1 flex-col overflow-hidden md:-m-5"
+      className="-m-4 flex min-h-0 flex-1 select-text flex-col overflow-hidden md:-m-5"
       data-testid="plugin-panel-body"
     >
       {mount}
