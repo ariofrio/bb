@@ -205,20 +205,6 @@ function mockCsvTableLayout() {
 }
 
 describe("FilePreview", () => {
-  it("keeps file-loading diagnostics selectable", () => {
-    render(
-      <FilePreview
-        headerMode="none"
-        path="src/missing.ts"
-        state={{ kind: "error", message: "Host file read failed" }}
-      />,
-    );
-
-    const diagnostic = screen.getByText("Host file read failed");
-    expect(diagnostic.closest(".select-text")).not.toBeNull();
-    expect(diagnostic.closest("[data-select-all-scope]")).not.toBeNull();
-  });
-
   beforeEach(() => {
     pierreMock.state.cachedFileKeys.clear();
     pierreMock.state.initialStats = pierreMock.createStats();
@@ -237,6 +223,20 @@ describe("FilePreview", () => {
     cleanup();
     vi.useRealTimers();
     vi.restoreAllMocks();
+  });
+
+  it("keeps file-loading diagnostics selectable", () => {
+    render(
+      <FilePreview
+        headerMode="none"
+        path="src/missing.ts"
+        state={{ kind: "error", message: "Host file read failed" }}
+      />,
+    );
+
+    const diagnostic = screen.getByText("Host file read failed");
+    expect(diagnostic.closest(".select-text")).not.toBeNull();
+    expect(diagnostic.closest("[data-select-all-scope]")).not.toBeNull();
   });
 
   it("offers a manual file refresh action", () => {
