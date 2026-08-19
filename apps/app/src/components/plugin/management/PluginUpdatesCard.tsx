@@ -149,7 +149,8 @@ export function PluginDetailReleaseStatus({
       <div
         role="status"
         aria-label="Update failed"
-        className="flex min-w-0 items-start gap-2.5"
+        className="select-text flex min-w-0 items-start gap-2.5"
+        data-select-all-scope=""
       >
         <Icon
           name="CircleX"
@@ -172,7 +173,8 @@ export function PluginDetailReleaseStatus({
       <div
         role="status"
         aria-label="Update needs attention"
-        className="flex min-w-0 items-start gap-2.5"
+        className="select-text flex min-w-0 items-start gap-2.5"
+        data-select-all-scope=""
       >
         <Icon
           name="AlertTriangle"

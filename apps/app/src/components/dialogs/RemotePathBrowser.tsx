@@ -253,7 +253,8 @@ export function RemotePathBrowser({
           fallbackMessage: "Couldn't read this folder.",
         })}
         messageClassName="text-destructive"
-        className="px-2 py-3"
+        className="select-text px-2 py-3"
+        data-select-all-scope=""
       />
     );
   } else if (!data) {
@@ -497,7 +498,11 @@ export function RemotePathBrowser({
               </div>
             </div>
             {newFolderError ? (
-              <p role="alert" className="px-2 text-xs text-destructive">
+              <p
+                role="alert"
+                className="select-text px-2 text-xs text-destructive"
+                data-select-all-scope=""
+              >
                 {newFolderError}
               </p>
             ) : null}

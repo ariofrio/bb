@@ -42,8 +42,9 @@ export function PluginBannerBar({
   return (
     <div
       role={role}
+      data-select-all-scope=""
       className={cn(
-        "bg-surface-recessed/55",
+        "select-text bg-surface-recessed/55",
         separator && "border-b border-border",
       )}
     >

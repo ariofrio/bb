@@ -26,13 +26,15 @@ interface DesktopContextMenuSpellcheckContext {
 
 interface BuildDesktopContextMenuTemplateArgs {
   params: ContextMenuParams;
+  selectAll: () => void;
   webContents: Pick<
     DesktopContextMenuWebContents,
     "replaceMisspelling" | "session"
   >;
 }
 
-interface RegisterDesktopContextMenuArgs {
+export interface RegisterDesktopContextMenuArgs {
+  selectAll: () => void;
   webContents: DesktopContextMenuWebContents;
 }
 
@@ -69,6 +71,7 @@ function getSpellcheckContextFromParams(
 
 export function buildDesktopContextMenuTemplate({
   params,
+  selectAll,
   webContents,
 }: BuildDesktopContextMenuTemplateArgs): MenuItemConstructorOptions[] {
   const template: MenuItemConstructorOptions[] = [];
@@ -131,7 +134,7 @@ export function buildDesktopContextMenuTemplate({
     template.push({ role: "copy", enabled: true });
   }
   if (params.editFlags.canSelectAll) {
-    template.push({ role: "selectAll", enabled: true });
+    template.push({ label: "Select All", click: selectAll });
   }
 
   return trimTrailingSeparator(template);
@@ -139,12 +142,14 @@ export function buildDesktopContextMenuTemplate({
 
 function showDesktopContextMenu({
   params,
+  selectAll,
   webContents,
 }: RegisterDesktopContextMenuArgs & {
   params: ContextMenuParams;
 }): void {
   const template = buildDesktopContextMenuTemplate({
     params,
+    selectAll,
     webContents,
   });
   if (template.length === 0) {
@@ -154,10 +159,11 @@ function showDesktopContextMenu({
 }
 
 export function registerDesktopContextMenu({
+  selectAll,
   webContents,
 }: RegisterDesktopContextMenuArgs): void {
   webContents.session.setSpellCheckerEnabled(true);
   webContents.on("context-menu", (_event, params) => {
-    showDesktopContextMenu({ params, webContents });
+    showDesktopContextMenu({ params, selectAll, webContents });
   });
 }

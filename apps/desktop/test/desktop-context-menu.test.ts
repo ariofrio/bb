@@ -132,6 +132,7 @@ describe("desktop context menu", () => {
     const template = buildDesktopContextMenuTemplate({
       webContents,
       params,
+      selectAll: vi.fn(),
     });
 
     expect(template[0]).toMatchObject({ label: "the" });
@@ -146,6 +147,7 @@ describe("desktop context menu", () => {
     const webContents = createFakeWebContents();
     const template = buildDesktopContextMenuTemplate({
       webContents,
+      selectAll: vi.fn(),
       params: createContextMenuParams({
         isEditable: true,
         spellcheckEnabled: true,
@@ -170,6 +172,7 @@ describe("desktop context menu", () => {
     const webContents = createFakeWebContents();
     const template = buildDesktopContextMenuTemplate({
       webContents,
+      selectAll: vi.fn(),
       params: createContextMenuParams({
         isEditable: true,
         editFlags: {
@@ -198,6 +201,7 @@ describe("desktop context menu", () => {
     const webContents = createFakeWebContents();
     const template = buildDesktopContextMenuTemplate({
       webContents,
+      selectAll: vi.fn(),
       params: createContextMenuParams({
         linkURL: "https://example.com/device",
       }),
@@ -218,6 +222,7 @@ describe("desktop context menu", () => {
     const webContents = createFakeWebContents();
     const template = buildDesktopContextMenuTemplate({
       webContents,
+      selectAll: vi.fn(),
       params: createContextMenuParams({
         selectionText: "device authorization",
         editFlags: {
@@ -230,7 +235,7 @@ describe("desktop context menu", () => {
 
     expect(template).toEqual([
       { role: "copy", enabled: true },
-      { role: "selectAll", enabled: true },
+      { label: "Select All", click: expect.any(Function) },
     ]);
   });
 
@@ -238,6 +243,7 @@ describe("desktop context menu", () => {
     const webContents = createFakeWebContents();
     const template = buildDesktopContextMenuTemplate({
       webContents,
+      selectAll: vi.fn(),
       params: createContextMenuParams({
         linkURL: "https://example.com/device",
         selectionText: "device authorization",
@@ -253,8 +259,31 @@ describe("desktop context menu", () => {
       { label: "Copy Link" },
       { type: "separator" },
       { role: "copy", enabled: true },
-      { role: "selectAll", enabled: true },
+      { label: "Select All" },
     ]);
+  });
+
+  it("routes Select All from non-editable application content through the app command", () => {
+    const webContents = createFakeWebContents();
+    const selectAll = vi.fn();
+    const template = buildDesktopContextMenuTemplate({
+      webContents,
+      selectAll,
+      params: createContextMenuParams({
+        editFlags: { ...DEFAULT_EDIT_FLAGS, canSelectAll: true },
+      }),
+    });
+
+    const item = template.find(
+      (candidate) =>
+        candidate.label === "Select All" || candidate.role === "selectAll",
+    );
+    expect(item?.label).toBe("Select All");
+    expect(item?.role).toBeUndefined();
+
+    clickMenuItem(item);
+
+    expect(selectAll).toHaveBeenCalledOnce();
   });
 
   it("does not show an empty menu for inert content", () => {
@@ -263,6 +292,7 @@ describe("desktop context menu", () => {
     expect(
       buildDesktopContextMenuTemplate({
         webContents,
+        selectAll: vi.fn(),
         params: createContextMenuParams(),
       }),
     ).toEqual([]);
@@ -274,7 +304,7 @@ describe("desktop context menu", () => {
       on: vi.fn(),
     } satisfies DesktopContextMenuWebContents;
 
-    registerDesktopContextMenu({ webContents });
+    registerDesktopContextMenu({ selectAll: vi.fn(), webContents });
 
     expect(webContents.spellCheckerEnabledValues).toEqual([true]);
 
