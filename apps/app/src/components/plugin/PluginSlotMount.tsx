@@ -202,6 +202,8 @@ interface PluginSlotMountProps {
    * otherwise see the plugin simply vanish.
    */
   onCrash?: (pluginId: string) => void;
+  selectText?: boolean;
+  selectAllScope?: boolean;
 }
 
 /**
@@ -223,6 +225,8 @@ export function PluginSlotMount({
   crashFallback,
   instanceId,
   onCrash,
+  selectText = false,
+  selectAllScope = false,
 }: PluginSlotMountProps) {
   usePluginCss(pluginId);
   return (
@@ -241,7 +245,8 @@ export function PluginSlotMount({
         <div
           data-bb-plugin-root=""
           data-bb-plugin={pluginId}
-          className="contents"
+          data-select-all-scope={selectAllScope ? "" : undefined}
+          className={selectText ? "contents select-text" : "contents"}
         >
           {children}
         </div>

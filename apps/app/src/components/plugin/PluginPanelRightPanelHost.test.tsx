@@ -760,6 +760,9 @@ describe("PluginPanelRightPanelHost", () => {
         .getByTestId("shared-secondary-panel-region")
         .hasAttribute("hidden"),
     ).toBe(false);
+    const fixedTabContent = screen.getByText("Navigation for task/123");
+    expect(fixedTabContent.closest(".select-text")).not.toBeNull();
+    expect(fixedTabContent.closest("[data-select-all-scope]")).not.toBeNull();
   });
 
   it("retains a validated fixed-tab target across panel and route remounts for the app session", async () => {

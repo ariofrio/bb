@@ -159,6 +159,8 @@ function PluginFixedTabContent({
       slotKind="navPanelFixedTab"
       slotId={registration.id}
       instanceId={panelId}
+      selectText
+      selectAllScope
     >
       <AppFixedTabTargetProvider state={targetState}>
         <FixedTabComponent subPath={subPath} />
@@ -651,7 +653,6 @@ export function PluginPanelRightPanelHost({
       subPath,
     ],
   );
-
   const renderPanelTabContent = useCallback(
     function renderTabContent(tab: SecondaryFileFixedPanelTab): ReactNode {
       switch (tab.kind) {
