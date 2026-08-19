@@ -55,6 +55,7 @@ export interface InstallApplicationMenuArgs {
   closeWindowOrSideTab(browserWindow: BaseWindow | undefined): void;
   createNewWindow(): void;
   openServerDaemonLogs(): void;
+  selectAll(): void;
   selectServer(serverId: string): void;
   setServerUrl(): void;
   /** Fired when the Window ▸ Server submenu opens (freshness trigger). */
@@ -205,7 +206,13 @@ export function buildApplicationMenuTemplate(
         { role: "cut" },
         { role: "copy" },
         { role: "paste" },
-        { role: "selectAll" },
+        {
+          accelerator: "CommandOrControl+A",
+          label: "Select All",
+          click() {
+            args.selectAll();
+          },
+        },
       ],
     },
     {

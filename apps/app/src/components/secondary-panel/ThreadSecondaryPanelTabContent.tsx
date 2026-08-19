@@ -254,7 +254,10 @@ export function GitDiffTabContent({
   if (diffFilesError) {
     return (
       <div className={cn(PANEL_SCROLL_SLOT_CLASS, "px-4 pb-3")}>
-        <div className="rounded-lg border border-surface-destructive-border bg-surface-destructive px-3 py-2 text-xs text-destructive">
+        <div
+          className="select-text rounded-lg border border-surface-destructive-border bg-surface-destructive px-3 py-2 text-xs text-destructive"
+          data-select-all-scope=""
+        >
           <p>
             {diffFilesError instanceof Error
               ? diffFilesError.message

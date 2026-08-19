@@ -43,6 +43,7 @@ import {
   BB_DESKTOP_CLOSE_WINDOW_RESPONSE_CHANNEL,
   BB_DESKTOP_GET_WINDOW_STATE_CHANNEL,
   BB_DESKTOP_OPEN_NEW_TAB_CHANNEL,
+  BB_DESKTOP_SELECT_ALL_CHANNEL,
   BB_DESKTOP_WINDOW_STATE_CHANGED_CHANNEL,
 } from "../src/desktop-window-command-ipc.js";
 const electronMock = vi.hoisted(() => {
@@ -515,5 +516,20 @@ describe("desktop preload browser API", () => {
       channel: BB_DESKTOP_CLOSE_WINDOW_RESPONSE_CHANNEL,
       payload: false,
     });
+  });
+
+  it("notifies the renderer when the desktop menu requests Select All", async () => {
+    const api = await loadPreload();
+    let selectAllRequests = 0;
+
+    api.onSelectAll?.(() => {
+      selectAllRequests += 1;
+    });
+    emitIpcPayload({
+      channel: BB_DESKTOP_SELECT_ALL_CHANNEL,
+      payload: null,
+    });
+
+    expect(selectAllRequests).toBe(1);
   });
 });
