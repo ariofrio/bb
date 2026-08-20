@@ -56,6 +56,7 @@ export interface InstallApplicationMenuArgs {
   createNewWindow(): void;
   openServerDaemonLogs(): void;
   selectAll(): void;
+  selectAllLabel: string;
   selectServer(serverId: string): void;
   setServerUrl(): void;
   /** Fired when the Window ▸ Server submenu opens (freshness trigger). */
@@ -208,7 +209,7 @@ export function buildApplicationMenuTemplate(
         { role: "paste" },
         {
           accelerator: "CommandOrControl+A",
-          label: "Select All",
+          label: args.selectAllLabel,
           click() {
             args.selectAll();
           },
@@ -265,6 +266,14 @@ export function buildApplicationMenuTemplate(
       ],
     },
   ];
+}
+
+export function getLocalizedSelectAllMenuLabel(): string {
+  const localized = Menu.buildFromTemplate([{ role: "selectAll" }]).items[0]
+    ?.label;
+  return localized === undefined || localized.length === 0
+    ? "Select All"
+    : localized;
 }
 
 export function installApplicationMenu(args: InstallApplicationMenuArgs): void {

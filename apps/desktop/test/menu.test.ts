@@ -38,6 +38,7 @@ function menuArgs(
     openSettings: () => {},
     reloadWindow,
     selectAll: () => {},
+    selectAllLabel: "Select All",
     selectServer: () => {},
     serverDaemonLogsMenuEnabled: false,
     servers: [{ checked: true, id: "builtin", name: "This Mac" }],
@@ -124,6 +125,18 @@ describe("application menu", () => {
     expect(selectAll?.click).toBeTypeOf("function");
     selectAll?.click?.({} as never, undefined, {} as never);
     expect(selectAllCommand).toHaveBeenCalledOnce();
+  });
+
+  it("keeps Electron's localized Select All label on the custom command", () => {
+    const template = buildApplicationMenuTemplate(
+      menuArgs(() => {}, { selectAllLabel: "Tout sélectionner" }),
+    );
+    const editMenu = template.find((item) => item.label === "Edit");
+    const submenu = editMenu?.submenu as MenuItemConstructorOptions[];
+
+    expect(
+      submenu.find((item) => item.accelerator === "CommandOrControl+A")?.label,
+    ).toBe("Tout sélectionner");
   });
 
   it("builds a Window ▸ Server radio submenu with a Set Server URL item", () => {

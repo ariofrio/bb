@@ -75,7 +75,11 @@ describe("GitDiffTabContent panel gating", () => {
           target={TARGET}
           isDiffPanelActive
           isPanelOpen
-          gitDiffViewOptions={{}}
+          gitDiffPresentation={{
+            view: "unified",
+            overflow: "scroll",
+            showLineNumbers: true,
+          }}
         />
       </Wrapper>,
     );

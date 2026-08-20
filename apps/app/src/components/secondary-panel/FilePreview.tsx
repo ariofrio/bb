@@ -1009,7 +1009,8 @@ function CsvFilePreview({ file, onSelectionAddToChat }: CsvFilePreviewProps) {
           className="persistent-scrollbar min-h-0 overflow-auto overscroll-contain rounded-md border border-border bg-background"
         >
           <table
-            className="min-w-full table-fixed border-separate border-spacing-0 font-mono text-xs leading-5"
+            className="min-w-full table-fixed select-text border-separate border-spacing-0 font-mono text-xs leading-5"
+            data-select-all-scope=""
             aria-label={`${file.name} CSV preview`}
             style={{ width: tableWidth }}
           >
@@ -1192,7 +1193,11 @@ function FilePreviewLoading() {
 
 function FilePreviewMessage({ message, role }: FilePreviewMessageProps) {
   return (
-    <EmptyStatePanel role={role} className="mx-4 mt-4 rounded-lg">
+    <EmptyStatePanel
+      role={role}
+      className="mx-4 mt-4 select-text rounded-lg"
+      data-select-all-scope=""
+    >
       {message}
     </EmptyStatePanel>
   );

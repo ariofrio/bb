@@ -1,4 +1,11 @@
-import { Suspense, lazy, useMemo, type ReactNode } from "react";
+import {
+  Suspense,
+  lazy,
+  useCallback,
+  useMemo,
+  useRef,
+  type ReactNode,
+} from "react";
 import type { ExperimentalDiffFullFileContents } from "@get-bb/plugin-sdk";
 import { PluginReplacementSlot } from "@/components/plugin/PluginReplacementSlot";
 import type { ParsedGitDiffFile } from "@/components/git-diff/git-diff-parsing";
@@ -9,13 +16,15 @@ import {
   DEFAULT_DIFF_VIEW,
   type DiffPresentation,
 } from "./code-rendering";
+import { registerSelectAllCopyText } from "@/lib/select-all-scope";
+import { cn } from "@bb/shared-ui/lib/utils";
 
 /** Shared by the mount and the host's crash check. */
 const DIFF_RENDERER_SLOT_KIND = "diffRenderer";
 
 const BbDiff = lazy(() => import("./BbDiff"));
 
-interface DiffHostProps extends Partial<DiffPresentation> {
+export interface DiffHostProps extends Partial<DiffPresentation> {
   /**
    * The parsed diff to render. Callers parse it anyway for their own header,
    * while the built-in renderer lazily enriches it if full contents are
@@ -34,6 +43,35 @@ interface DiffHostProps extends Partial<DiffPresentation> {
   /** Rendered while BB's renderer chunk loads. */
   fallback?: ReactNode;
   onSelectionAddToChat?: (text: string) => void;
+}
+
+function DiffSelectionScope({
+  children,
+  className,
+  getCopyText,
+}: {
+  children: ReactNode;
+  className?: string;
+  getCopyText: () => string;
+}) {
+  const unregisterRef = useRef<(() => void) | null>(null);
+  const setScopeRef = useCallback(
+    (scope: HTMLDivElement | null) => {
+      unregisterRef.current?.();
+      unregisterRef.current =
+        scope === null ? null : registerSelectAllCopyText(scope, getCopyText);
+    },
+    [getCopyText],
+  );
+  return (
+    <div
+      ref={setScopeRef}
+      className={cn("select-text", className)}
+      data-select-all-scope=""
+    >
+      {children}
+    </div>
+  );
 }
 
 /**
@@ -69,20 +107,25 @@ export function DiffHost({
     () => (isReplaced ? (patchText ?? buildFileDiffPatchText(file)) : ""),
     [file, isReplaced, patchText],
   );
+  const getCopyText = useCallback(
+    () => patchText ?? buildFileDiffPatchText(file),
+    [file, patchText],
+  );
 
   const original = (
-    <Suspense fallback={fallback}>
-      <BbDiff
-        file={file}
-        patchText={patchText}
-        fullFileContents={fullFileContents}
-        view={view}
-        overflow={overflow}
-        showLineNumbers={showLineNumbers}
-        className={className}
-        onSelectionAddToChat={onSelectionAddToChat}
-      />
-    </Suspense>
+    <DiffSelectionScope className={className} getCopyText={getCopyText}>
+      <Suspense fallback={fallback}>
+        <BbDiff
+          file={file}
+          patchText={patchText}
+          fullFileContents={fullFileContents}
+          view={view}
+          overflow={overflow}
+          showLineNumbers={showLineNumbers}
+          onSelectionAddToChat={onSelectionAddToChat}
+        />
+      </Suspense>
+    </DiffSelectionScope>
   );
 
   return (
@@ -92,7 +135,7 @@ export function DiffHost({
       slotKind={DIFF_RENDERER_SLOT_KIND}
     >
       {(slot, BoundOriginal) => (
-        <div className={className}>
+        <DiffSelectionScope className={className} getCopyText={getCopyText}>
           <slot.component
             patch={semanticPatch}
             path={file.name}
@@ -102,7 +145,7 @@ export function DiffHost({
             experimental_fullFileContents={fullFileContents}
             experimental_Original={BoundOriginal}
           />
-        </div>
+        </DiffSelectionScope>
       )}
     </PluginReplacementSlot>
   );
