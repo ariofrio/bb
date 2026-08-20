@@ -1564,9 +1564,13 @@ describe("PluginNavSidebarItems + PluginPanelView", () => {
     expect(screen.queryByText(/This plugin panel is not available/)).toBeNull();
 
     act(() => markPluginFrontendsSettled());
-    expect(
-      screen.getByText(/This plugin panel is not available/),
-    ).toBeDefined();
+    const unavailablePanel = screen.getByText(
+      /This plugin panel is not available/,
+    );
+    expect(unavailablePanel).toBeDefined();
+    const selectionScope = unavailablePanel.closest("[data-select-all-scope]");
+    expect(selectionScope).not.toBeNull();
+    expect(selectionScope?.classList.contains("select-text")).toBe(true);
   });
 });
 
@@ -2197,7 +2201,11 @@ describe("plugin file opener tabs", () => {
         fileOpenerOriginal={<div>must not render</div>}
       />,
     );
-    expect(screen.getByText(/file opener is not available/)).toBeDefined();
+    const unavailableOpener = screen.getByText(/file opener is not available/);
+    expect(unavailableOpener).toBeDefined();
+    const selectionScope = unavailableOpener.closest("[data-select-all-scope]");
+    expect(selectionScope).not.toBeNull();
+    expect(selectionScope?.classList.contains("select-text")).toBe(true);
   });
 
   it("restores the exact native preview node when the opener crashes", () => {
