@@ -53,4 +53,20 @@ describe("ThreadGoalCard", () => {
     ).toBe(true);
     expect(screen.getByText("Goal")).not.toBeNull();
   });
+
+  it("keeps prompt-stack reading content selectable as one boundary", () => {
+    render(
+      <ThreadGoalCard
+        goal={goal}
+        isExpanded
+        onClearGoal={() => {}}
+        onToggle={() => {}}
+      />,
+    );
+
+    const scope = screen
+      .getByText("Finish the activity model")
+      .closest("[data-select-all-scope]");
+    expect(scope?.classList.contains("select-text")).toBe(true);
+  });
 });

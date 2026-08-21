@@ -3,7 +3,7 @@ import { isSelectAllShortcutInput } from "@bb/domain";
 import {
   clearSelectAllHighlight,
   closestEventElement,
-  findSelectAllScope,
+  findSelectAllScopes,
   getSelectAllCopyText,
   isEditableTarget,
   resolveSelectAllRoot,
@@ -41,7 +41,7 @@ export function AppSelectAllController() {
       text: string;
     }
 
-    let activeScope: HTMLElement | null = null;
+    let activeScopes: HTMLElement[] = [];
     let activePreferredRoot: Document | ShadowRoot | null = null;
     let activeSelectionAnchor: Element | null = null;
     let copyOverride: CopyOverride | null = null;
@@ -84,9 +84,10 @@ export function AppSelectAllController() {
         selectEditorContents(activeElement);
         return true;
       }
+      const activeScope =
+        activeScopes.find((scope) => scope.isConnected) ?? null;
       if (
         activeScope !== null &&
-        activeScope.isConnected &&
         activePreferredRoot !== null &&
         activeSelectionAnchor !== null
       ) {
@@ -182,16 +183,16 @@ export function AppSelectAllController() {
         event.composedPath()[0] ?? event.target,
       );
       if (target === null || isEditableTarget(target)) {
-        activeScope = null;
+        activeScopes = [];
         activePreferredRoot = null;
         activeSelectionAnchor = null;
         return;
       }
-      activeScope = findSelectAllScope(event.composedPath());
+      activeScopes = findSelectAllScopes(event.composedPath());
       activeSelectionAnchor = target;
       const selectionRoot = target.getRootNode();
       activePreferredRoot =
-        activeScope !== null &&
+        activeScopes.length > 0 &&
         (selectionRoot instanceof Document ||
           selectionRoot instanceof ShadowRoot)
           ? selectionRoot

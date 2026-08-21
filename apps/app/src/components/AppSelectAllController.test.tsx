@@ -896,6 +896,24 @@ describe("AppSelectAllController", () => {
     );
   });
 
+  it("falls back to a connected ancestor scope after an inner scope unmounts", () => {
+    render(<AppSelectAllController />);
+    const outer = document.createElement("section");
+    outer.dataset.selectAllScope = "";
+    outer.innerHTML =
+      '<p>Outer first</p><div data-testid="inner" data-select-all-scope><p data-testid="anchor">Inner text</p></div><p>Outer last</p>';
+    document.body.append(outer);
+    const inner = outer.querySelector<HTMLElement>('[data-testid="inner"]')!;
+    const anchor = outer.querySelector<HTMLElement>('[data-testid="anchor"]')!;
+
+    fireEvent.pointerDown(anchor);
+    inner.remove();
+    dispatchSelectAll(outer);
+
+    expect(window.getSelection()?.toString()).toContain("Outer first");
+    expect(window.getSelection()?.toString()).toContain("Outer last");
+  });
+
   it("does not guess a segment after an anchor is removed from a split scope", () => {
     render(<AppSelectAllController />);
     const scope = document.createElement("section");

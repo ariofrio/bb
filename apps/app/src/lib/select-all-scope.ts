@@ -85,18 +85,19 @@ function isEditableSelectionSubtree(element: Element): boolean {
   );
 }
 
-export function findSelectAllScope(
+export function findSelectAllScopes(
   composedPath: readonly EventTarget[],
-): HTMLElement | null {
+): HTMLElement[] {
+  const scopes: HTMLElement[] = [];
   for (const target of composedPath) {
     if (
       target instanceof HTMLElement &&
       target.matches(SELECT_ALL_SCOPE_SELECTOR)
     ) {
-      return target;
+      scopes.push(target);
     }
   }
-  return null;
+  return scopes;
 }
 
 export function registerSelectAllCopyText(
@@ -132,6 +133,9 @@ function isSkippedSelectionSubtree(element: Element): boolean {
 }
 
 function ensureShadowSelectionPolicy(root: ShadowRoot): void {
+  // Open shadow trees need their own control exclusions and highlight rule.
+  // Install them once when Select All is explicitly invoked; pointer/focus
+  // tracking must remain mutation-free on long reading surfaces.
   if (
     Array.from(root.querySelectorAll("style")).some(
       (style) =>

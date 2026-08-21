@@ -9,6 +9,8 @@ interface BrowserSelectionResults {
   iframePrevented: boolean;
   main: string;
   mainPrevented: boolean;
+  portal: string;
+  portalPrevented: boolean;
   shadow: string;
   shadowPrevented: boolean;
 }
@@ -65,6 +67,7 @@ async function run(): Promise<void> {
   const chrome = document.querySelector("#chrome");
   const editor = document.querySelector("#editor");
   const preview = document.querySelector("#preview");
+  const pluginPortal = document.querySelector("#plugin-portal");
   const shadowScope = document.querySelector("#shadow-scope");
   const shadowHost = document.querySelector("#shadow-host");
   if (
@@ -72,6 +75,7 @@ async function run(): Promise<void> {
     !(chrome instanceof HTMLElement) ||
     !(editor instanceof HTMLTextAreaElement) ||
     !(preview instanceof HTMLIFrameElement) ||
+    !(pluginPortal instanceof HTMLElement) ||
     !(shadowScope instanceof HTMLElement) ||
     !(shadowHost instanceof HTMLElement)
   ) {
@@ -91,10 +95,13 @@ async function run(): Promise<void> {
 
   const mainSelection = selectAllFrom(main);
   const chromeSelection = selectAllFrom(chrome);
+  const portalSelection = selectAllFrom(pluginPortal);
   const shadowSelection = selectAllFrom(shadowScope);
   const results: BrowserSelectionResults = {
     main: mainSelection.text,
     mainPrevented: mainSelection.prevented,
+    portal: portalSelection.text,
+    portalPrevented: portalSelection.prevented,
     chrome: chromeSelection.text,
     editorPrevented: dispatchSelectAll(editor).defaultPrevented,
     iframePrevented: dispatchSelectAll(previewText).defaultPrevented,

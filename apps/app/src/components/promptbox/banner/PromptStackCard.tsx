@@ -47,7 +47,8 @@ export function PromptStackCard({
       <section
         ref={rootRef}
         aria-label={ariaLabel}
-        className={cn(BASE_CHROME, className)}
+        className={cn(BASE_CHROME, "select-text", className)}
+        data-select-all-scope=""
         style={style}
       >
         {children}
@@ -57,7 +58,8 @@ export function PromptStackCard({
   return (
     <div
       ref={rootRef as Ref<HTMLDivElement>}
-      className={cn(BASE_CHROME, className)}
+      className={cn(BASE_CHROME, "select-text", className)}
+      data-select-all-scope=""
       style={style}
     >
       {children}

@@ -20,6 +20,8 @@ interface BrowserSelectionResults {
   iframePrevented: boolean;
   main: string;
   mainPrevented: boolean;
+  portal: string;
+  portalPrevented: boolean;
   shadow: string;
   shadowPrevented: boolean;
 }
@@ -152,6 +154,9 @@ app.on("window-all-closed", () => app.quit());
 <section class="select-text" data-select-all-scope><p>SIDE CONTENT</p></section>
 <textarea id="editor">EDITOR DRAFT</textarea>
 <iframe id="preview" srcdoc="<p id='preview-text'>HTML PREVIEW</p>"></iframe>
+<section id="plugin-portal" data-bb-plugin-root data-bb-portaled-overlay data-select-all-scope>
+  <p>PORTAL FIRST</p><button>PORTAL ACTION</button><p>PORTAL LAST</p>
+</section>
 <section id="shadow-scope" class="select-text" data-select-all-scope>
   <div id="shadow-host"></div>
 </section>
@@ -223,6 +228,8 @@ app.on("window-all-closed", () => app.quit());
       iframePrevented: false,
       main: "MAIN FIRST\n\nMAIN LAST",
       mainPrevented: true,
+      portal: "PORTAL FIRST\n\nPORTAL LAST",
+      portalPrevented: true,
       shadow: "SHADOW FIRSTSHADOW LAST",
       shadowPrevented: true,
     });

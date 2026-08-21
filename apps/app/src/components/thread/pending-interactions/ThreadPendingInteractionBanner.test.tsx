@@ -129,8 +129,9 @@ describe("ThreadPendingInteractionBanner", () => {
     expect(
       screen.getByText("/workspace/plan.md").closest("[data-select-all-scope]"),
     ).not.toBeNull();
-    expect(
-      screen.getByText("Ship it.").closest("[data-select-all-scope]"),
-    ).not.toBeNull();
+    const planScope = screen
+      .getByText("Ship it.")
+      .closest("[data-select-all-scope]");
+    expect(planScope?.classList.contains("select-text")).toBe(true);
   });
 });

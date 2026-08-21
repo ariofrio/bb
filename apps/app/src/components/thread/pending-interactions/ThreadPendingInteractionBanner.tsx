@@ -388,7 +388,7 @@ function buildApprovalSubject({
               data-select-all-scope=""
               className={cn(
                 getDetailScrollMaxHeightClass("base"),
-                "overflow-auto px-3 py-2",
+                "select-text overflow-auto px-3 py-2",
               )}
             >
               <MarkdownPreview content={plan} className="text-xs" />

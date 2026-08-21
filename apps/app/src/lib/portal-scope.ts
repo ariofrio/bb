@@ -10,8 +10,10 @@ import { PluginContext } from "@/components/plugin/plugin-context";
  * Spreading these props on the portaled element re-attaches the plugin scope
  * inside a plugin slot. Every portal also carries a stable overlay marker so
  * the desktop stylesheet can carve interactive portal content out of Electron
- * window-drag regions. This is native hit-test policy, not CSS pointer-event
- * suppression: visible overlay controls remain the actual pointer target.
+ * window-drag regions. Plugin portals also become their own selectable reading
+ * boundary because they no longer inherit the selection policy of their slot
+ * mount. This is native hit-test policy, not CSS pointer-event suppression:
+ * visible overlay controls remain the actual pointer target.
  *
  * The registry-vendored copy of this file in a plugin returns the attribute
  * unconditionally (everything a plugin renders is plugin-scoped) — component
@@ -21,6 +23,7 @@ export function usePortalScopeProps(): {
   "data-bb-portaled-overlay": "";
   "data-bb-plugin-root"?: "";
   "data-bb-plugin"?: string;
+  "data-select-all-scope"?: "";
 } {
   const pluginId = useContext(PluginContext);
   return pluginId === null
@@ -29,5 +32,6 @@ export function usePortalScopeProps(): {
         "data-bb-portaled-overlay": "",
         "data-bb-plugin-root": "",
         "data-bb-plugin": pluginId,
+        "data-select-all-scope": "",
       };
 }
