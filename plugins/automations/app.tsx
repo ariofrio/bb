@@ -397,7 +397,10 @@ function DeleteAutomationDialog({
           <>
             <DialogHeader>
               <DialogTitle>Delete automation?</DialogTitle>
-              <DialogDescription>
+              <DialogDescription
+                className="select-text"
+                data-select-all-scope=""
+              >
                 &ldquo;{name}&rdquo; and its run history will be permanently
                 removed.
               </DialogDescription>

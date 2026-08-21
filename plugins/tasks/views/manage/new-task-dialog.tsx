@@ -379,7 +379,7 @@ export function NewTaskDialog({
           Create a task with a title, description, attributes, and attachments.
         </DialogDescription>
         {createdTask ? (
-          <div className="px-4 pt-2">
+          <div className="select-text px-4 pt-2" data-select-all-scope="">
             <p role="alert" className="text-sm">
               Task <span className="font-medium">{createdTask.key}</span> was
               created, but {failedCount} attachment
@@ -444,7 +444,10 @@ export function NewTaskDialog({
             </div>
           ) : null}
           {hasOversized ? (
-            <p className="mt-2 text-xs text-destructive">
+            <p
+              className="select-text mt-2 text-xs text-destructive"
+              data-select-all-scope=""
+            >
               Remove attachments over the 25 MB limit before creating the task.
             </p>
           ) : null}
@@ -646,7 +649,11 @@ export function NewTaskDialog({
           ) : null}
         </div>
         {error ? (
-          <p role="alert" className="px-4 pt-2 text-xs text-destructive">
+          <p
+            role="alert"
+            className="select-text px-4 pt-2 text-xs text-destructive"
+            data-select-all-scope=""
+          >
             {error}
           </p>
         ) : null}

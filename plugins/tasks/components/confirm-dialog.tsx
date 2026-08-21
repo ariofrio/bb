@@ -37,7 +37,9 @@ export function ConfirmDialog({
       <DialogContent className="max-w-sm">
         <DialogHeader>
           <DialogTitle>{title}</DialogTitle>
-          <DialogDescription>{description}</DialogDescription>
+          <DialogDescription className="select-text" data-select-all-scope="">
+            {description}
+          </DialogDescription>
         </DialogHeader>
         <DialogFooter>
           <Button

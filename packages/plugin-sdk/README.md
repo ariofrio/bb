@@ -9,6 +9,18 @@ The authoritative contracts are the exported declarations in
 [`src/app-contract.ts`](src/app-contract.ts). Keep author-facing guidance in
 the built-in `bb-plugin-authoring` skill synchronized with those declarations.
 
+## Selectable content
+
+BB treats interface chrome as nonselectable. Host wrappers opt ordinary plugin
+reading surfaces back into native text selection, but content portaled into a
+dialog, popover, or similar overlay no longer inherits that wrapper. Add the
+`select-text` class to user-authored, diagnostic, or command content inside a
+portal when users should be able to drag-select it. Add
+`data-select-all-scope=""` separately only when Cmd/Ctrl+A should select that
+content boundary. Do not put either marker on generic menus, tooltips, or
+controls; controls nested in an explicitly selectable reading surface remain
+excluded by the host policy.
+
 ## Composer customization
 
 Composer UI extensions register through `app.composer.customize(...)`. A

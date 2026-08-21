@@ -523,7 +523,9 @@ describe("connect settings section", () => {
 
     // The dialog names the concrete URL that will die.
     await slot.findByText("Disconnect remote access?");
-    await slot.findByText(/will stop working on all devices/);
+    const warning = await slot.findByText(/will stop working on all devices/);
+    expect(warning.classList.contains("select-text")).toBe(true);
+    expect(warning.hasAttribute("data-select-all-scope")).toBe(true);
     fireEvent.click(slot.getByRole("button", { name: "Disconnect" }));
 
     await waitFor(() =>

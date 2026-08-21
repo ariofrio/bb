@@ -384,11 +384,7 @@
         "$TURBO_DEFAULT$",
         "$TURBO_ROOT$/apps/app/package.json",
         "$TURBO_ROOT$/apps/app/fixtures/app-select-all-browser.tsx",
-        "$TURBO_ROOT$/apps/app/src/app.css",
-        "$TURBO_ROOT$/apps/app/src/components/AppSelectAllController.tsx",
-        "$TURBO_ROOT$/apps/app/src/components/ui/theme.css",
-        "$TURBO_ROOT$/apps/app/src/lib/bb-desktop.ts",
-        "$TURBO_ROOT$/apps/app/src/lib/select-all-scope.ts",
+        "$TURBO_ROOT$/apps/app/src/**",
         "$TURBO_ROOT$/packages/domain/src/app-keybindings.ts",
         "$TURBO_ROOT$/vitest.shared.ts"
       ]

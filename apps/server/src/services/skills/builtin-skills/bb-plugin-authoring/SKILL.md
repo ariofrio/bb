@@ -2268,6 +2268,12 @@ only `definePluginApp` + the hooks):
   variables (`bg-background`, `text-muted-foreground`, `rounded-lg`, and
   `animate-in`/`fade-in-0` via tw-animate-css) — derive colors from theme
   tokens, never hardcoded grays.
+- Text selection: bb keeps interface chrome nonselectable. Host wrappers make
+  ordinary plugin reading surfaces selectable, but content portaled into a
+  dialog or popover no longer inherits that wrapper. Put `select-text` on
+  user-authored, diagnostic, or command content inside a portal; add
+  `data-select-all-scope=""` separately only when Cmd/Ctrl+A should target that
+  reading boundary. Do not mark generic menus, tooltips, or controls.
 - The old bb extras (`EmptyState`, `Markdown`, `PageBody`, `Spinner`) are
   gone — write your own (each is a few lines; see
   `plugins/github/components/` for reference implementations).

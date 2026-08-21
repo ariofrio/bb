@@ -286,7 +286,11 @@ export function NewProjectDialog({ open, onOpenChange }: NewProjectDialogProps) 
           </Field>
         </div>
         {error ? (
-          <p role="alert" className="text-xs text-destructive">
+          <p
+            role="alert"
+            className="select-text text-xs text-destructive"
+            data-select-all-scope=""
+          >
             {error}
           </p>
         ) : null}

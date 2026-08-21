@@ -150,6 +150,12 @@ describe("keyboard shortcut settings", () => {
       getAppShortcutAssignmentError("thread.new", { ...selectAll, alt: true }),
     ).toBeNull();
     expect(
+      getAppShortcutAssignmentError("thread.new", {
+        ...selectAll,
+        control: true,
+      }),
+    ).toBeNull();
+    expect(
       getCommandShortcut(
         defaults,
         [{ command: "thread.new", shortcut: selectAll }],

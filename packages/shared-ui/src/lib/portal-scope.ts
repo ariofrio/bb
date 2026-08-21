@@ -12,9 +12,9 @@
  * the host app the same hook reads the plugin-slot context instead, so host
  * overlays stay out of plugin scopes. The portaled-overlay marker is shared
  * with the host copy and lets Electron route pointer input to visible
- * overlay controls instead of an underlying window-drag region. The Select
- * All marker lets the host restore the plugin portal's reading boundary after
- * it leaves the slot mount.
+ * overlay controls instead of an underlying window-drag region. Reading and
+ * diagnostic content opts into text selection explicitly; generic plugin
+ * overlays remain app chrome.
  */
 declare const __BB_PLUGIN_ID__: string | undefined;
 
@@ -22,14 +22,12 @@ export function usePortalScopeProps(): {
   "data-bb-portaled-overlay": "";
   "data-bb-plugin-root"?: "";
   "data-bb-plugin"?: string;
-  "data-select-all-scope": "";
 } {
   const pluginId =
     typeof __BB_PLUGIN_ID__ === "string" ? __BB_PLUGIN_ID__ : undefined;
   return {
     "data-bb-portaled-overlay": "",
     "data-bb-plugin-root": "",
-    "data-select-all-scope": "",
     ...(pluginId !== undefined ? { "data-bb-plugin": pluginId } : {}),
   };
 }

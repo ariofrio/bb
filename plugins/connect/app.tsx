@@ -1040,7 +1040,10 @@ function DisconnectDialog({
             <DialogHeader>
               <DialogTitle>Disconnect remote access?</DialogTitle>
             </DialogHeader>
-            <p className="text-sm text-muted-foreground">
+            <p
+              className="select-text text-sm text-muted-foreground"
+              data-select-all-scope=""
+            >
               <span className="font-medium text-foreground">{host}</span> will
               stop working on all devices. Re-pairing needs a new code from your{" "}
               {dashboardHost} dashboard.

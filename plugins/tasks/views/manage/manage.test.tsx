@@ -382,6 +382,10 @@ describe("NewTaskDialog attachments", () => {
     expect(alert.textContent).toContain(
       "was created, but 1 attachment failed to upload",
     );
+    const uploadFailureSurface = alert.closest<HTMLElement>(
+      "[data-select-all-scope]",
+    );
+    expect(uploadFailureSurface?.classList.contains("select-text")).toBe(true);
     // The task exists but the dialog stays open; nothing navigated away and
     // the successful chip left the tray.
     expect(slot.navigateCalls).toEqual([]);
@@ -420,7 +424,11 @@ describe("NewTaskDialog attachments", () => {
     ).toContain("Over the 25 MB attachment limit");
 
     // The rejected chip blocks creation instead of being silently dropped.
-    await slot.findByText(/Remove attachments over the 25 MB limit/);
+    const oversizedMessage = await slot.findByText(
+      /Remove attachments over the 25 MB limit/,
+    );
+    expect(oversizedMessage.classList.contains("select-text")).toBe(true);
+    expect(oversizedMessage.hasAttribute("data-select-all-scope")).toBe(true);
     const createButton = slot.getByRole("button", {
       name: "Create task",
     }) as HTMLButtonElement;
@@ -905,9 +913,13 @@ describe("Manage folders", () => {
     fireEvent.click(
       await slot.findByRole("button", { name: "Delete folder bb" }),
     );
-    await slot.findByText(
+    const diagnostic = await slot.findByText(
       "Could not load the folder's contents: projects unavailable",
     );
+    const diagnosticSurface = diagnostic.closest<HTMLElement>(
+      "[data-select-all-scope]",
+    );
+    expect(diagnosticSurface?.classList.contains("select-text")).toBe(true);
     expect(
       slot.getByRole<HTMLButtonElement>("button", { name: "Delete folder" })
         .disabled,
@@ -1070,6 +1082,23 @@ describe("NewProjectDialog", () => {
         }) as HTMLButtonElement
       ).disabled,
     ).toBe(true);
+  });
+
+  it("keeps project creation diagnostics selectable inside the portal", async () => {
+    const slot = renderEmptyState({
+      createProject: () => {
+        throw new Error("Project creation failed");
+      },
+    });
+    fireEvent.click(await slot.findByRole("button", { name: /New project/ }));
+    fireEvent.change(await slot.findByPlaceholderText("e.g. Tasks Plugin"), {
+      target: { value: "Home Lab" },
+    });
+    fireEvent.click(slot.getByRole("button", { name: "Create project" }));
+
+    const alert = await slot.findByRole("alert");
+    expect(alert.classList.contains("select-text")).toBe(true);
+    expect(alert.hasAttribute("data-select-all-scope")).toBe(true);
   });
 
   it("links the personal project from the discovered project picker", async () => {

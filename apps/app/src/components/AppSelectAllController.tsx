@@ -42,8 +42,7 @@ export function AppSelectAllController() {
     }
 
     let activeScopes: HTMLElement[] = [];
-    let activePreferredRoot: Document | ShadowRoot | null = null;
-    let activeSelectionAnchor: Element | null = null;
+    let activeSelectionAnchors: Element[] = [];
     let copyOverride: CopyOverride | null = null;
 
     function selectionMatchesCopyOverride(override: CopyOverride): boolean {
@@ -86,19 +85,22 @@ export function AppSelectAllController() {
       }
       const activeScope =
         activeScopes.find((scope) => scope.isConnected) ?? null;
-      if (
-        activeScope !== null &&
-        activePreferredRoot !== null &&
-        activeSelectionAnchor !== null
-      ) {
-        const selectionRoot = resolveSelectAllRoot(
-          activeScope,
-          activePreferredRoot,
-        );
+      const activeSelectionAnchor =
+        activeSelectionAnchors.find((anchor) => anchor.isConnected) ?? null;
+      if (activeScope !== null && activeSelectionAnchor !== null) {
+        const preferredRoot = activeSelectionAnchor.getRootNode();
+        if (
+          !(preferredRoot instanceof Document) &&
+          !(preferredRoot instanceof ShadowRoot)
+        ) {
+          window.getSelection()?.removeAllRanges();
+          return true;
+        }
+        const selectionRoot = resolveSelectAllRoot(activeScope, preferredRoot);
         const selectedScope = selectAllScopeContents(
           activeScope,
           selectionRoot,
-          activeSelectionAnchor.isConnected ? activeSelectionAnchor : null,
+          activeSelectionAnchor,
         );
         const registeredCopyText = getSelectAllCopyText(activeScope);
         captureCopyOverride(
@@ -184,19 +186,14 @@ export function AppSelectAllController() {
       );
       if (target === null || isEditableTarget(target)) {
         activeScopes = [];
-        activePreferredRoot = null;
-        activeSelectionAnchor = null;
+        activeSelectionAnchors = [];
         return;
       }
-      activeScopes = findSelectAllScopes(event.composedPath());
-      activeSelectionAnchor = target;
-      const selectionRoot = target.getRootNode();
-      activePreferredRoot =
-        activeScopes.length > 0 &&
-        (selectionRoot instanceof Document ||
-          selectionRoot instanceof ShadowRoot)
-          ? selectionRoot
-          : null;
+      const composedPath = event.composedPath();
+      activeScopes = findSelectAllScopes(composedPath);
+      activeSelectionAnchors = composedPath.filter(
+        (candidate): candidate is Element => candidate instanceof Element,
+      );
     }
 
     window.addEventListener("pointerdown", updateActiveScope, true);

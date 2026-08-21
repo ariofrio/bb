@@ -530,6 +530,24 @@ describe("AppSelectAllController", () => {
     );
   });
 
+  it("leaves a combined Control+Command+A chord available to app shortcuts", () => {
+    render(<AppSelectAllController />);
+    const fixture = createFixture();
+    fireEvent.pointerDown(fixture.mainMessage);
+    const event = new KeyboardEvent("keydown", {
+      bubbles: true,
+      cancelable: true,
+      code: "KeyA",
+      key: "a",
+      ctrlKey: true,
+      metaKey: true,
+    });
+
+    fixture.mainMessage.dispatchEvent(event);
+
+    expect(event.defaultPrevented).toBe(false);
+  });
+
   it("suppresses repeated Select All work without reopening native selection", () => {
     render(<AppSelectAllController />);
     const fixture = createFixture();
@@ -914,24 +932,25 @@ describe("AppSelectAllController", () => {
     expect(window.getSelection()?.toString()).toContain("Outer last");
   });
 
-  it("does not guess a segment after an anchor is removed from a split scope", () => {
+  it("uses a connected interaction ancestor after a leaf is replaced", () => {
     render(<AppSelectAllController />);
     const scope = document.createElement("section");
     scope.dataset.selectAllScope = "";
     scope.innerHTML =
-      '<p>Sent before</p><div contenteditable="true">Draft</div><p data-testid="anchor">Sent after</p>';
+      '<p>Sent before</p><div contenteditable="true">Draft</div><div data-testid="row"><p data-testid="anchor">Sent after</p></div>';
     document.body.append(scope);
+    const row = scope.querySelector<HTMLElement>('[data-testid="row"]')!;
     const anchor = scope.querySelector<HTMLElement>('[data-testid="anchor"]')!;
-    const setBaseAndExtent = vi.spyOn(
-      window.getSelection()!,
-      "setBaseAndExtent",
-    );
 
     fireEvent.pointerDown(anchor);
-    anchor.remove();
+    row.innerHTML = "<p>Sent after replacement</p>";
     dispatchSelectAll(scope);
 
-    expect(setBaseAndExtent).not.toHaveBeenCalled();
+    expect(window.getSelection()?.toString()).toContain(
+      "Sent after replacement",
+    );
+    expect(window.getSelection()?.toString()).not.toContain("Sent before");
+    expect(window.getSelection()?.toString()).not.toContain("Draft");
   });
 
   it("does not arm authoritative copy text for a whitespace-only segment", () => {

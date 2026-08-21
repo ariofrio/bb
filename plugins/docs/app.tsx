@@ -2077,7 +2077,12 @@ function NotesWorkspace({
                 />
               </label>
               {folderError ? (
-                <p className="text-xs text-destructive">{folderError}</p>
+                <p
+                  className="select-text text-xs text-destructive"
+                  data-select-all-scope=""
+                >
+                  {folderError}
+                </p>
               ) : null}
               <DialogFooter>
                 <Button
@@ -2145,7 +2150,12 @@ function NotesWorkspace({
                 </Select>
               </label>
               {vaultError ? (
-                <p className="text-xs text-destructive">{vaultError}</p>
+                <p
+                  className="select-text text-xs text-destructive"
+                  data-select-all-scope=""
+                >
+                  {vaultError}
+                </p>
               ) : null}
               <DialogFooter>
                 <Button

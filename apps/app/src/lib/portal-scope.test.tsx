@@ -55,13 +55,13 @@ function openDialog() {
 afterEach(cleanup);
 
 describe("usePortalScopeProps", () => {
-  it("stamps portaled dialog content + overlay inside a plugin slot", () => {
+  it("stamps plugin style scope without making generic portal UI selectable", () => {
     const { baseElement } = render(inPluginScope(openDialog()));
 
     const content = baseElement.querySelector('[role="dialog"]');
     expect(content).not.toBeNull();
     expect(content!.getAttribute("data-bb-portaled-overlay")).toBe("");
-    expect(content!.getAttribute("data-select-all-scope")).toBe("");
+    expect(content!.hasAttribute("data-select-all-scope")).toBe(false);
     // Portaled out of the plugin mount subtree, so it must carry its own
     // scope root for the plugin stylesheet to reach it.
     expect(content!.getAttribute("data-bb-plugin-root")).toBe("");

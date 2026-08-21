@@ -32,11 +32,11 @@ describe("app text selection policy", () => {
     expect(css).not.toContain(":has([data-selection-active])");
   });
 
-  it("keeps plugin-authored portal content selectable", () => {
-    expect(compactCss).toContain(
+  it("requires plugin-authored portal reading content to opt in", () => {
+    expect(compactCss).not.toContain(
       "body.bb-app-shell [data-bb-plugin-root][data-bb-portaled-overlay] { user-select: text !important; }",
     );
-    expect(compactCss).toContain(
+    expect(compactCss).not.toContain(
       `body.bb-app-shell [data-bb-plugin-root][data-bb-portaled-overlay] :where( ${SELECTION_CONTROL_SELECTORS.join(", ")} ):not(.select-text) { user-select: none; }`,
     );
   });
