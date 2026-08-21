@@ -209,10 +209,18 @@ describe("DiffFileCard context expansion", () => {
       .getByTestId("diff-view")
       .closest("[data-select-all-scope]");
     const contextScope = expandButton.closest("[data-select-all-scope]");
+    const cardBodyScope = diffScope?.parentElement?.closest(
+      "[data-select-all-scope]",
+    );
     expect(diffScope).not.toBeNull();
     expect(contextScope).not.toBeNull();
+    expect(cardBodyScope).not.toBeNull();
+    expect(cardBodyScope).not.toBe(diffScope);
     expect(diffScope).not.toBe(contextScope);
     expect(getSelectAllCopyText(diffScope as HTMLElement)).toContain(
+      "-const b = 2;\n+const b = 3;",
+    );
+    expect(getSelectAllCopyText(cardBodyScope as HTMLElement)).toContain(
       "-const b = 2;\n+const b = 3;",
     );
     expect(diffViewMock.renderedOptions.at(-1)?.unsafeCSS).toContain(

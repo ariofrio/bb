@@ -113,7 +113,7 @@ export function DiffHost({
   );
 
   const original = (
-    <DiffSelectionScope className={className} getCopyText={getCopyText}>
+    <DiffSelectionScope getCopyText={getCopyText}>
       <Suspense fallback={fallback}>
         <BbDiff
           file={file}
@@ -122,6 +122,7 @@ export function DiffHost({
           view={view}
           overflow={overflow}
           showLineNumbers={showLineNumbers}
+          className={className}
           onSelectionAddToChat={onSelectionAddToChat}
         />
       </Suspense>

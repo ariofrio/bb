@@ -40,4 +40,10 @@ describe("app text selection policy", () => {
       "body.bb-app-shell .select-text .sr-only { user-select: none; }",
     );
   });
+
+  it("keeps aria-hidden duplicate text out of content selection", () => {
+    expect(compactCss).toContain(
+      'body.bb-app-shell .select-text [aria-hidden="true"] { user-select: none; }',
+    );
+  });
 });

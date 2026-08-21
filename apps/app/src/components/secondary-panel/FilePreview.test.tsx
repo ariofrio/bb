@@ -21,6 +21,7 @@ import {
   PierreWorkerPoolGateContext,
   type PierreWorkerPoolGate,
 } from "@/lib/pierre-worker-pool-gate";
+import { getSelectAllCopyText } from "@/lib/select-all-scope";
 
 interface MockPierreFileProps {
   file: {
@@ -565,10 +566,14 @@ describe("FilePreview", () => {
     const fileScope = screen
       .getByTestId("pierre-file")
       .closest("[data-select-all-scope]");
+    const viewport = screen
+      .getByTestId("pierre-file")
+      .closest("[data-bb-source-code-viewport]");
     const truncationScope = screen
       .getByText(/Showing the first/)
       .closest("[data-select-all-scope]");
     expect(fileScope).not.toBeNull();
+    expect(fileScope).toBe(viewport);
     expect(truncationScope).not.toBeNull();
     expect(fileScope).not.toBe(truncationScope);
 
@@ -921,6 +926,32 @@ describe("FilePreview", () => {
     expect(
       screen.getByText("Showing the first 500 rows and 100 columns."),
     ).not.toBeNull();
+  });
+
+  it("copies every parsed CSV row after Select All despite row virtualization", () => {
+    mockCsvTableLayout();
+    const lines = ["name,score"];
+    for (let rowIndex = 0; rowIndex < 100; rowIndex += 1) {
+      lines.push(`person-${rowIndex},${rowIndex}`);
+    }
+
+    render(
+      <FilePreview
+        path="data/scores.csv"
+        state={{
+          kind: "ready",
+          file: { name: "scores.csv", contents: lines.join("\n") },
+          lineRange: null,
+          textPreviewKind: "csv",
+        }}
+      />,
+    );
+
+    const table = screen.getByRole("table", {
+      name: "scores.csv CSV preview",
+    });
+    expect(screen.queryByText("person-99")).toBeNull();
+    expect(getSelectAllCopyText(table)).toContain("person-99\t99");
   });
 
   it("uses the CSV table preview for loaded CSV text files", () => {

@@ -11,6 +11,7 @@ import type { FileContents } from "@pierre/diffs";
 import type { GitDiffFileChangeKind } from "@bb/server-contract";
 import type { ExperimentalDiffFullFileContents } from "@get-bb/plugin-sdk";
 import { useIntersectionObserver } from "usehooks-ts";
+import { useComposedRefs } from "@radix-ui/react-compose-refs";
 import { Button } from "@bb/shared-ui/button";
 import { usePointerCoarse } from "@bb/shared-ui/hooks/use-pointer-coarse";
 import { DiffHost } from "@/components/code/DiffHost";
@@ -21,6 +22,8 @@ import {
   IMAGE_TRANSPARENCY_CHECKER_STYLE,
 } from "@/components/ui/image-lightbox.js";
 import { Skeleton } from "@bb/shared-ui/skeleton";
+import { registerSelectAllCopyText } from "@/lib/select-all-scope";
+import { buildFileDiffPatchText } from "./git-diff-patch-text";
 import {
   formatGitDiffFileLabel,
   isPreviewableImagePath,
@@ -851,10 +854,26 @@ export function GitDiffCardBody({
     fullFileContents,
     patchText,
   } = state;
+  const unregisterSelectAllCopyTextRef = useRef<(() => void) | null>(null);
+  const getSelectAllCopyText = useCallback(
+    () => patchText ?? buildFileDiffPatchText(fileDiff),
+    [fileDiff, patchText],
+  );
+  const selectAllScopeRef = useCallback(
+    (scope: HTMLDivElement | null) => {
+      unregisterSelectAllCopyTextRef.current?.();
+      unregisterSelectAllCopyTextRef.current =
+        scope === null
+          ? null
+          : registerSelectAllCopyText(scope, getSelectAllCopyText);
+    },
+    [getSelectAllCopyText],
+  );
+  const bodyRef = useComposedRefs(bodySentinelRef, selectAllScopeRef);
 
   return (
     <div
-      ref={bodySentinelRef}
+      ref={bodyRef}
       className="overflow-hidden rounded-b-lg bg-background select-text"
       data-select-all-scope=""
       style={GIT_DIFF_CARD_BODY_STYLE}

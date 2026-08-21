@@ -10,15 +10,11 @@ describe("Pierre selection policy", () => {
     expect(PIERRE_SELECTION_POLICY_CSS).toContain('[role="button"]');
     expect(PIERRE_SELECTION_POLICY_CSS).toContain("[data-expand-button]");
     expect(PIERRE_SELECTION_POLICY_CSS).toContain("[data-utility-button]");
+    expect(PIERRE_SELECTION_POLICY_CSS).toContain('[aria-hidden="true"]');
     expect(PIERRE_SELECTION_POLICY_CSS).toContain("user-select: none");
   });
 
-  it("appends the policy to caller-provided Pierre CSS", () => {
-    const customCss = ":host { color: red; }";
-
-    const css = applyPierreSelectionPolicy(customCss);
-
-    expect(css).toContain(customCss);
-    expect(css).toContain(PIERRE_SELECTION_POLICY_CSS);
+  it("returns the complete Pierre selection policy", () => {
+    expect(applyPierreSelectionPolicy()).toBe(PIERRE_SELECTION_POLICY_CSS);
   });
 });

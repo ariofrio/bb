@@ -91,6 +91,91 @@ describe("GitDiffTabContent panel gating", () => {
     expect(diagnostic.closest("[data-select-all-scope]")).not.toBeNull();
   });
 
+  it.each([
+    {
+      label: "workspace-unavailable diagnostics",
+      response: {
+        outcome: "unavailable",
+        failure: {
+          code: "unknown",
+          workspacePath: "/workspace",
+          message: "Workspace host is offline",
+        },
+      } satisfies EnvironmentDiffFilesResponse,
+      text: "Workspace host is offline",
+    },
+    {
+      label: "not-applicable diagnostics",
+      response: {
+        outcome: "not_applicable",
+        reason: "non_git_environment",
+        message: "This source has no git worktree",
+      } satisfies EnvironmentDiffFilesResponse,
+      text: "This source has no git worktree",
+    },
+  ])("keeps $label selectable", async ({ response, text }) => {
+    vi.mocked(sdk.environments.diffFiles).mockResolvedValue(response);
+    const { wrapper: Wrapper } = createQueryClientTestHarness();
+    render(
+      <Wrapper>
+        <GitDiffTabContent
+          environmentId={ENVIRONMENT_ID}
+          target={TARGET}
+          isDiffPanelActive
+          isPanelOpen
+          gitDiffPresentation={{
+            view: "unified",
+            overflow: "scroll",
+            showLineNumbers: true,
+          }}
+        />
+      </Wrapper>,
+    );
+
+    const diagnostic = await screen.findByText(text);
+    expect(diagnostic.closest(".select-text")).not.toBeNull();
+    expect(diagnostic.closest("[data-select-all-scope]")).not.toBeNull();
+  });
+
+  it("keeps truncated diff diagnostics selectable", async () => {
+    vi.mocked(sdk.environments.diffFiles).mockResolvedValue({
+      ...emptyDiff,
+      files: [
+        {
+          path: "src/index.ts",
+          previousPath: null,
+          changeKind: "modified",
+          additions: 1,
+          deletions: 0,
+          binary: false,
+          origin: "tracked",
+          loadMode: "auto",
+        },
+      ],
+      truncated: true,
+    });
+    const { wrapper: Wrapper } = createQueryClientTestHarness();
+    render(
+      <Wrapper>
+        <GitDiffTabContent
+          environmentId={ENVIRONMENT_ID}
+          target={TARGET}
+          isDiffPanelActive
+          isPanelOpen
+          gitDiffPresentation={{
+            view: "unified",
+            overflow: "scroll",
+            showLineNumbers: true,
+          }}
+        />
+      </Wrapper>,
+    );
+
+    const diagnostic = await screen.findByRole("status");
+    expect(diagnostic.closest(".select-text")).not.toBeNull();
+    expect(diagnostic.closest("[data-select-all-scope]")).not.toBeNull();
+  });
+
   it("fetches the diff TOC only while the panel is open, and refetches once on reopen", async () => {
     vi.mocked(sdk.environments.diffFiles).mockResolvedValue(emptyDiff);
     const { queryClient, wrapper: Wrapper } = createQueryClientTestHarness();

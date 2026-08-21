@@ -152,7 +152,7 @@ export function AppSelectAllController() {
         event.type === "pointerdown" &&
         "button" in event &&
         typeof event.button === "number" &&
-        event.button !== 0;
+        event.button === 2;
       if (isSecondaryPointerDown) {
         preserveCopyOverrideThroughFocus = true;
         queueMicrotask(() => {

@@ -27,6 +27,11 @@ export const SELECT_ALL_SHADOW_POLICY_CSS = `
   user-select: none;
 }
 
+:where(.sr-only, [aria-hidden="true"]) {
+  -webkit-user-select: none;
+  user-select: none;
+}
+
 ::highlight(${SELECT_ALL_HIGHLIGHT_NAME}) {
   background-color: Highlight;
   color: HighlightText;
@@ -319,7 +324,7 @@ export function selectAllScopeContents(
     }
     return {
       kind: "logical",
-      fallbackCopyText: endpoints.texts.map((text) => text.data).join(""),
+      fallbackCopyText: endpoints.texts.map((text) => text.data).join("\n"),
     };
   }
   return null;

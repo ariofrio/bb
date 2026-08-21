@@ -713,7 +713,7 @@ describe("AppSelectAllController", () => {
     document.dispatchEvent(fallbackCopyEvent);
     expect(fallbackSetData).toHaveBeenCalledWith(
       "text/plain",
-      "shadow-root file contentsshadow tail",
+      "shadow-root file contents\nshadow tail",
     );
 
     fireEvent.pointerDown(fixture.sidebar);
@@ -1047,6 +1047,30 @@ describe("AppSelectAllController", () => {
     );
 
     expect(shadowRoot.innerHTML).toBe(shadowMarkup);
+  });
+
+  it("clears a scoped copy override on middle-click interaction", () => {
+    render(<AppSelectAllController />);
+    const fixture = createFixture();
+    const unregister = registerSelectAllCopyText(
+      fixture.mainRegion,
+      () => "AUTHORITATIVE_VIRTUALIZED_TEXT",
+    );
+
+    fireEvent.pointerDown(fixture.mainMessage);
+    dispatchSelectAll(fixture.mainMessage);
+    fireEvent.pointerDown(fixture.sidebar, { button: 1 });
+
+    const setData = vi.fn();
+    const copyEvent = new Event("copy", { bubbles: true, cancelable: true });
+    Object.defineProperty(copyEvent, "clipboardData", {
+      value: { setData },
+    });
+    document.dispatchEvent(copyEvent);
+
+    expect(setData).not.toHaveBeenCalled();
+    expect(copyEvent.defaultPrevented).toBe(false);
+    unregister();
   });
 
   it("removes app-level event behavior when unmounted", () => {

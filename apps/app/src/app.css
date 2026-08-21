@@ -90,6 +90,10 @@
     user-select: none;
   }
 
+  body.bb-app-shell .select-text [aria-hidden="true"] {
+    user-select: none;
+  }
+
   @media (display-mode: standalone) {
     :root {
       --bb-shell-height: 100lvh;

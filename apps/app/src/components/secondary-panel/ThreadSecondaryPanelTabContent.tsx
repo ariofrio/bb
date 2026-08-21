@@ -281,7 +281,10 @@ export function GitDiffTabContent({
   if (diffFilesResponse.outcome === "unavailable") {
     return (
       <div className={cn(PANEL_SCROLL_SLOT_CLASS, "px-4 pb-3")}>
-        <div className="rounded-lg border border-border bg-surface-raised px-3 py-2 text-xs text-muted-foreground">
+        <div
+          className="select-text rounded-lg border border-border bg-surface-raised px-3 py-2 text-xs text-muted-foreground"
+          data-select-all-scope=""
+        >
           <p className="font-medium text-foreground">Workspace unavailable</p>
           <p className="mt-1 leading-5">{diffFilesResponse.failure.message}</p>
         </div>
@@ -292,7 +295,10 @@ export function GitDiffTabContent({
   if (diffFilesResponse.outcome === "not_applicable") {
     return (
       <div className={cn(PANEL_SCROLL_SLOT_CLASS, "px-4 pb-3")}>
-        <div className="rounded-lg border border-border bg-surface-raised px-3 py-2 text-xs text-muted-foreground">
+        <div
+          className="select-text rounded-lg border border-border bg-surface-raised px-3 py-2 text-xs text-muted-foreground"
+          data-select-all-scope=""
+        >
           <p className="mt-1 leading-5">{diffFilesResponse.message}</p>
         </div>
       </div>
@@ -326,7 +332,8 @@ export function GitDiffTabContent({
       {diffFilesResponse.truncated ? (
         <div
           role="status"
-          className="mx-4 mb-2 rounded-lg border border-border bg-surface-raised px-3 py-2 text-xs text-muted-foreground"
+          className="mx-4 mb-2 select-text rounded-lg border border-border bg-surface-raised px-3 py-2 text-xs text-muted-foreground"
+          data-select-all-scope=""
         >
           Showing the first {diffFilesResponse.files.length} changed files.
           Additional changes are omitted.

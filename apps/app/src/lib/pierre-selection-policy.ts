@@ -15,8 +15,6 @@ ${SELECT_ALL_SHADOW_POLICY_CSS}
 }
 `;
 
-export function applyPierreSelectionPolicy(unsafeCSS?: string): string {
-  return unsafeCSS === undefined || unsafeCSS.length === 0
-    ? PIERRE_SELECTION_POLICY_CSS
-    : `${unsafeCSS}\n${PIERRE_SELECTION_POLICY_CSS}`;
+export function applyPierreSelectionPolicy(): string {
+  return PIERRE_SELECTION_POLICY_CSS;
 }

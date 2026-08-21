@@ -245,6 +245,19 @@ describe("DiffHost", () => {
     expect(hunkReads).toBeGreaterThan(0);
   });
 
+  it("keeps caller layout classes on BB's built-in diff scroller", async () => {
+    render(
+      <DiffHost
+        file={parseFixture()}
+        fullFileContents={null}
+        className="h-full max-h-64"
+      />,
+    );
+
+    await screen.findByTestId("bb-diff");
+    expect(bbDiff.lastProps?.className).toBe("h-full max-h-64");
+  });
+
   it("honours a pin to BB's renderer without disabling the plugin", async () => {
     registerDiffRenderer((props) => {
       receivedProps.push(props);

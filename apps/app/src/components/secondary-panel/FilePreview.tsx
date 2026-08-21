@@ -1,5 +1,6 @@
 import {
   type CSSProperties,
+  useCallback,
   useEffect,
   useMemo,
   useRef,
@@ -38,6 +39,7 @@ import {
   type CodeOverflowModeChangeHandler,
 } from "@/lib/code-overflow-mode";
 import { cn } from "@bb/shared-ui/lib/utils";
+import { registerSelectAllCopyText } from "@/lib/select-all-scope";
 import { SecondaryPanelSelectionActions } from "./SecondaryPanelSelectionActions.js";
 
 export interface FilePreviewFile {
@@ -971,6 +973,24 @@ function CsvFilePreview({ file, onSelectionAddToChat }: CsvFilePreviewProps) {
   }));
   const tableWidth = `max(100%, ${3 + columns.length * 18}rem)`;
   const truncationNote = getCsvTruncationNote(preview, bodyRows.length);
+  const selectAllCopyText = useMemo(
+    () =>
+      preview.rows
+        .map((row) => row.slice(0, preview.columnCount).join("\t"))
+        .join("\n"),
+    [preview],
+  );
+  const unregisterSelectAllCopyTextRef = useRef<(() => void) | null>(null);
+  const setSelectAllScopeRef = useCallback(
+    (scope: HTMLTableElement | null) => {
+      unregisterSelectAllCopyTextRef.current?.();
+      unregisterSelectAllCopyTextRef.current =
+        scope === null
+          ? null
+          : registerSelectAllCopyText(scope, () => selectAllCopyText);
+    },
+    [selectAllCopyText],
+  );
 
   // The parse cap still allows 500 x 100 = 50,000 cells, and a scroll box only
   // clips painting, not DOM: mounting every row blocked the main thread for
@@ -1009,6 +1029,7 @@ function CsvFilePreview({ file, onSelectionAddToChat }: CsvFilePreviewProps) {
           className="persistent-scrollbar min-h-0 overflow-auto overscroll-contain rounded-md border border-border bg-background"
         >
           <table
+            ref={setSelectAllScopeRef}
             className="min-w-full table-fixed select-text border-separate border-spacing-0 font-mono text-xs leading-5"
             data-select-all-scope=""
             aria-label={`${file.name} CSV preview`}

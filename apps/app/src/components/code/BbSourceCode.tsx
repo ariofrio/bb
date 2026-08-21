@@ -543,24 +543,22 @@ function BbSourceCode({
       onPointerUpCapture={lineSelectionActions.onPointerUpCapture}
     >
       <PierreWorkerPoolBoundary>
-        <SourceCodeViewport>
-          <div ref={setSelectAllScopeRef} data-select-all-scope="">
-            <PierreFile
-              key={renderedFileMountKey}
-              disableWorkerPool={workerPoolStats?.workersFailed === true}
-              file={renderedFile}
-              metrics={SOURCE_VIRTUAL_FILE_METRICS}
-              options={options}
-              selectedLines={selectedLines}
-            />
-          </div>
-          {truncation !== null && !showsFullFile ? (
-            <SourceCodeTruncationNotice
-              truncation={truncation}
-              onLoadFullFile={handleLoadFullFile}
-            />
-          ) : null}
+        <SourceCodeViewport selectAllScopeRef={setSelectAllScopeRef}>
+          <PierreFile
+            key={renderedFileMountKey}
+            disableWorkerPool={workerPoolStats?.workersFailed === true}
+            file={renderedFile}
+            metrics={SOURCE_VIRTUAL_FILE_METRICS}
+            options={options}
+            selectedLines={selectedLines}
+          />
         </SourceCodeViewport>
+        {truncation !== null && !showsFullFile ? (
+          <SourceCodeTruncationNotice
+            truncation={truncation}
+            onLoadFullFile={handleLoadFullFile}
+          />
+        ) : null}
       </PierreWorkerPoolBoundary>
       {lineSelectionActions.menu}
     </div>
@@ -576,19 +574,26 @@ const TARGET_LINE_MAX_ATTEMPTS = 40;
  * inlined so the scroller carries a ref and a data marker the target-line
  * scrolling can find without walking the tree by class name.
  */
-function SourceCodeViewport({ children }: { children: ReactNode }) {
+function SourceCodeViewport({
+  children,
+  selectAllScopeRef,
+}: {
+  children: ReactNode;
+  selectAllScopeRef: (node: HTMLDivElement | null) => void;
+}) {
   const [virtualizer] = useState(() =>
     typeof window === "undefined" ? undefined : new PierreVirtualizer(),
   );
   const viewportRef = useCallback(
     (node: HTMLDivElement | null) => {
+      selectAllScopeRef(node);
       if (node !== null) {
         virtualizer?.setup(node);
       } else {
         virtualizer?.cleanUp();
       }
     },
-    [virtualizer],
+    [selectAllScopeRef, virtualizer],
   );
   return (
     <VirtualizerContext.Provider value={virtualizer}>
@@ -596,6 +601,7 @@ function SourceCodeViewport({ children }: { children: ReactNode }) {
         ref={viewportRef}
         className="min-h-0 flex-1 overflow-y-auto"
         data-bb-source-code-viewport
+        data-select-all-scope=""
       >
         <div>{children}</div>
       </div>
