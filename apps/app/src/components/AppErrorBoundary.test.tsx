@@ -77,7 +77,7 @@ describe("AppErrorBoundary", () => {
       bubbles: true,
       cancelable: true,
       key: "a",
-      metaKey: true,
+      ctrlKey: true,
     });
     details.dispatchEvent(selectAll);
 

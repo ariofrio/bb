@@ -210,7 +210,13 @@ export function buildApplicationMenuTemplate(
         {
           accelerator: "CommandOrControl+A",
           label: args.selectAllLabel,
-          click() {
+          click(_menuItem, browserWindow) {
+            if (browserWindow === null) {
+              if (args.isMac) {
+                Menu.sendActionToFirstResponder("selectAll:");
+              }
+              return;
+            }
             args.selectAll();
           },
         },

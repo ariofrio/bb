@@ -9,6 +9,7 @@ import {
 } from "@testing-library/react";
 import { act, type ReactElement } from "react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { Virtualizer as PierreVirtualizer } from "@pierre/diffs";
 import {
   FilePreview,
   buildCsvPreviewData,
@@ -259,6 +260,11 @@ describe("FilePreview", () => {
     fireEvent.click(screen.getByRole("button", { name: "Refresh file" }));
 
     expect(onRefresh).toHaveBeenCalledOnce();
+    expect(
+      screen
+        .getByRole("heading", { name: "Preview" })
+        .closest("[data-select-all-scope]"),
+    ).not.toBeNull();
   });
 
   it("disables the manual refresh action while a refresh is running", () => {
@@ -373,7 +379,7 @@ describe("FilePreview", () => {
       cancelable: true,
       composed: true,
       key: "a",
-      metaKey: true,
+      ctrlKey: true,
     });
     visibleLine?.dispatchEvent(selectAllEvent);
     expect(selectAllEvent.defaultPrevented).toBe(true);
@@ -931,6 +937,7 @@ describe("FilePreview", () => {
 
   it("copies every parsed CSV row after Select All despite row virtualization", () => {
     mockCsvTableLayout();
+    const joinSpy = vi.spyOn(Array.prototype, "join");
     const lines = ["name,score"];
     for (let rowIndex = 0; rowIndex < 100; rowIndex += 1) {
       lines.push(`person-${rowIndex},${rowIndex}`);
@@ -952,7 +959,67 @@ describe("FilePreview", () => {
       name: "scores.csv CSV preview",
     });
     expect(screen.queryByText("person-99")).toBeNull();
+    expect(
+      joinSpy.mock.calls.filter(([separator]) => separator === "\t"),
+    ).toHaveLength(0);
     expect(getSelectAllCopyText(table)).toContain("person-99\t99");
+    expect(
+      joinSpy.mock.calls.filter(([separator]) => separator === "\t").length,
+    ).toBeGreaterThan(0);
+  });
+
+  it("keeps the source viewport registered when file contents change", async () => {
+    const cleanUp = vi.spyOn(PierreVirtualizer.prototype, "cleanUp");
+    const view = renderWithWorkerPool(
+      <FilePreview
+        headerMode="none"
+        path="src/example.ts"
+        state={{
+          kind: "ready",
+          file: {
+            cacheKey: "stable-cache-key",
+            name: "example.ts",
+            contents: "export const first = true;",
+          },
+          lineRange: null,
+          textPreviewKind: null,
+        }}
+      />,
+    );
+    await screen.findByTestId("pierre-file");
+    const cleanUpsBeforeContentChange = cleanUp.mock.calls.length;
+
+    view.rerender(
+      <PierreWorkerPoolGateContext.Provider
+        value={{
+          ready: true,
+          pool: pierreMock.workerPool as unknown as NonNullable<
+            PierreWorkerPoolGate["pool"]
+          >,
+          request: () => undefined,
+        }}
+      >
+        <FilePreview
+          headerMode="none"
+          path="src/example.ts"
+          state={{
+            kind: "ready",
+            file: {
+              cacheKey: "stable-cache-key",
+              name: "example.ts",
+              contents: "export const second = true;",
+            },
+            lineRange: null,
+            textPreviewKind: null,
+          }}
+        />
+      </PierreWorkerPoolGateContext.Provider>,
+    );
+    await waitFor(() =>
+      expect(pierreMock.state.lastFile?.contents).toContain("second"),
+    );
+
+    expect(cleanUp).toHaveBeenCalledTimes(cleanUpsBeforeContentChange);
   });
 
   it("uses the CSV table preview for loaded CSV text files", () => {

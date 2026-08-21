@@ -26,13 +26,15 @@ function dispatchPointerDown(target: Element): void {
 }
 
 function dispatchSelectAll(target: Element): KeyboardEvent {
+  const useMetaForMod = /Mac|iPhone|iPad|iPod/u.test(window.navigator.platform);
   const event = new KeyboardEvent("keydown", {
     bubbles: true,
     cancelable: true,
     code: "KeyA",
     composed: true,
     key: "a",
-    metaKey: true,
+    ctrlKey: !useMetaForMod,
+    metaKey: useMetaForMod,
   });
   target.dispatchEvent(event);
   return event;

@@ -196,6 +196,7 @@ function getComposedTextEndpoints(
 } | null {
   let segment = 0;
   let anchorSegment: number | null = null;
+  let anchorContainsEditable = false;
   const textBySegment = new Map<number, Text[]>();
   const visibilityByParent = new WeakMap<Element, boolean>();
 
@@ -217,6 +218,13 @@ function getComposedTextEndpoints(
     }
     if (node !== scope && node instanceof Element) {
       if (isEditableSelectionSubtree(node)) {
+        if (
+          selectionAnchor !== null &&
+          selectionAnchor !== node &&
+          selectionAnchor.contains(node)
+        ) {
+          anchorContainsEditable = true;
+        }
         if (selectionAnchor !== null && node.contains(selectionAnchor)) {
           anchorSegment = segment;
         }
@@ -234,13 +242,27 @@ function getComposedTextEndpoints(
   }
 
   visit(scope);
+  const populatedSegments = Array.from(textBySegment.entries()).filter(
+    ([, texts]) => texts.length > 0,
+  );
   if (selectionAnchor === null) {
     if (segment > 0) return null;
-    const populatedSegments = Array.from(textBySegment.entries()).filter(
-      ([, texts]) => texts.length > 0,
-    );
     if (populatedSegments.length !== 1) return null;
     anchorSegment = populatedSegments[0]![0];
+  } else if (anchorContainsEditable) {
+    anchorSegment =
+      populatedSegments.reduce<{
+        segment: number;
+        textLength: number;
+      } | null>((largest, [candidateSegment, texts]) => {
+        const textLength = texts.reduce(
+          (length, text) => length + text.data.trim().length,
+          0,
+        );
+        return largest === null || textLength > largest.textLength
+          ? { segment: candidateSegment, textLength }
+          : largest;
+      }, null)?.segment ?? null;
   }
   if (anchorSegment === null) return null;
   const selectedText = textBySegment.get(anchorSegment) ?? [];

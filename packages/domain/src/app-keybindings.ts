@@ -113,16 +113,13 @@ export const SELECT_ALL_SHORTCUT_RESERVED_MESSAGE =
   "Command/Ctrl+A is reserved for Select All.";
 
 export function isReservedAppShortcut(shortcut: AppShortcut): boolean {
-  const selectAllModifierCount = [
-    shortcut.mod,
-    shortcut.meta,
-    shortcut.control,
-  ].filter(Boolean).length;
   return (
     shortcut.key.toLowerCase() === "a" &&
+    shortcut.mod &&
+    !shortcut.meta &&
+    !shortcut.control &&
     !shortcut.alt &&
-    !shortcut.shift &&
-    selectAllModifierCount === 1
+    !shortcut.shift
   );
 }
 
@@ -150,11 +147,17 @@ export interface AppShortcutInput {
   shiftKey: boolean;
 }
 
-export function isSelectAllShortcutInput(input: AppShortcutInput): boolean {
+export function isSelectAllShortcutInput(
+  input: AppShortcutInput,
+  useMetaForMod: boolean,
+): boolean {
+  const hasPrimaryModifier = useMetaForMod
+    ? input.metaKey && !input.ctrlKey
+    : input.ctrlKey && !input.metaKey;
   return (
     !input.altKey &&
     !input.shiftKey &&
-    input.metaKey !== input.ctrlKey &&
+    hasPrimaryModifier &&
     (input.key.toLowerCase() === "a" ||
       (input.code === "KeyA" && !/^[a-z]$/iu.test(input.key)))
   );
@@ -196,8 +199,11 @@ function isAsciiAlphanumeric(value: string): boolean {
   return /^[a-z0-9]$/iu.test(value);
 }
 
-export function normalizeAppShortcutInputKey(input: AppShortcutInput): string {
-  if (isSelectAllShortcutInput(input)) {
+export function normalizeAppShortcutInputKey(
+  input: AppShortcutInput,
+  useMetaForMod: boolean,
+): string {
+  if (isSelectAllShortcutInput(input, useMetaForMod)) {
     return "a";
   }
   if (input.key === " " || input.key === "Spacebar") {
@@ -229,7 +235,7 @@ export function matchesAppShortcut(
   const expectedMeta = shortcut.meta || (shortcut.mod && useMetaForMod);
   const expectedControl = shortcut.control || (shortcut.mod && !useMetaForMod);
   return (
-    normalizeAppShortcutInputKey(input).toLowerCase() ===
+    normalizeAppShortcutInputKey(input, useMetaForMod).toLowerCase() ===
       shortcut.key.toLowerCase() &&
     input.metaKey === expectedMeta &&
     input.ctrlKey === expectedControl &&

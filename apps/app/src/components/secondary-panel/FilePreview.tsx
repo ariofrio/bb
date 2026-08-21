@@ -2,6 +2,7 @@ import {
   type CSSProperties,
   useCallback,
   useEffect,
+  useLayoutEffect,
   useMemo,
   useRef,
   useState,
@@ -948,7 +949,10 @@ function MarkdownFilePreview({
     // owns the boundary, so another raised "paper" layer would make nested
     // file viewers feel like cards stacked inside cards.
     <SecondaryPanelSelectionActions onSelectionAddToChat={onSelectionAddToChat}>
-      <div className="flex-auto bg-background px-4 py-4">
+      <div
+        className="flex-auto bg-background px-4 py-4"
+        data-select-all-scope=""
+      >
         <MarkdownPreview
           allowHtml
           content={file.contents}
@@ -973,12 +977,16 @@ function CsvFilePreview({ file, onSelectionAddToChat }: CsvFilePreviewProps) {
   }));
   const tableWidth = `max(100%, ${3 + columns.length * 18}rem)`;
   const truncationNote = getCsvTruncationNote(preview, bodyRows.length);
-  const selectAllCopyText = useMemo(
+  const previewRef = useRef(preview);
+  useLayoutEffect(() => {
+    previewRef.current = preview;
+  }, [preview]);
+  const getSelectAllCopyText = useCallback(
     () =>
-      preview.rows
+      previewRef.current.rows
         .map((row) => row.slice(0, preview.columnCount).join("\t"))
         .join("\n"),
-    [preview],
+    [preview.columnCount],
   );
   const unregisterSelectAllCopyTextRef = useRef<(() => void) | null>(null);
   const setSelectAllScopeRef = useCallback(
@@ -987,9 +995,9 @@ function CsvFilePreview({ file, onSelectionAddToChat }: CsvFilePreviewProps) {
       unregisterSelectAllCopyTextRef.current =
         scope === null
           ? null
-          : registerSelectAllCopyText(scope, () => selectAllCopyText);
+          : registerSelectAllCopyText(scope, getSelectAllCopyText);
     },
-    [selectAllCopyText],
+    [getSelectAllCopyText],
   );
 
   // The parse cap still allows 500 x 100 = 50,000 cells, and a scroll box only

@@ -2,6 +2,8 @@
 
 import { describe, expect, it } from "vitest";
 import {
+  isReservedAppShortcut,
+  isSelectAllShortcutInput,
   matchesAppShortcut,
   type AppCommandContext,
   type AppKeybinding,
@@ -47,6 +49,55 @@ const CONTEXT: AppCommandContext = {
 };
 
 describe("app keybindings", () => {
+  it("recognizes Select All only with the platform primary modifier", () => {
+    const input = {
+      key: "a",
+      code: "KeyA",
+      metaKey: true,
+      ctrlKey: false,
+      altKey: false,
+      shiftKey: false,
+    };
+
+    expect(isSelectAllShortcutInput(input, true)).toBe(true);
+    expect(isSelectAllShortcutInput(input, false)).toBe(false);
+    expect(
+      isSelectAllShortcutInput(
+        { ...input, metaKey: false, ctrlKey: true },
+        false,
+      ),
+    ).toBe(true);
+    expect(
+      isSelectAllShortcutInput(
+        { ...input, metaKey: false, ctrlKey: true },
+        true,
+      ),
+    ).toBe(false);
+    expect(isSelectAllShortcutInput({ ...input, ctrlKey: true }, true)).toBe(
+      false,
+    );
+  });
+
+  it("reserves only the portable primary-modifier Select All shortcut", () => {
+    expect(isReservedAppShortcut({ ...MOD_N, key: "a" })).toBe(true);
+    expect(
+      isReservedAppShortcut({
+        ...MOD_N,
+        key: "a",
+        mod: false,
+        meta: true,
+      }),
+    ).toBe(false);
+    expect(
+      isReservedAppShortcut({
+        ...MOD_N,
+        key: "a",
+        mod: false,
+        control: true,
+      }),
+    ).toBe(false);
+  });
+
   it("maps mod to the platform primary modifier and rejects extras", () => {
     const base = {
       key: "N",

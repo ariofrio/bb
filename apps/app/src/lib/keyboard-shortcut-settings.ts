@@ -32,11 +32,11 @@ export function appShortcutFromInput(
   ) {
     return null;
   }
-  const normalizedKey = normalizeAppShortcutInputKey(input);
+  const useMetaForMod = isMacKeyboardPlatform(platform);
+  const normalizedKey = normalizeAppShortcutInputKey(input, useMetaForMod);
   if (normalizedKey.length === 0 || normalizedKey.length > 32) {
     return null;
   }
-  const useMetaForMod = isMacKeyboardPlatform(platform);
   const mod = useMetaForMod ? input.metaKey : input.ctrlKey;
   return {
     key:

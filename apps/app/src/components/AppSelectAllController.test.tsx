@@ -2,7 +2,7 @@
 
 import { act, cleanup, fireEvent, render } from "@testing-library/react";
 import type { BbDesktopApi } from "@bb/desktop-contract";
-import { afterEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { AppSelectAllController } from "@/components/AppSelectAllController";
 import { registerSelectAllCopyText } from "@/lib/select-all-scope";
 
@@ -85,6 +85,10 @@ function installDesktopSelectAllBridge(): () => boolean {
   } as unknown as BbDesktopApi;
   return () => listener?.() ?? false;
 }
+
+beforeEach(() => {
+  vi.spyOn(window.navigator, "platform", "get").mockReturnValue("MacIntel");
+});
 
 afterEach(() => {
   vi.restoreAllMocks();
@@ -420,6 +424,35 @@ describe("AppSelectAllController", () => {
     fireEvent.pointerDown(fixture.mainMessage);
     dispatchSelectAll(fixture.mainMessage);
     fireEvent.pointerDown(fixture.mainMessage, { button: 2 });
+    await Promise.resolve();
+    fireEvent.focusIn(fixture.mainAction);
+
+    const setData = vi.fn();
+    const copyEvent = new Event("copy", { bubbles: true, cancelable: true });
+    Object.defineProperty(copyEvent, "clipboardData", {
+      value: { setData },
+    });
+    document.dispatchEvent(copyEvent);
+
+    expect(setData).toHaveBeenCalledWith(
+      "text/plain",
+      "AUTHORITATIVE_VIRTUALIZED_TEXT",
+    );
+    expect(copyEvent.defaultPrevented).toBe(true);
+    unregister();
+  });
+
+  it("preserves a scoped copy override through macOS Control-click focus", async () => {
+    render(<AppSelectAllController />);
+    const fixture = createFixture();
+    const unregister = registerSelectAllCopyText(
+      fixture.mainRegion,
+      () => "AUTHORITATIVE_VIRTUALIZED_TEXT",
+    );
+
+    fireEvent.pointerDown(fixture.mainMessage);
+    dispatchSelectAll(fixture.mainMessage);
+    fireEvent.pointerDown(fixture.mainMessage, { button: 0, ctrlKey: true });
     await Promise.resolve();
     fireEvent.focusIn(fixture.mainAction);
 
@@ -1016,6 +1049,42 @@ describe("AppSelectAllController", () => {
     expect(window.getSelection()?.toString()).not.toContain(
       "UNSENT INLINE DRAFT",
     );
+  });
+
+  it("selects the populated reading segment when its ancestor contains an editor", () => {
+    render(<AppSelectAllController />);
+    const scope = document.createElement("section");
+    scope.dataset.selectAllScope = "";
+    scope.innerHTML =
+      '<div data-testid="toolbar"><input aria-label="Filter"/><button>Apply</button></div><p>ROW ONE</p><p>ROW TWO</p>';
+    document.body.append(scope);
+    const toolbar = scope.querySelector<HTMLElement>(
+      '[data-testid="toolbar"]',
+    )!;
+
+    fireEvent.pointerDown(toolbar);
+    dispatchSelectAll(toolbar);
+
+    expect(window.getSelection()?.toString()).toContain("ROW ONE");
+    expect(window.getSelection()?.toString()).toContain("ROW TWO");
+    expect(window.getSelection()?.toString()).not.toContain("Apply");
+  });
+
+  it("prefers the text-rich segment when an ancestor spans an editor", () => {
+    render(<AppSelectAllController />);
+    const scope = document.createElement("section");
+    scope.dataset.selectAllScope = "";
+    scope.innerHTML =
+      '<p>THE LONGER READING SEGMENT</p><input aria-label="Filter"/><p>X</p><p>Y</p>';
+    document.body.append(scope);
+
+    fireEvent.pointerDown(scope);
+    dispatchSelectAll(scope);
+
+    expect(window.getSelection()?.toString()).toContain(
+      "THE LONGER READING SEGMENT",
+    );
+    expect(window.getSelection()?.toString()).not.toContain("XY");
   });
 
   it("excludes CSS-hidden text from scoped Select All endpoints", () => {

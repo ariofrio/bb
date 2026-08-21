@@ -127,6 +127,24 @@ describe("application menu", () => {
     expect(selectAllCommand).toHaveBeenCalledOnce();
   });
 
+  it("selects through the native responder when a macOS panel has focus", () => {
+    vi.mocked(Menu.sendActionToFirstResponder).mockClear();
+    const selectAllCommand = vi.fn();
+    const template = buildApplicationMenuTemplate(
+      menuArgs(() => {}, { selectAll: selectAllCommand }),
+    );
+    const editMenu = template.find((item) => item.label === "Edit");
+    const submenu = editMenu?.submenu as MenuItemConstructorOptions[];
+    const selectAll = submenu.find(
+      (item) => item.accelerator === "CommandOrControl+A",
+    );
+
+    selectAll?.click?.({} as never, null as never, {} as never);
+
+    expect(Menu.sendActionToFirstResponder).toHaveBeenCalledWith("selectAll:");
+    expect(selectAllCommand).not.toHaveBeenCalled();
+  });
+
   it("keeps Electron's localized Select All label on the custom command", () => {
     const template = buildApplicationMenuTemplate(
       menuArgs(() => {}, { selectAllLabel: "Tout sélectionner" }),

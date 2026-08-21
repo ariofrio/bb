@@ -352,7 +352,7 @@ describe("KeyboardSettingsSection", () => {
     fireEvent.keyDown(recorder, {
       key: "ф",
       code: "KeyA",
-      metaKey: true,
+      ctrlKey: true,
     });
 
     expect(

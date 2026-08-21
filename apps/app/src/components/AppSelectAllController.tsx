@@ -1,5 +1,5 @@
 import { useEffect } from "react";
-import { isSelectAllShortcutInput } from "@bb/domain";
+import { isMacKeyboardPlatform, isSelectAllShortcutInput } from "@bb/domain";
 import {
   clearSelectAllHighlight,
   closestEventElement,
@@ -136,7 +136,10 @@ export function AppSelectAllController() {
       );
       if (
         event.defaultPrevented ||
-        !isSelectAllShortcutInput(event) ||
+        !isSelectAllShortcutInput(
+          event,
+          isMacKeyboardPlatform(window.navigator.platform),
+        ) ||
         isEditableTarget(target)
       ) {
         return;
@@ -151,12 +154,16 @@ export function AppSelectAllController() {
     let preserveCopyOverrideTimer: number | null = null;
 
     function updateActiveScope(event: Event) {
-      const isSecondaryPointerDown =
+      const isContextMenuPointerDown =
         event.type === "pointerdown" &&
         "button" in event &&
         typeof event.button === "number" &&
-        event.button === 2;
-      if (isSecondaryPointerDown) {
+        (event.button === 2 ||
+          (event.button === 0 &&
+            "ctrlKey" in event &&
+            event.ctrlKey === true &&
+            isMacKeyboardPlatform(window.navigator.platform)));
+      if (isContextMenuPointerDown) {
         preserveCopyOverrideThroughFocus = true;
         if (preserveCopyOverrideTimer !== null) {
           window.clearTimeout(preserveCopyOverrideTimer);

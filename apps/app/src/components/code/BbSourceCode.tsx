@@ -385,16 +385,20 @@ function BbSourceCode({
       contents: truncation.contents,
     };
   }, [file, fileCacheKey, showsFullFile, truncation]);
-  const setSelectAllScopeRef = useCallback(
-    (scope: HTMLDivElement | null) => {
-      unregisterSelectAllCopyTextRef.current?.();
-      unregisterSelectAllCopyTextRef.current =
-        scope === null
-          ? null
-          : registerSelectAllCopyText(scope, () => renderedFile.contents);
-    },
-    [renderedFile.contents],
-  );
+  const renderedFileContentsRef = useRef(renderedFile.contents);
+  useLayoutEffect(() => {
+    renderedFileContentsRef.current = renderedFile.contents;
+  }, [renderedFile.contents]);
+  const setSelectAllScopeRef = useCallback((scope: HTMLDivElement | null) => {
+    unregisterSelectAllCopyTextRef.current?.();
+    unregisterSelectAllCopyTextRef.current =
+      scope === null
+        ? null
+        : registerSelectAllCopyText(
+            scope,
+            () => renderedFileContentsRef.current,
+          );
+  }, []);
   // Pierre's virtualized file instance keeps the contents it was hydrated
   // with (`VirtualizedFile.render` ignores a later `file`), so a content swap
   // — the capped prefix giving way to the full file, or a refetch — needs a
