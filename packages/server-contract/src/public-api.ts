@@ -17,7 +17,7 @@ import type {
 } from "@bb/domain";
 import {
   appSettingsSchema,
-  appKeybindingOverridesSchema,
+  assignableAppKeybindingOverridesSchema,
   appThemeSelectionSchema,
   experimentsSchema,
 } from "@bb/domain";
@@ -1338,7 +1338,7 @@ export const publicApiRoutes = {
       path: "/settings/keyboard",
       method: "put",
       request: jsonRequest<EmptyInput, AppKeybindingOverrides>(
-        appKeybindingOverridesSchema,
+        assignableAppKeybindingOverridesSchema,
       ),
       response: jsonResponse<AppKeybindingOverrides>(),
     }),

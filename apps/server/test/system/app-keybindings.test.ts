@@ -652,6 +652,37 @@ describe("app keybindings", () => {
     });
   });
 
+  it("rejects Select All overrides instead of persisting an ignored value", async () => {
+    await withTestHarness(async (harness) => {
+      const response = await harness.app.request("/api/v1/settings/keyboard", {
+        method: "PUT",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify([
+          {
+            command: "thread.new",
+            shortcut: {
+              key: "a",
+              mod: true,
+              meta: false,
+              control: false,
+              alt: false,
+              shift: false,
+            },
+          },
+        ]),
+      });
+
+      expect(response.status).toBe(400);
+      await expect(readJson(response)).resolves.toMatchObject({
+        code: "invalid_request",
+        message: expect.stringContaining(
+          "Command/Ctrl+A is reserved for Select All.",
+        ),
+      });
+      expect(getAppKeybindingOverrides(harness.db)).toEqual([]);
+    });
+  });
+
   it("falls back to defaults when stored overrides are corrupt", async () => {
     await withTestHarness(async (harness) => {
       harness.db.$client

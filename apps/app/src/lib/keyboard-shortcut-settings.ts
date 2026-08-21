@@ -1,6 +1,7 @@
 import {
   APP_COMMAND_IDS,
   QUESTION_SELECT_APP_COMMAND_IDS,
+  SELECT_ALL_SHORTCUT_RESERVED_MESSAGE,
   isAppKeybindingAvailableForClient,
   isMacKeyboardPlatform,
   isReservedAppShortcut,
@@ -71,7 +72,7 @@ export function getAppShortcutAssignmentError(
   shortcut: AppShortcut,
 ): string | null {
   if (isReservedAppShortcut(shortcut)) {
-    return "Command/Ctrl+A is reserved for Select All.";
+    return SELECT_ALL_SHORTCUT_RESERVED_MESSAGE;
   }
   return shortcut.mod ||
     shortcut.meta ||

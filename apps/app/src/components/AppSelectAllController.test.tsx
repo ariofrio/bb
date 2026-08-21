@@ -156,6 +156,35 @@ describe("AppSelectAllController", () => {
     );
   });
 
+  it("uses the scope opened directly through its context menu", () => {
+    const requestSelectAll = installDesktopSelectAllBridge();
+    render(<AppSelectAllController />);
+    const fixture = createFixture();
+
+    fireEvent.pointerDown(fixture.sideMessage, { button: 2 });
+    act(requestSelectAll);
+
+    expect(window.getSelection()?.toString()).toContain("Side chat message");
+    expect(window.getSelection()?.toString()).not.toContain(
+      "Main timeline message",
+    );
+  });
+
+  it("moves context-menu Select All to the newly opened scope", () => {
+    const requestSelectAll = installDesktopSelectAllBridge();
+    render(<AppSelectAllController />);
+    const fixture = createFixture();
+
+    fireEvent.pointerDown(fixture.mainMessage);
+    fireEvent.pointerDown(fixture.sideMessage, { button: 2 });
+    act(requestSelectAll);
+
+    expect(window.getSelection()?.toString()).toContain("Side chat message");
+    expect(window.getSelection()?.toString()).not.toContain(
+      "Main timeline message",
+    );
+  });
+
   it("leaves desktop Select All to Electron when an iframe owns focus", () => {
     const requestSelectAll = installDesktopSelectAllBridge();
     render(<AppSelectAllController />);
@@ -857,6 +886,40 @@ describe("AppSelectAllController", () => {
     dispatchSelectAll(fixture.mainRegion);
 
     expect(setBaseAndExtent).not.toHaveBeenCalled();
+  });
+
+  it("does not arm authoritative copy text for a whitespace-only segment", () => {
+    render(<AppSelectAllController />);
+    const scope = document.createElement("section");
+    scope.dataset.selectAllScope = "";
+    scope.innerHTML =
+      '<p>Reading content</p><div contenteditable="true">Draft</div><div data-testid="padding"> \n </div>';
+    document.body.append(scope);
+    const padding = scope.querySelector<HTMLElement>(
+      '[data-testid="padding"]',
+    )!;
+    const unregister = registerSelectAllCopyText(
+      scope,
+      () => "AUTHORITATIVE_TEXT_FROM_ANOTHER_SEGMENT",
+    );
+    const setBaseAndExtent = vi.spyOn(
+      window.getSelection()!,
+      "setBaseAndExtent",
+    );
+
+    fireEvent.pointerDown(padding);
+    dispatchSelectAll(padding);
+    const setData = vi.fn();
+    const copyEvent = new Event("copy", { bubbles: true, cancelable: true });
+    Object.defineProperty(copyEvent, "clipboardData", {
+      value: { setData },
+    });
+    document.dispatchEvent(copyEvent);
+
+    expect(setBaseAndExtent).not.toHaveBeenCalled();
+    expect(setData).not.toHaveBeenCalled();
+    expect(copyEvent.defaultPrevented).toBe(false);
+    unregister();
   });
 
   it("excludes an inline editor between reading-content endpoints", () => {

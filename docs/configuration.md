@@ -235,6 +235,10 @@ are not editable. Actions supported by both clients use the same resolved
 bindings in the browser and desktop app; browsers may still reserve some chords
 before bb receives them.
 
+`Mod+A` is reserved for platform Select All and cannot be assigned to an app
+command through Settings, the CLI, or the API. If an older database already
+contains that override, bb ignores it and keeps the command's current default.
+
 `Mod` means Command on macOS and Control on Windows/Linux. Numbered thread and
 pane shortcuts follow Slack's browser-safe convention: web uses
 `Control+1…9` on macOS and `Ctrl+Shift+1…9` on Windows/Linux, while desktop

@@ -5,6 +5,8 @@ import {
   appSettingsSchema,
   experimentKeySchema,
   experimentsSchema,
+  isReservedAppShortcut,
+  SELECT_ALL_SHORTCUT_RESERVED_MESSAGE,
   type AppSettings,
   type AppShortcut,
   type Experiments,
@@ -214,6 +216,14 @@ export function registerSettingsCommands(
       action(
         async (commandInput: string, shortcut: string, opts: JsonOptions) => {
           const command = appCommandIdSchema.parse(commandInput);
+          const parsedShortcut =
+            shortcut === "disabled" ? null : parseShortcut(shortcut);
+          if (
+            parsedShortcut !== null &&
+            isReservedAppShortcut(parsedShortcut)
+          ) {
+            throw new Error(SELECT_ALL_SHORTCUT_RESERVED_MESSAGE);
+          }
           const sdk = createCliBbSdk(getUrl());
           const config = await sdk.system.config();
           const next = config.keybindingOverrides.filter(
@@ -221,7 +231,7 @@ export function registerSettingsCommands(
           );
           next.push({
             command,
-            shortcut: shortcut === "disabled" ? null : parseShortcut(shortcut),
+            shortcut: parsedShortcut,
           });
           const result = await sdk.system.updateKeyboardSettings(next);
           if (outputJson(opts, result)) return;

@@ -1,4 +1,5 @@
 import { useEffect } from "react";
+import { isSelectAllShortcutInput } from "@bb/domain";
 import {
   clearSelectAllHighlight,
   closestEventElement,
@@ -27,13 +28,6 @@ function selectEditorContents(editor: Element): void {
     return;
   }
   document.execCommand("selectAll");
-}
-
-function isSelectAllKey(event: KeyboardEvent): boolean {
-  return (
-    event.key.toLowerCase() === "a" ||
-    (event.code === "KeyA" && !/^[a-z]$/i.test(event.key))
-  );
 }
 
 export function AppSelectAllController() {
@@ -140,10 +134,7 @@ export function AppSelectAllController() {
       );
       if (
         event.defaultPrevented ||
-        event.altKey ||
-        event.shiftKey ||
-        !(event.metaKey || event.ctrlKey) ||
-        !isSelectAllKey(event) ||
+        !isSelectAllShortcutInput(event) ||
         isEditableTarget(target)
       ) {
         return;
@@ -157,24 +148,23 @@ export function AppSelectAllController() {
     let preserveCopyOverrideThroughFocus = false;
 
     function updateActiveScope(event: Event) {
-      if (
+      const isSecondaryPointerDown =
         event.type === "pointerdown" &&
         "button" in event &&
         typeof event.button === "number" &&
-        event.button !== 0
-      ) {
+        event.button !== 0;
+      if (isSecondaryPointerDown) {
         preserveCopyOverrideThroughFocus = true;
         queueMicrotask(() => {
           preserveCopyOverrideThroughFocus = false;
         });
+      } else if (event.type === "focusin" && preserveCopyOverrideThroughFocus) {
         return;
+      } else {
+        preserveCopyOverrideThroughFocus = false;
+        copyOverride = null;
+        clearSelectAllHighlight();
       }
-      if (event.type === "focusin" && preserveCopyOverrideThroughFocus) {
-        return;
-      }
-      preserveCopyOverrideThroughFocus = false;
-      copyOverride = null;
-      clearSelectAllHighlight();
       const target = closestEventElement(
         event.composedPath()[0] ?? event.target,
       );

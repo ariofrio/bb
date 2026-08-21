@@ -151,6 +151,25 @@ describe("keyboard shortcut settings", () => {
     ).toEqual(defaults[0]!.shortcut);
   });
 
+  it("reserves the physical Select All key on a non-Latin layout", () => {
+    const recorded = appShortcutFromInput(
+      {
+        key: "ф",
+        code: "KeyA",
+        metaKey: true,
+        ctrlKey: false,
+        altKey: false,
+        shiftKey: false,
+      },
+      "MacIntel",
+    );
+
+    expect(recorded).toMatchObject({ key: "a", mod: true });
+    expect(recorded && canAssignAppShortcut("thread.new", recorded)).toBe(
+      false,
+    );
+  });
+
   it("stores disable overrides and removes redundant default overrides", () => {
     const disabled = setCommandShortcutOverride(
       defaults,

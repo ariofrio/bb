@@ -140,6 +140,7 @@ Bindings for non-native actions apply in browser and desktop clients. Command
 contexts and native-only availability remain server-owned, and desktop menu
 accelerators for New Thread, New Window, New Tab, Close, and Settings use the
 same resolved bindings. The complete default table is in docs/configuration.md.
+`Mod+A` is reserved for platform Select All; attempts to assign it are rejected.
 
   bb settings keyboard list
   bb settings keyboard hints <true|false>

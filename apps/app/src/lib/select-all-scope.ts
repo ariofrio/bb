@@ -198,7 +198,7 @@ function getComposedTextEndpoints(
     }
     if (node instanceof Text) {
       if (
-        node.data.length === 0 ||
+        node.data.trim().length === 0 ||
         node.getRootNode() !== selectionRoot ||
         !isRenderedTextNode(node, visibilityByParent)
       )

@@ -109,6 +109,9 @@ export const appShortcutSchema = z
   .strict();
 export type AppShortcut = z.infer<typeof appShortcutSchema>;
 
+export const SELECT_ALL_SHORTCUT_RESERVED_MESSAGE =
+  "Command/Ctrl+A is reserved for Select All.";
+
 export function isReservedAppShortcut(shortcut: AppShortcut): boolean {
   return (
     shortcut.key.toLowerCase() === "a" &&
@@ -126,6 +129,16 @@ export interface AppShortcutInput {
   key: string;
   metaKey: boolean;
   shiftKey: boolean;
+}
+
+export function isSelectAllShortcutInput(input: AppShortcutInput): boolean {
+  return (
+    !input.altKey &&
+    !input.shiftKey &&
+    (input.metaKey || input.ctrlKey) &&
+    (input.key.toLowerCase() === "a" ||
+      (input.code === "KeyA" && !/^[a-z]$/iu.test(input.key)))
+  );
 }
 
 const SHIFTED_KEY_BASES: Readonly<Record<string, string>> = {
@@ -165,6 +178,9 @@ function isAsciiAlphanumeric(value: string): boolean {
 }
 
 export function normalizeAppShortcutInputKey(input: AppShortcutInput): string {
+  if (isSelectAllShortcutInput(input)) {
+    return "a";
+  }
   if (input.key === " " || input.key === "Spacebar") {
     return "Space";
   }
@@ -274,6 +290,22 @@ export const appKeybindingOverridesSchema = z
 export type AppKeybindingOverrides = z.infer<
   typeof appKeybindingOverridesSchema
 >;
+
+export const assignableAppKeybindingOverridesSchema =
+  appKeybindingOverridesSchema.superRefine((overrides, context) => {
+    for (const [index, override] of overrides.entries()) {
+      if (
+        override.shortcut !== null &&
+        isReservedAppShortcut(override.shortcut)
+      ) {
+        context.addIssue({
+          code: "custom",
+          message: SELECT_ALL_SHORTCUT_RESERVED_MESSAGE,
+          path: [index, "shortcut"],
+        });
+      }
+    }
+  });
 
 export function applyAppKeybindingOverrides(
   defaults: AppDefaultKeybindings,

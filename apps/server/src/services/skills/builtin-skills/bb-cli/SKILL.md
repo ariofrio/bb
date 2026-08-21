@@ -103,7 +103,8 @@ message agents, or inspect projects, providers, and environments.
   `bb settings keyboard hints <true|false>`.
   Reset returns to bb's current default; Clear disables the command. Non-native
   actions apply in browser and desktop clients, and desktop menu accelerators
-  use the same resolved bindings. For details, read
+  use the same resolved bindings. `Mod+A` is reserved for platform Select All
+  and cannot be assigned to an app command. For details, read
   `references/app-settings.md`.
 - Use `bb settings show`, `bb settings general`, `bb settings experiment`,
   `bb settings keyboard`, `bb settings usage`, and `bb settings version` to
