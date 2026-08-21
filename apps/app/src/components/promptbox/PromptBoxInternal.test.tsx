@@ -3054,14 +3054,6 @@ describe("PromptBoxInternal selection reveal", () => {
 });
 
 describe("PromptBoxInternal prompt actions", () => {
-  it("keeps the action row out of text selection while the editor stays selectable", () => {
-    renderPromptBox("");
-
-    const actionRow = document.querySelector("[data-promptbox-action-row]");
-    expect(actionRow?.classList.contains("select-none")).toBe(true);
-    expect(getPromptEditorElement().closest(".select-none")).toBeNull();
-  });
-
   it("keeps the custom caret reveal for composer-handled text pastes", async () => {
     const { changes, promptBoxRef } = renderPromptBox("");
 

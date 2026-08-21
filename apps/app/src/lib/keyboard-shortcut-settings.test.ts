@@ -7,7 +7,7 @@ import {
 import { getAppCommandMetadata } from "./app-command-metadata";
 import {
   appShortcutFromInput,
-  canAssignAppShortcut,
+  getAppShortcutAssignmentError,
   getCommandShortcut,
   resetCommandShortcutOverride,
   setCommandShortcutOverride,
@@ -116,11 +116,15 @@ describe("keyboard shortcut settings", () => {
       alt: false,
       shift: false,
     };
-    expect(canAssignAppShortcut("thread.new", plainKey)).toBe(false);
-    expect(canAssignAppShortcut("question.select.1", plainKey)).toBe(true);
-    expect(canAssignAppShortcut("thread.new", { ...plainKey, key: "F2" })).toBe(
-      true,
-    );
+    expect(
+      getAppShortcutAssignmentError("thread.new", plainKey),
+    ).not.toBeNull();
+    expect(
+      getAppShortcutAssignmentError("question.select.1", plainKey),
+    ).toBeNull();
+    expect(
+      getAppShortcutAssignmentError("thread.new", { ...plainKey, key: "F2" }),
+    ).toBeNull();
   });
 
   it("reserves the unshifted Select All chord for platform selection", () => {
@@ -133,13 +137,18 @@ describe("keyboard shortcut settings", () => {
       shift: false,
     };
 
-    expect(canAssignAppShortcut("thread.new", selectAll)).toBe(false);
+    expect(getAppShortcutAssignmentError("thread.new", selectAll)).toBe(
+      "Command/Ctrl+A is reserved for Select All.",
+    );
     expect(
-      canAssignAppShortcut("thread.new", { ...selectAll, shift: true }),
-    ).toBe(true);
+      getAppShortcutAssignmentError("thread.new", {
+        ...selectAll,
+        shift: true,
+      }),
+    ).toBeNull();
     expect(
-      canAssignAppShortcut("thread.new", { ...selectAll, alt: true }),
-    ).toBe(true);
+      getAppShortcutAssignmentError("thread.new", { ...selectAll, alt: true }),
+    ).toBeNull();
     expect(
       getCommandShortcut(
         defaults,
@@ -165,9 +174,9 @@ describe("keyboard shortcut settings", () => {
     );
 
     expect(recorded).toMatchObject({ key: "a", mod: true });
-    expect(recorded && canAssignAppShortcut("thread.new", recorded)).toBe(
-      false,
-    );
+    expect(
+      recorded && getAppShortcutAssignmentError("thread.new", recorded),
+    ).toBe("Command/Ctrl+A is reserved for Select All.");
   });
 
   it("stores disable overrides and removes redundant default overrides", () => {

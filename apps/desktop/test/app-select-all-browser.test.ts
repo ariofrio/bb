@@ -17,6 +17,7 @@ const TIMEOUT_MS = 15_000;
 interface BrowserSelectionResults {
   chrome: string;
   editorPrevented: boolean;
+  iframePrevented: boolean;
   main: string;
   mainPrevented: boolean;
   shadow: string;
@@ -150,6 +151,7 @@ app.on("window-all-closed", () => app.quit());
 </main>
 <section class="select-text" data-select-all-scope><p>SIDE CONTENT</p></section>
 <textarea id="editor">EDITOR DRAFT</textarea>
+<iframe id="preview" srcdoc="<p id='preview-text'>HTML PREVIEW</p>"></iframe>
 <section id="shadow-scope" class="select-text" data-select-all-scope>
   <div id="shadow-host"></div>
 </section>
@@ -218,6 +220,7 @@ app.on("window-all-closed", () => app.quit());
     expect(results).toEqual({
       chrome: "",
       editorPrevented: false,
+      iframePrevented: false,
       main: "MAIN FIRST\n\nMAIN LAST",
       mainPrevented: true,
       shadow: "SHADOW FIRSTSHADOW LAST",

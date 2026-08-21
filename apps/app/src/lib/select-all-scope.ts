@@ -184,21 +184,19 @@ function isRenderedTextNode(
 function getComposedTextEndpoints(
   scope: HTMLElement,
   selectionRoot: Document | ShadowRoot,
-  selectionAnchor: Element,
+  selectionAnchor: Element | null,
 ): {
   first: Text;
   last: Text;
   texts: Text[];
 } | null {
-  let first: Text | null = null;
-  let last: Text | null = null;
   let segment = 0;
   let anchorSegment: number | null = null;
   const textBySegment = new Map<number, Text[]>();
   const visibilityByParent = new WeakMap<Element, boolean>();
 
   function visit(node: Node) {
-    if (node === selectionAnchor) {
+    if (selectionAnchor !== null && node === selectionAnchor) {
       anchorSegment = segment;
     }
     if (node instanceof Text) {
@@ -215,14 +213,14 @@ function getComposedTextEndpoints(
     }
     if (node !== scope && node instanceof Element) {
       if (isEditableSelectionSubtree(node)) {
-        if (node.contains(selectionAnchor)) {
+        if (selectionAnchor !== null && node.contains(selectionAnchor)) {
           anchorSegment = segment;
         }
         segment += 1;
         return;
       }
       if (isSkippedSelectionSubtree(node)) {
-        if (node.contains(selectionAnchor)) {
+        if (selectionAnchor !== null && node.contains(selectionAnchor)) {
           anchorSegment = segment;
         }
         return;
@@ -232,13 +230,105 @@ function getComposedTextEndpoints(
   }
 
   visit(scope);
+  if (selectionAnchor === null) {
+    if (segment > 0) return null;
+    const populatedSegments = Array.from(textBySegment.entries()).filter(
+      ([, texts]) => texts.length > 0,
+    );
+    if (populatedSegments.length !== 1) return null;
+    anchorSegment = populatedSegments[0]![0];
+  }
   if (anchorSegment === null) return null;
   const selectedText = textBySegment.get(anchorSegment) ?? [];
-  first = selectedText[0] ?? null;
-  last = selectedText.at(-1) ?? null;
+  const first = selectedText[0] ?? null;
+  const last = selectedText.at(-1) ?? null;
   return first === null || last === null
     ? null
     : { first, last, texts: selectedText };
+}
+
+const FALLBACK_TEXT_BLOCK_SELECTOR = [
+  "address",
+  "article",
+  "aside",
+  "blockquote",
+  "dd",
+  "div",
+  "dl",
+  "dt",
+  "fieldset",
+  "figcaption",
+  "figure",
+  "footer",
+  "form",
+  "h1",
+  "h2",
+  "h3",
+  "h4",
+  "h5",
+  "h6",
+  "header",
+  "li",
+  "main",
+  "nav",
+  "ol",
+  "p",
+  "pre",
+  "section",
+  "table",
+  "tbody",
+  "td",
+  "tfoot",
+  "th",
+  "thead",
+  "tr",
+  "ul",
+].join(", ");
+
+function serializeFallbackText(texts: readonly Text[]): string {
+  const blockByElement = new WeakMap<Element, Element | null>();
+
+  function findBlock(element: Element | null): Element | null {
+    if (element === null) return null;
+    const cached = blockByElement.get(element);
+    if (cached !== undefined) return cached;
+    const display =
+      element.ownerDocument.defaultView?.getComputedStyle(element).display ??
+      "";
+    const isInline =
+      display === "contents" ||
+      display.startsWith("inline") ||
+      display.startsWith("ruby");
+    const block =
+      display !== "" && !isInline
+        ? element
+        : display === "" && element.matches(FALLBACK_TEXT_BLOCK_SELECTOR)
+          ? element
+          : findBlock(element.parentElement);
+    blockByElement.set(element, block);
+    return block;
+  }
+
+  let previousBlock: Element | null = null;
+  let previousText: Text | null = null;
+  let serialized = "";
+  for (const text of texts) {
+    const block = findBlock(text.parentElement);
+    let hasLineBreak = false;
+    if (previousText !== null && block === previousBlock) {
+      const between = text.ownerDocument.createRange();
+      between.setStart(previousText, previousText.data.length);
+      between.setEnd(text, 0);
+      hasLineBreak = between.cloneContents().querySelector("br") !== null;
+    }
+    if (serialized.length > 0 && (block !== previousBlock || hasLineBreak)) {
+      serialized += "\n";
+    }
+    serialized += text.data;
+    previousBlock = block;
+    previousText = text;
+  }
+  return serialized;
 }
 
 export function resolveSelectAllRoot(
@@ -283,7 +373,7 @@ export function resolveSelectAllRoot(
 export function selectAllScopeContents(
   scope: HTMLElement,
   selectionRoot: Document | ShadowRoot,
-  selectionAnchor: Element,
+  selectionAnchor: Element | null,
 ): {
   kind: "native" | "logical";
   fallbackCopyText: string | null;
@@ -324,7 +414,7 @@ export function selectAllScopeContents(
     }
     return {
       kind: "logical",
-      fallbackCopyText: endpoints.texts.map((text) => text.data).join("\n"),
+      fallbackCopyText: serializeFallbackText(endpoints.texts),
     };
   }
   return null;

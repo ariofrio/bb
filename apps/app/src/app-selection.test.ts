@@ -19,6 +19,9 @@ describe("app text selection policy", () => {
     expect(compactCss).toContain(
       'body.bb-app-shell :where(input, textarea, [contenteditable]:not([contenteditable="false"])) { user-select: text !important; }',
     );
+    expect(compactCss).not.toContain(
+      '.select-none :where(input, textarea, [contenteditable]:not([contenteditable="false"]))',
+    );
   });
 
   it("keeps explicit content selectable without pointer-time style changes", () => {

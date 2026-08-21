@@ -28,7 +28,7 @@ import {
   useRequirePierreWorkerPool,
 } from "@/lib/pierre-worker-pool-gate";
 import { usePierreStrictModeRecoveryOptions } from "@/lib/pierre-strict-mode-recovery";
-import { applyPierreSelectionPolicy } from "@/lib/pierre-selection-policy";
+import { PIERRE_SELECTION_POLICY_CSS } from "@/lib/pierre-selection-policy";
 import { registerSelectAllCopyText } from "@/lib/select-all-scope";
 import { cn } from "@bb/shared-ui/lib/utils";
 import {
@@ -327,7 +327,7 @@ function BbSourceCode({
       themeType: preferredTheme,
       theme: codeTheme,
       overflow,
-      unsafeCSS: applyPierreSelectionPolicy(),
+      unsafeCSS: PIERRE_SELECTION_POLICY_CSS,
       disableFileHeader: true,
       enableGutterUtility: onSelectionAddToChat !== undefined,
       enableLineSelection:
@@ -618,7 +618,7 @@ function SourceCodeTruncationNotice({
 }) {
   return (
     <div
-      className="select-text flex flex-wrap items-center gap-x-2 gap-y-1 px-4 py-3 text-xs text-muted-foreground"
+      className="flex shrink-0 select-text flex-wrap items-center gap-x-2 gap-y-1 px-4 py-3 text-xs text-muted-foreground"
       data-select-all-scope=""
     >
       <span>

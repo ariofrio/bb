@@ -88,8 +88,7 @@ export function AppSelectAllController() {
         activeScope !== null &&
         activeScope.isConnected &&
         activePreferredRoot !== null &&
-        activeSelectionAnchor !== null &&
-        activeSelectionAnchor.isConnected
+        activeSelectionAnchor !== null
       ) {
         const selectionRoot = resolveSelectAllRoot(
           activeScope,
@@ -98,7 +97,7 @@ export function AppSelectAllController() {
         const selectedScope = selectAllScopeContents(
           activeScope,
           selectionRoot,
-          activeSelectionAnchor,
+          activeSelectionAnchor.isConnected ? activeSelectionAnchor : null,
         );
         const registeredCopyText = getSelectAllCopyText(activeScope);
         captureCopyOverride(
@@ -146,6 +145,7 @@ export function AppSelectAllController() {
     }
 
     let preserveCopyOverrideThroughFocus = false;
+    let preserveCopyOverrideTimer: number | null = null;
 
     function updateActiveScope(event: Event) {
       const isSecondaryPointerDown =
@@ -155,13 +155,26 @@ export function AppSelectAllController() {
         event.button === 2;
       if (isSecondaryPointerDown) {
         preserveCopyOverrideThroughFocus = true;
-        queueMicrotask(() => {
+        if (preserveCopyOverrideTimer !== null) {
+          window.clearTimeout(preserveCopyOverrideTimer);
+        }
+        preserveCopyOverrideTimer = window.setTimeout(() => {
           preserveCopyOverrideThroughFocus = false;
-        });
+          preserveCopyOverrideTimer = null;
+        }, 0);
       } else if (event.type === "focusin" && preserveCopyOverrideThroughFocus) {
+        preserveCopyOverrideThroughFocus = false;
+        if (preserveCopyOverrideTimer !== null) {
+          window.clearTimeout(preserveCopyOverrideTimer);
+          preserveCopyOverrideTimer = null;
+        }
         return;
       } else {
         preserveCopyOverrideThroughFocus = false;
+        if (preserveCopyOverrideTimer !== null) {
+          window.clearTimeout(preserveCopyOverrideTimer);
+          preserveCopyOverrideTimer = null;
+        }
         copyOverride = null;
         clearSelectAllHighlight();
       }
@@ -201,6 +214,9 @@ export function AppSelectAllController() {
       window.removeEventListener("keydown", handleSelectAll, true);
       document.removeEventListener("copy", handleCopy, true);
       unsubscribeDesktopSelectAll?.();
+      if (preserveCopyOverrideTimer !== null) {
+        window.clearTimeout(preserveCopyOverrideTimer);
+      }
       clearSelectAllHighlight();
     };
   }, []);

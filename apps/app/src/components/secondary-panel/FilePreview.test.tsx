@@ -575,6 +575,7 @@ describe("FilePreview", () => {
     expect(fileScope).not.toBeNull();
     expect(fileScope).toBe(viewport);
     expect(truncationScope).not.toBeNull();
+    expect(truncationScope?.classList.contains("shrink-0")).toBe(true);
     expect(fileScope).not.toBe(truncationScope);
 
     fireEvent.click(screen.getByRole("button", { name: "Load full file" }));

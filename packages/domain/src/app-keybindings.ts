@@ -121,6 +121,20 @@ export function isReservedAppShortcut(shortcut: AppShortcut): boolean {
   );
 }
 
+export function areAppShortcutsEqual(
+  left: AppShortcut,
+  right: AppShortcut,
+): boolean {
+  return (
+    left.key.toLowerCase() === right.key.toLowerCase() &&
+    left.mod === right.mod &&
+    left.meta === right.meta &&
+    left.control === right.control &&
+    left.alt === right.alt &&
+    left.shift === right.shift
+  );
+}
+
 export interface AppShortcutInput {
   altKey: boolean;
   /** The physical key (`KeyboardEvent.code`), layout- and modifier-independent. */
@@ -291,21 +305,14 @@ export type AppKeybindingOverrides = z.infer<
   typeof appKeybindingOverridesSchema
 >;
 
-export const assignableAppKeybindingOverridesSchema =
-  appKeybindingOverridesSchema.superRefine((overrides, context) => {
-    for (const [index, override] of overrides.entries()) {
-      if (
-        override.shortcut !== null &&
-        isReservedAppShortcut(override.shortcut)
-      ) {
-        context.addIssue({
-          code: "custom",
-          message: SELECT_ALL_SHORTCUT_RESERVED_MESSAGE,
-          path: [index, "shortcut"],
-        });
-      }
-    }
-  });
+export function filterReservedAppKeybindingOverrides(
+  overrides: AppKeybindingOverrides,
+): AppKeybindingOverrides {
+  return overrides.filter(
+    (override) =>
+      override.shortcut === null || !isReservedAppShortcut(override.shortcut),
+  );
+}
 
 export function applyAppKeybindingOverrides(
   defaults: AppDefaultKeybindings,

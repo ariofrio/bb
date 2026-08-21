@@ -14,7 +14,3 @@ ${SELECT_ALL_SHADOW_POLICY_CSS}
   user-select: none;
 }
 `;
-
-export function applyPierreSelectionPolicy(): string {
-  return PIERRE_SELECTION_POLICY_CSS;
-}

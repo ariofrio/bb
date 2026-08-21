@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { getAppKeybindingOverrides } from "@bb/db";
+import { getAppKeybindingOverrides, setAppKeybindingOverrides } from "@bb/db";
 import {
   PANE_FOCUS_APP_COMMAND_IDS,
   THREAD_JUMP_APP_COMMAND_IDS,
@@ -680,6 +680,52 @@ describe("app keybindings", () => {
         ),
       });
       expect(getAppKeybindingOverrides(harness.db)).toEqual([]);
+    });
+  });
+
+  it("filters a legacy Select All override from config and unrelated updates", async () => {
+    await withTestHarness(async (harness) => {
+      const legacySelectAll = {
+        command: "thread.new" as const,
+        shortcut: {
+          key: "a",
+          mod: true,
+          meta: false,
+          control: false,
+          alt: false,
+          shift: false,
+        },
+      };
+      const validOverride = {
+        command: "thread.rename" as const,
+        shortcut: {
+          key: "r",
+          mod: true,
+          meta: false,
+          control: false,
+          alt: false,
+          shift: false,
+        },
+      };
+      setAppKeybindingOverrides(harness.db, [legacySelectAll]);
+
+      const configResponse = await harness.app.request("/api/v1/system/config");
+      const config = systemConfigResponseSchema.parse(
+        await readJson(configResponse),
+      );
+      expect(config.keybindingOverrides).toEqual([]);
+
+      const updateResponse = await harness.app.request(
+        "/api/v1/settings/keyboard",
+        {
+          method: "PUT",
+          headers: { "content-type": "application/json" },
+          body: JSON.stringify([legacySelectAll, validOverride]),
+        },
+      );
+      expect(updateResponse.status).toBe(200);
+      expect(await readJson(updateResponse)).toEqual([validOverride]);
+      expect(getAppKeybindingOverrides(harness.db)).toEqual([validOverride]);
     });
   });
 

@@ -497,6 +497,8 @@ The canonical release summary.
     const changelogPreview = changelog?.querySelector(
       "[data-changelog-preview]",
     );
+    expect(changelogPreview?.classList.contains("select-text")).toBe(true);
+    expect(changelogPreview?.hasAttribute("data-select-all-scope")).toBe(true);
     expect(changelogPreview?.className).toContain("p-4");
     expect(changelogPreview?.className).not.toContain("grid");
     expect(

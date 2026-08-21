@@ -409,7 +409,7 @@ describe("AppSelectAllController", () => {
     unregister();
   });
 
-  it("preserves a scoped copy override while opening its context menu", () => {
+  it("preserves a scoped copy override through context-menu focus", async () => {
     render(<AppSelectAllController />);
     const fixture = createFixture();
     const unregister = registerSelectAllCopyText(
@@ -420,6 +420,8 @@ describe("AppSelectAllController", () => {
     fireEvent.pointerDown(fixture.mainMessage);
     dispatchSelectAll(fixture.mainMessage);
     fireEvent.pointerDown(fixture.mainMessage, { button: 2 });
+    await Promise.resolve();
+    fireEvent.focusIn(fixture.mainAction);
 
     const setData = vi.fn();
     const copyEvent = new Event("copy", { bubbles: true, cancelable: true });
@@ -619,10 +621,10 @@ describe("AppSelectAllController", () => {
     scope.dataset.selectAllScope = "";
     const shadowHost = document.createElement("div");
     shadowHost.attachShadow({ mode: "open" }).innerHTML =
-      "<code>shadow-root file contents</code><button>Shadow action</button><code>shadow tail</code>";
+      "<p>Hello <strong>formatted</strong> world<br>next line</p><button>Shadow action</button><p>Second block</p>";
     scope.append(shadowHost);
     fixture.mainRegion.append(scope);
-    const shadowCode = shadowHost.shadowRoot!.querySelector("code")!;
+    const shadowCode = shadowHost.shadowRoot!.querySelector("p")!;
     const selection = window.getSelection()!;
     vi.spyOn(selection, "setBaseAndExtent").mockImplementation(() => {
       selection.removeAllRanges();
@@ -676,8 +678,11 @@ describe("AppSelectAllController", () => {
       )?.textContent,
     ).toContain("button");
     expect(createdHighlights[0]?.map((range) => range.toString())).toEqual([
-      "shadow-root file contents",
-      "shadow tail",
+      "Hello ",
+      "formatted",
+      " world",
+      "next line",
+      "Second block",
     ]);
     const setData = vi.fn();
     const copyEvent = new Event("copy", { bubbles: true, cancelable: true });
@@ -713,7 +718,7 @@ describe("AppSelectAllController", () => {
     document.dispatchEvent(fallbackCopyEvent);
     expect(fallbackSetData).toHaveBeenCalledWith(
       "text/plain",
-      "shadow-root file contents\nshadow tail",
+      "Hello formatted world\nnext line\nSecond block",
     );
 
     fireEvent.pointerDown(fixture.sidebar);
@@ -873,7 +878,7 @@ describe("AppSelectAllController", () => {
     );
   });
 
-  it("does not select a different segment after the interaction anchor is removed", () => {
+  it("recovers a single-segment scope after the interaction anchor is removed", () => {
     render(<AppSelectAllController />);
     const fixture = createFixture();
     const setBaseAndExtent = vi.spyOn(
@@ -884,6 +889,29 @@ describe("AppSelectAllController", () => {
     fireEvent.pointerDown(fixture.mainLink);
     fixture.mainLink.remove();
     dispatchSelectAll(fixture.mainRegion);
+
+    expect(setBaseAndExtent).toHaveBeenCalled();
+    expect(window.getSelection()?.toString()).toContain(
+      "Main timeline message",
+    );
+  });
+
+  it("does not guess a segment after an anchor is removed from a split scope", () => {
+    render(<AppSelectAllController />);
+    const scope = document.createElement("section");
+    scope.dataset.selectAllScope = "";
+    scope.innerHTML =
+      '<p>Sent before</p><div contenteditable="true">Draft</div><p data-testid="anchor">Sent after</p>';
+    document.body.append(scope);
+    const anchor = scope.querySelector<HTMLElement>('[data-testid="anchor"]')!;
+    const setBaseAndExtent = vi.spyOn(
+      window.getSelection()!,
+      "setBaseAndExtent",
+    );
+
+    fireEvent.pointerDown(anchor);
+    anchor.remove();
+    dispatchSelectAll(scope);
 
     expect(setBaseAndExtent).not.toHaveBeenCalled();
   });

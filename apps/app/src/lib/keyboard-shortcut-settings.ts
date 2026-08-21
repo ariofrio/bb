@@ -2,6 +2,7 @@ import {
   APP_COMMAND_IDS,
   QUESTION_SELECT_APP_COMMAND_IDS,
   SELECT_ALL_SHORTCUT_RESERVED_MESSAGE,
+  areAppShortcutsEqual,
   isAppKeybindingAvailableForClient,
   isMacKeyboardPlatform,
   isReservedAppShortcut,
@@ -12,6 +13,8 @@ import {
   type AppShortcut,
   type AppShortcutInput,
 } from "@bb/domain";
+
+export { areAppShortcutsEqual };
 
 const MODIFIER_KEYS = new Set(["Alt", "Control", "Meta", "OS", "Shift"]);
 const QUESTION_COMMANDS = new Set<AppCommandId>(
@@ -44,27 +47,6 @@ export function appShortcutFromInput(
     alt: input.altKey,
     shift: input.shiftKey,
   };
-}
-
-export function areAppShortcutsEqual(
-  left: AppShortcut,
-  right: AppShortcut,
-): boolean {
-  return (
-    left.key.toLowerCase() === right.key.toLowerCase() &&
-    left.mod === right.mod &&
-    left.meta === right.meta &&
-    left.control === right.control &&
-    left.alt === right.alt &&
-    left.shift === right.shift
-  );
-}
-
-export function canAssignAppShortcut(
-  command: AppCommandId,
-  shortcut: AppShortcut,
-): boolean {
-  return getAppShortcutAssignmentError(command, shortcut) === null;
 }
 
 export function getAppShortcutAssignmentError(

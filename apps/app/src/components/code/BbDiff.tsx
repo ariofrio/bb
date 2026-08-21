@@ -5,7 +5,7 @@ import { usePierreLineSelectionActions } from "@/components/git-diff/PierreLineS
 import { PierreWorkerPoolBoundary } from "@/lib/pierre-worker-pool-boundary";
 import { useRequirePierreWorkerPool } from "@/lib/pierre-worker-pool-gate";
 import { usePierreStrictModeRecoveryOptions } from "@/lib/pierre-strict-mode-recovery";
-import { applyPierreSelectionPolicy } from "@/lib/pierre-selection-policy";
+import { PIERRE_SELECTION_POLICY_CSS } from "@/lib/pierre-selection-policy";
 import {
   buildFileDiffPatchText,
   buildDiffDomSelectionText,
@@ -121,7 +121,7 @@ export function BbDiff({
       ...(expansionLineCount === undefined ? {} : { expansionLineCount }),
       themeType,
       theme: codeTheme,
-      unsafeCSS: applyPierreSelectionPolicy(),
+      unsafeCSS: PIERRE_SELECTION_POLICY_CSS,
       enableGutterUtility: onSelectionAddToChat !== undefined,
       enableLineSelection: onSelectionAddToChat !== undefined,
       lineHoverHighlight:

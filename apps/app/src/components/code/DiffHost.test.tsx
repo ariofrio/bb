@@ -245,7 +245,7 @@ describe("DiffHost", () => {
     expect(hunkReads).toBeGreaterThan(0);
   });
 
-  it("keeps caller layout classes on BB's built-in diff scroller", async () => {
+  it("keeps the built-in selection scope layout-neutral", async () => {
     render(
       <DiffHost
         file={parseFixture()}
@@ -254,7 +254,9 @@ describe("DiffHost", () => {
       />,
     );
 
-    await screen.findByTestId("bb-diff");
+    const renderedDiff = await screen.findByTestId("bb-diff");
+    const scope = renderedDiff.closest("[data-select-all-scope]");
+    expect(scope?.classList.contains("contents")).toBe(true);
     expect(bbDiff.lastProps?.className).toBe("h-full max-h-64");
   });
 

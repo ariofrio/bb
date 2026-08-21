@@ -378,6 +378,19 @@
         "$TURBO_ROOT$/vitest.shared.ts"
       ]
     },
+    "@bb/desktop#test": {
+      "dependsOn": ["//#ensure-native-modules", "topo"],
+      "inputs": [
+        "$TURBO_DEFAULT$",
+        "$TURBO_ROOT$/apps/app/fixtures/app-select-all-browser.tsx",
+        "$TURBO_ROOT$/apps/app/src/app.css",
+        "$TURBO_ROOT$/apps/app/src/components/AppSelectAllController.tsx",
+        "$TURBO_ROOT$/apps/app/src/lib/bb-desktop.ts",
+        "$TURBO_ROOT$/apps/app/src/lib/select-all-scope.ts",
+        "$TURBO_ROOT$/packages/domain/src/app-keybindings.ts",
+        "$TURBO_ROOT$/vitest.shared.ts"
+      ]
+    },
     "test": {
       "dependsOn": ["//#ensure-native-modules", "topo"],
       "inputs": ["$TURBO_DEFAULT$", "$TURBO_ROOT$/vitest.shared.ts"]

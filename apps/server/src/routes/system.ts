@@ -14,9 +14,13 @@ import {
   setStoredAppearance,
 } from "@bb/db";
 import {
+  SELECT_ALL_SHORTCUT_RESERVED_MESSAGE,
   applyAppKeybindingOverrides,
+  areAppShortcutsEqual,
   customThemeNameSchema,
+  filterReservedAppKeybindingOverrides,
   isBuiltInThemeId,
+  isReservedAppShortcut,
   resolveCodeTheme,
   type AppKeybindingOverrides,
   type AppTheme,
@@ -120,7 +124,7 @@ export function registerSystemRoutes(
     context.json({ hasAttention: hasActiveThreadAttention(deps.db) }),
   );
 
-  function readAppKeybindingOverrides(): AppKeybindingOverrides {
+  function readStoredAppKeybindingOverrides(): AppKeybindingOverrides {
     try {
       return getAppKeybindingOverrides(deps.db);
     } catch (error) {
@@ -130,6 +134,12 @@ export function registerSystemRoutes(
       );
       return [];
     }
+  }
+
+  function readAppKeybindingOverrides(): AppKeybindingOverrides {
+    return filterReservedAppKeybindingOverrides(
+      readStoredAppKeybindingOverrides(),
+    );
   }
 
   async function resolveSelectedTheme(
@@ -201,9 +211,33 @@ export function registerSystemRoutes(
   });
 
   put(routes.keyboardSettings, (context, payload) => {
-    setAppKeybindingOverrides(deps.db, payload);
+    const storedOverrides = readStoredAppKeybindingOverrides();
+    for (const override of payload) {
+      if (
+        override.shortcut === null ||
+        !isReservedAppShortcut(override.shortcut)
+      ) {
+        continue;
+      }
+      const storedOverride = storedOverrides.find(
+        (candidate) => candidate.command === override.command,
+      );
+      if (
+        storedOverride?.shortcut === null ||
+        storedOverride?.shortcut === undefined ||
+        !areAppShortcutsEqual(storedOverride.shortcut, override.shortcut)
+      ) {
+        throw new ApiError(
+          400,
+          "invalid_request",
+          SELECT_ALL_SHORTCUT_RESERVED_MESSAGE,
+        );
+      }
+    }
+    const assignableOverrides = filterReservedAppKeybindingOverrides(payload);
+    setAppKeybindingOverrides(deps.db, assignableOverrides);
     deps.hub.notifySystem(["config-changed"]);
-    return context.json(getAppKeybindingOverrides(deps.db));
+    return context.json(assignableOverrides);
   });
 
   put(routes.experiments, (context, payload) => {

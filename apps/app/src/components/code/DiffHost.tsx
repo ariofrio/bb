@@ -48,10 +48,12 @@ export interface DiffHostProps extends Partial<DiffPresentation> {
 function DiffSelectionScope({
   children,
   className,
+  displayContents = false,
   getCopyText,
 }: {
   children: ReactNode;
   className?: string;
+  displayContents?: boolean;
   getCopyText: () => string;
 }) {
   const unregisterRef = useRef<(() => void) | null>(null);
@@ -66,7 +68,7 @@ function DiffSelectionScope({
   return (
     <div
       ref={setScopeRef}
-      className={cn("select-text", className)}
+      className={cn("select-text", displayContents && "contents", className)}
       data-select-all-scope=""
     >
       {children}
@@ -113,7 +115,7 @@ export function DiffHost({
   );
 
   const original = (
-    <DiffSelectionScope getCopyText={getCopyText}>
+    <DiffSelectionScope displayContents getCopyText={getCopyText}>
       <Suspense fallback={fallback}>
         <BbDiff
           file={file}

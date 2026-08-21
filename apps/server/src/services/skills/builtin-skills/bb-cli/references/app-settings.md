@@ -19,6 +19,9 @@ every window and client sees the same value.
   disable the shortcuts themselves.
 - Settings → Keyboard records sparse per-command chord overrides. `Mod` means
   Command on macOS and Control on Windows/Linux.
+- `Mod+A` is reserved for Select All. New assignments are rejected, and bb
+  drops legacy stored `Mod+A` overrides while preserving each command's
+  current default.
 - Reset removes the override and follows bb's current default. Clear stores an
   explicit disabled value.
 - Bindings for non-native actions apply in browser and desktop clients. Command

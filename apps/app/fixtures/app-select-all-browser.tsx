@@ -6,6 +6,7 @@ import "../src/app.css";
 interface BrowserSelectionResults {
   chrome: string;
   editorPrevented: boolean;
+  iframePrevented: boolean;
   main: string;
   mainPrevented: boolean;
   shadow: string;
@@ -63,12 +64,14 @@ async function run(): Promise<void> {
   const main = document.querySelector("#main-scope");
   const chrome = document.querySelector("#chrome");
   const editor = document.querySelector("#editor");
+  const preview = document.querySelector("#preview");
   const shadowScope = document.querySelector("#shadow-scope");
   const shadowHost = document.querySelector("#shadow-host");
   if (
     !(main instanceof HTMLElement) ||
     !(chrome instanceof HTMLElement) ||
     !(editor instanceof HTMLTextAreaElement) ||
+    !(preview instanceof HTMLIFrameElement) ||
     !(shadowScope instanceof HTMLElement) ||
     !(shadowHost instanceof HTMLElement)
   ) {
@@ -81,6 +84,11 @@ async function run(): Promise<void> {
 
   await nextPaint();
 
+  const previewText = preview.contentDocument?.querySelector("#preview-text");
+  if (previewText === null || previewText === undefined) {
+    throw new Error("Missing iframe preview text");
+  }
+
   const mainSelection = selectAllFrom(main);
   const chromeSelection = selectAllFrom(chrome);
   const shadowSelection = selectAllFrom(shadowScope);
@@ -89,6 +97,7 @@ async function run(): Promise<void> {
     mainPrevented: mainSelection.prevented,
     chrome: chromeSelection.text,
     editorPrevented: dispatchSelectAll(editor).defaultPrevented,
+    iframePrevented: dispatchSelectAll(previewText).defaultPrevented,
     shadow: shadowSelection.text,
     shadowPrevented: shadowSelection.prevented,
   };

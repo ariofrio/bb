@@ -740,7 +740,11 @@ export function ChangelogPreviewCard() {
           )}
         >
           <div className="min-h-0 overflow-hidden">
-            <article data-changelog-preview className="min-w-0 p-4 sm:p-5">
+            <article
+              data-changelog-preview
+              data-select-all-scope=""
+              className="min-w-0 select-text p-4 sm:p-5"
+            >
               <div className="flex min-w-0 flex-wrap items-center gap-x-2 gap-y-1">
                 <span
                   data-changelog-version={entry.version}
