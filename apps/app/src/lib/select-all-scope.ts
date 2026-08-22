@@ -132,10 +132,9 @@ function isSkippedSelectionSubtree(element: Element): boolean {
   );
 }
 
-function ensureShadowSelectionPolicy(root: ShadowRoot): void {
+export function ensureShadowSelectionPolicy(root: ShadowRoot): void {
   // Open shadow trees need their own control exclusions and highlight rule.
-  // Install them once when Select All is explicitly invoked; pointer/focus
-  // tracking must remain mutation-free on long reading surfaces.
+  // Install them once before pointer selection or Select All reaches the tree.
   if (
     Array.from(root.querySelectorAll("style")).some(
       (style) =>

@@ -652,34 +652,39 @@ describe("app keybindings", () => {
     });
   });
 
-  it("rejects Select All overrides instead of persisting an ignored value", async () => {
+  it("rejects every Select All override instead of persisting a dead value", async () => {
     await withTestHarness(async (harness) => {
-      const response = await harness.app.request("/api/v1/settings/keyboard", {
-        method: "PUT",
-        headers: { "content-type": "application/json" },
-        body: JSON.stringify([
+      for (const modifier of ["mod", "meta", "control"] as const) {
+        const response = await harness.app.request(
+          "/api/v1/settings/keyboard",
           {
-            command: "thread.new",
-            shortcut: {
-              key: "a",
-              mod: true,
-              meta: false,
-              control: false,
-              alt: false,
-              shift: false,
-            },
+            method: "PUT",
+            headers: { "content-type": "application/json" },
+            body: JSON.stringify([
+              {
+                command: "thread.new",
+                shortcut: {
+                  key: "a",
+                  mod: modifier === "mod",
+                  meta: modifier === "meta",
+                  control: modifier === "control",
+                  alt: false,
+                  shift: false,
+                },
+              },
+            ]),
           },
-        ]),
-      });
+        );
 
-      expect(response.status).toBe(400);
-      await expect(readJson(response)).resolves.toMatchObject({
-        code: "invalid_request",
-        message: expect.stringContaining(
-          "Command/Ctrl+A is reserved for Select All.",
-        ),
-      });
-      expect(getAppKeybindingOverrides(harness.db)).toEqual([]);
+        expect(response.status).toBe(400);
+        await expect(readJson(response)).resolves.toMatchObject({
+          code: "invalid_request",
+          message: expect.stringContaining(
+            "Command/Ctrl+A is reserved for Select All.",
+          ),
+        });
+        expect(getAppKeybindingOverrides(harness.db)).toEqual([]);
+      }
     });
   });
 

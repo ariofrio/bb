@@ -70,19 +70,22 @@ describe("bb settings commands", () => {
     });
   });
 
-  it("rejects the platform Select All shortcut with an actionable error", async () => {
-    stubServerApi({});
+  it.each(["mod+a", "meta+a", "control+a"])(
+    "rejects the Select All shortcut %s with an actionable error",
+    async (shortcut) => {
+      stubServerApi({});
 
-    await expect(
-      runCommand(
-        ["settings", "keyboard", "set", "thread.new", "mod+a"],
-        register,
-      ),
-    ).rejects.toThrow("process.exit:1");
-    expect(console.error).toHaveBeenCalledWith(
-      "Error: Command/Ctrl+A is reserved for Select All.",
-    );
-  });
+      await expect(
+        runCommand(
+          ["settings", "keyboard", "set", "thread.new", shortcut],
+          register,
+        ),
+      ).rejects.toThrow("process.exit:1");
+      expect(console.error).toHaveBeenCalledWith(
+        "Error: Command/Ctrl+A is reserved for Select All.",
+      );
+    },
+  );
 
   it("updates active-thread Enter behavior while preserving the full contract", async () => {
     const put = vi.fn(async ({ json }) => json);

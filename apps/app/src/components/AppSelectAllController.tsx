@@ -3,6 +3,7 @@ import { isMacKeyboardPlatform, isSelectAllShortcutInput } from "@bb/domain";
 import {
   clearSelectAllHighlight,
   closestEventElement,
+  ensureShadowSelectionPolicy,
   findSelectAllScopes,
   getSelectAllCopyText,
   isEditableTarget,
@@ -41,8 +42,8 @@ export function AppSelectAllController() {
       text: string;
     }
 
-    let activeScopes: HTMLElement[] = [];
-    let activeSelectionAnchors: Element[] = [];
+    let activeScopes: WeakRef<HTMLElement>[] = [];
+    let activeSelectionAnchors: WeakRef<Element>[] = [];
     let copyOverride: CopyOverride | null = null;
 
     function selectionMatchesCopyOverride(override: CopyOverride): boolean {
@@ -84,9 +85,13 @@ export function AppSelectAllController() {
         return true;
       }
       const activeScope =
-        activeScopes.find((scope) => scope.isConnected) ?? null;
+        activeScopes
+          .map((scope) => scope.deref())
+          .find((scope) => scope?.isConnected) ?? null;
       const activeSelectionAnchor =
-        activeSelectionAnchors.find((anchor) => anchor.isConnected) ?? null;
+        activeSelectionAnchors
+          .map((anchor) => anchor.deref())
+          .find((anchor) => anchor?.isConnected) ?? null;
       if (activeScope !== null && activeSelectionAnchor !== null) {
         const preferredRoot = activeSelectionAnchor.getRootNode();
         if (
@@ -197,10 +202,19 @@ export function AppSelectAllController() {
         return;
       }
       const composedPath = event.composedPath();
-      activeScopes = findSelectAllScopes(composedPath);
-      activeSelectionAnchors = composedPath.filter(
-        (candidate): candidate is Element => candidate instanceof Element,
-      );
+      const scopes = findSelectAllScopes(composedPath);
+      if (event.type === "pointerdown" && scopes.length > 0) {
+        const selectionRoot = target.getRootNode();
+        if (selectionRoot instanceof ShadowRoot) {
+          ensureShadowSelectionPolicy(selectionRoot);
+        }
+      }
+      activeScopes = scopes.map((scope) => new WeakRef(scope));
+      activeSelectionAnchors = composedPath
+        .filter(
+          (candidate): candidate is Element => candidate instanceof Element,
+        )
+        .map((anchor) => new WeakRef(anchor));
     }
 
     window.addEventListener("pointerdown", updateActiveScope, true);

@@ -1165,7 +1165,7 @@ describe("AppSelectAllController", () => {
     ).toHaveLength(0);
   });
 
-  it("does not mutate an active open shadow root", () => {
+  it("installs the shadow control policy before the first drag", () => {
     render(<AppSelectAllController />);
     const fixture = createFixture();
     const shadowHost = document.createElement("div");
@@ -1174,13 +1174,21 @@ describe("AppSelectAllController", () => {
     button.textContent = "Shadow action";
     shadowRoot.append(button);
     fixture.mainRegion.append(shadowHost);
-    const shadowMarkup = shadowRoot.innerHTML;
+    button.dispatchEvent(
+      new Event("pointerdown", { bubbles: true, composed: true }),
+    );
+
+    expect(
+      shadowRoot.querySelectorAll("style[data-bb-select-all-shadow-policy]"),
+    ).toHaveLength(1);
 
     button.dispatchEvent(
       new Event("pointerdown", { bubbles: true, composed: true }),
     );
 
-    expect(shadowRoot.innerHTML).toBe(shadowMarkup);
+    expect(
+      shadowRoot.querySelectorAll("style[data-bb-select-all-shadow-policy]"),
+    ).toHaveLength(1);
   });
 
   it("clears a scoped copy override on middle-click interaction", () => {

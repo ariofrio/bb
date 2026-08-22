@@ -17,12 +17,13 @@ const TIMEOUT_MS = 15_000;
 interface BrowserSelectionResults {
   chrome: string;
   editorPrevented: boolean;
-  iframePrevented: boolean;
+  iframeHandled: boolean;
   main: string;
   mainPrevented: boolean;
   portal: string;
   portalPrevented: boolean;
   shadow: string;
+  shadowDrag: string;
   shadowPrevented: boolean;
 }
 
@@ -225,12 +226,13 @@ app.on("window-all-closed", () => app.quit());
     expect(results).toEqual({
       chrome: "",
       editorPrevented: false,
-      iframePrevented: false,
+      iframeHandled: false,
       main: "MAIN FIRST\n\nMAIN LAST",
       mainPrevented: true,
       portal: "PORTAL FIRST\n\nPORTAL LAST",
       portalPrevented: true,
       shadow: "SHADOW FIRSTSHADOW LAST",
+      shadowDrag: "SHADOW FIRSTSHADOW LAST",
       shadowPrevented: true,
     });
   } finally {

@@ -6,14 +6,27 @@ import "../src/app.css";
 interface BrowserSelectionResults {
   chrome: string;
   editorPrevented: boolean;
-  iframePrevented: boolean;
+  iframeHandled: boolean;
   main: string;
   mainPrevented: boolean;
   portal: string;
   portalPrevented: boolean;
   shadow: string;
+  shadowDrag: string;
   shadowPrevented: boolean;
 }
+
+let desktopSelectAll: (() => boolean) | null = null;
+Object.defineProperty(window, "bbDesktop", {
+  configurable: true,
+  value: {
+    onSelectAll(listener: () => boolean) {
+      desktopSelectAll = listener;
+      return () => {};
+    },
+    platform: "macos",
+  },
+});
 
 function dispatchPointerDown(target: Element): void {
   target.dispatchEvent(
@@ -90,15 +103,32 @@ async function run(): Promise<void> {
 
   await nextPaint();
 
-  const previewText = preview.contentDocument?.querySelector("#preview-text");
-  if (previewText === null || previewText === undefined) {
-    throw new Error("Missing iframe preview text");
+  const shadowFirst = shadowRoot.querySelector("span")?.firstChild;
+  const shadowLast = shadowRoot.querySelector("span:last-child")?.firstChild;
+  if (
+    !(shadowFirst instanceof Text) ||
+    !(shadowLast instanceof Text) ||
+    shadowFirst.parentElement === null
+  ) {
+    throw new Error("Missing shadow selection endpoints");
   }
+  dispatchPointerDown(shadowFirst.parentElement);
+  const selection = window.getSelection();
+  selection?.setBaseAndExtent(
+    shadowFirst,
+    0,
+    shadowLast,
+    shadowLast.data.length,
+  );
+  const shadowDrag = selection?.toString() ?? "";
+  selection?.removeAllRanges();
 
   const mainSelection = selectAllFrom(main);
   const chromeSelection = selectAllFrom(chrome);
   const portalSelection = selectAllFrom(pluginPortal);
   const shadowSelection = selectAllFrom(shadowScope);
+  preview.focus();
+  const iframeHandled = desktopSelectAll?.() ?? true;
   const results: BrowserSelectionResults = {
     main: mainSelection.text,
     mainPrevented: mainSelection.prevented,
@@ -106,8 +136,9 @@ async function run(): Promise<void> {
     portalPrevented: portalSelection.prevented,
     chrome: chromeSelection.text,
     editorPrevented: dispatchSelectAll(editor).defaultPrevented,
-    iframePrevented: dispatchSelectAll(previewText).defaultPrevented,
+    iframeHandled,
     shadow: shadowSelection.text,
+    shadowDrag,
     shadowPrevented: shadowSelection.prevented,
   };
 

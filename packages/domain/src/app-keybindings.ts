@@ -113,11 +113,11 @@ export const SELECT_ALL_SHORTCUT_RESERVED_MESSAGE =
   "Command/Ctrl+A is reserved for Select All.";
 
 export function isReservedAppShortcut(shortcut: AppShortcut): boolean {
+  const selectAllModifierCount =
+    Number(shortcut.mod) + Number(shortcut.meta) + Number(shortcut.control);
   return (
     shortcut.key.toLowerCase() === "a" &&
-    shortcut.mod &&
-    !shortcut.meta &&
-    !shortcut.control &&
+    selectAllModifierCount === 1 &&
     !shortcut.alt &&
     !shortcut.shift
   );

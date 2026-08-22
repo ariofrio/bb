@@ -78,7 +78,7 @@ describe("app keybindings", () => {
     );
   });
 
-  it("reserves only the portable primary-modifier Select All shortcut", () => {
+  it("reserves every single-primary-modifier Select All shortcut", () => {
     expect(isReservedAppShortcut({ ...MOD_N, key: "a" })).toBe(true);
     expect(
       isReservedAppShortcut({
@@ -87,13 +87,20 @@ describe("app keybindings", () => {
         mod: false,
         meta: true,
       }),
-    ).toBe(false);
+    ).toBe(true);
     expect(
       isReservedAppShortcut({
         ...MOD_N,
         key: "a",
         mod: false,
         control: true,
+      }),
+    ).toBe(true);
+    expect(
+      isReservedAppShortcut({
+        ...MOD_N,
+        key: "a",
+        meta: true,
       }),
     ).toBe(false);
   });
@@ -143,30 +150,33 @@ describe("app keybindings", () => {
     ["m", "µ", "KeyM"],
     ["p", "π", "KeyP"],
     ["t", "†", "KeyT"],
-  ])("matches Alt+%s by physical key when macOS reports %s", (key, composed, code) => {
-    const shortcut: AppShortcut = {
-      key,
-      mod: false,
-      meta: false,
-      control: false,
-      alt: true,
-      shift: false,
-    };
-    expect(
-      matchesAppShortcut(
-        {
-          key: composed,
-          code,
-          metaKey: false,
-          ctrlKey: false,
-          altKey: true,
-          shiftKey: false,
-        },
-        shortcut,
-        true,
-      ),
-    ).toBe(true);
-  });
+  ])(
+    "matches Alt+%s by physical key when macOS reports %s",
+    (key, composed, code) => {
+      const shortcut: AppShortcut = {
+        key,
+        mod: false,
+        meta: false,
+        control: false,
+        alt: true,
+        shift: false,
+      };
+      expect(
+        matchesAppShortcut(
+          {
+            key: composed,
+            code,
+            metaKey: false,
+            ctrlKey: false,
+            altKey: true,
+            shiftKey: false,
+          },
+          shortcut,
+          true,
+        ),
+      ).toBe(true);
+    },
+  );
 
   it.each([
     ["m", "Â", "KeyM"],
