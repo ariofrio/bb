@@ -137,7 +137,12 @@ export function buildDesktopContextMenuTemplate({
     template.push({ role: "copy", enabled: true });
   }
   if (params.editFlags.canSelectAll) {
-    template.push({ label: selectAllLabel, click: selectAll });
+    template.push({
+      label: selectAllLabel,
+      accelerator: "CommandOrControl+A",
+      registerAccelerator: false,
+      click: selectAll,
+    });
   }
 
   return trimTrailingSeparator(template);

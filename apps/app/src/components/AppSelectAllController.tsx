@@ -20,15 +20,19 @@ function getDeepActiveElement(): Element | null {
   return activeElement;
 }
 
-function selectEditorContents(editor: Element): void {
+function selectEditorContents(editor: Element): boolean {
+  if (editor instanceof HTMLSelectElement) {
+    return false;
+  }
   if (
     editor instanceof HTMLInputElement ||
     editor instanceof HTMLTextAreaElement
   ) {
     editor.select();
-    return;
+    return true;
   }
   document.execCommand("selectAll");
+  return true;
 }
 
 export function AppSelectAllController() {
@@ -81,8 +85,7 @@ export function AppSelectAllController() {
         return false;
       }
       if (activeElement !== null && isEditableTarget(activeElement)) {
-        selectEditorContents(activeElement);
-        return true;
+        return selectEditorContents(activeElement);
       }
       const activeScope =
         activeScopes

@@ -3,7 +3,10 @@ import type { BaseWindow, MenuItemConstructorOptions } from "electron";
 
 vi.mock("electron", () => ({
   app: { name: "bb" },
-  Menu: { sendActionToFirstResponder: vi.fn() },
+  Menu: {
+    buildFromTemplate: vi.fn(() => ({ items: [{ label: "Select All" }] })),
+    sendActionToFirstResponder: vi.fn(),
+  },
 }));
 
 import { Menu } from "electron";
@@ -11,6 +14,7 @@ import { Menu } from "electron";
 import {
   buildApplicationMenuTemplate,
   CONNECT_SERVERS_SKIPPED_MENU_LABELS,
+  getLocalizedSelectAllMenuLabel,
   SET_SERVER_URL_MENU_LABEL,
   type InstallApplicationMenuArgs,
 } from "../src/menu.js";
@@ -57,6 +61,15 @@ function findServerSubmenu(
 }
 
 describe("application menu", () => {
+  it("reuses the process-wide localized Select All label", () => {
+    vi.mocked(Menu.buildFromTemplate).mockClear();
+
+    expect(getLocalizedSelectAllMenuLabel()).toBe("Select All");
+    expect(getLocalizedSelectAllMenuLabel()).toBe("Select All");
+
+    expect(Menu.buildFromTemplate).toHaveBeenCalledOnce();
+  });
+
   it("closes a native panel when Electron omits its window", () => {
     vi.mocked(Menu.sendActionToFirstResponder).mockClear();
     const closeWindowOrSideTab = vi.fn();

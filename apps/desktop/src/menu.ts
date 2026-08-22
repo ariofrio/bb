@@ -274,12 +274,19 @@ export function buildApplicationMenuTemplate(
   ];
 }
 
+let localizedSelectAllMenuLabel: string | undefined;
+
 export function getLocalizedSelectAllMenuLabel(): string {
+  if (localizedSelectAllMenuLabel !== undefined) {
+    return localizedSelectAllMenuLabel;
+  }
   const localized = Menu.buildFromTemplate([{ role: "selectAll" }]).items[0]
     ?.label;
-  return localized === undefined || localized.length === 0
-    ? "Select All"
-    : localized;
+  localizedSelectAllMenuLabel =
+    localized === undefined || localized.length === 0
+      ? "Select All"
+      : localized;
+  return localizedSelectAllMenuLabel;
 }
 
 export function installApplicationMenu(args: InstallApplicationMenuArgs): void {

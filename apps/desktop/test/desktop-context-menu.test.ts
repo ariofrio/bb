@@ -240,7 +240,12 @@ describe("desktop context menu", () => {
 
     expect(template).toEqual([
       { role: "copy", enabled: true },
-      { label: "Select All", click: expect.any(Function) },
+      {
+        label: "Select All",
+        accelerator: "CommandOrControl+A",
+        registerAccelerator: false,
+        click: expect.any(Function),
+      },
     ]);
   });
 

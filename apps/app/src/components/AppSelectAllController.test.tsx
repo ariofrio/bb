@@ -92,6 +92,7 @@ beforeEach(() => {
 
 afterEach(() => {
   vi.restoreAllMocks();
+  Reflect.deleteProperty(document, "execCommand");
   cleanup();
   document.body.replaceChildren();
   window.getSelection()?.removeAllRanges();
@@ -314,6 +315,24 @@ describe("AppSelectAllController", () => {
     fireEvent.pointerDown(select);
 
     expect(dispatchSelectAll(select).defaultPrevented).toBe(false);
+  });
+
+  it("leaves desktop Select All to Electron in a multi-select control", () => {
+    const requestSelectAll = installDesktopSelectAllBridge();
+    const execCommand = vi.fn();
+    Object.defineProperty(document, "execCommand", {
+      configurable: true,
+      value: execCommand,
+    });
+    render(<AppSelectAllController />);
+    const select = document.createElement("select");
+    select.multiple = true;
+    select.append(new Option("One"), new Option("Two"));
+    document.body.append(select);
+    select.focus();
+
+    expect(requestSelectAll()).toBe(false);
+    expect(execCommand).not.toHaveBeenCalled();
   });
 
   it("leaves Select All native in an editor inside an open shadow root", () => {
