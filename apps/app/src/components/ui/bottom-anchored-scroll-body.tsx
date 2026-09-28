@@ -326,7 +326,7 @@ export function BottomAnchoredScrollBody({
 
   const queueBottomRestore = useCallback(() => {
     if (!shouldStickToBottomRef.current) return;
-    restoreBottomOnce();
+    restoreBottomFromCacheOnce();
     restoreFramesRemainingRef.current = BOTTOM_RESTORE_SETTLE_FRAME_COUNT;
     restoreTailLiveReadRef.current = false;
     if (restoreFrameRef.current !== null) return;

@@ -195,6 +195,30 @@ function growContentWhilePinned() {
 }
 
 describe("BottomAnchoredScrollBody settle tail", () => {
+  it("uses observed geometry when restoring after a resize", () => {
+    const { scrollArea, scrollContent } = renderScrollBody();
+    scrollArea.scrollTop = 200;
+    const { readScrollHeight, readClientHeight } = installGeometryReadCounters(
+      scrollArea,
+      { scrollHeight: 400, clientHeight: 100 },
+    );
+
+    getLatestResizeObserver().trigger([
+      makeResizeEntry(scrollArea, {
+        contentBlockSize: 100,
+        borderBlockSize: 108,
+      }),
+      makeResizeEntry(scrollContent, {
+        contentBlockSize: 392,
+        borderBlockSize: 400,
+      }),
+    ]);
+
+    expect(scrollArea.scrollTop).toBe(300);
+    expect(readScrollHeight).not.toHaveBeenCalled();
+    expect(readClientHeight).not.toHaveBeenCalled();
+  });
+
   it("settles without re-reading geometry when the cached restore finds no drift", () => {
     const { scrollArea } = growContentWhilePinned();
     const { readScrollHeight, readClientHeight } = installGeometryReadCounters(
