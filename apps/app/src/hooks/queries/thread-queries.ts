@@ -9,10 +9,7 @@ import {
 import { useCallback, useMemo } from "react";
 import { COMPACT_VIEWPORT_QUERY } from "@bb/shared-ui/hooks/use-compact-viewport";
 import { getMediaQuerySnapshot } from "@bb/shared-ui/hooks/use-media-query";
-import type {
-  PendingInteraction,
-  ThreadListEntry,
-} from "@bb/domain";
+import type { PendingInteraction, ThreadListEntry } from "@bb/domain";
 import type {
   PromptHistoryResponse,
   ThreadQueuedMessageListResponse,
@@ -949,11 +946,12 @@ interface FetchThreadTimelineArgs {
 }
 
 export const COMPACT_THREAD_TIMELINE_SEGMENT_LIMIT = 8;
+export const DESKTOP_THREAD_TIMELINE_SEGMENT_LIMIT = 4;
 
-function resolveThreadTimelineSegmentLimit(): number | undefined {
+function resolveThreadTimelineSegmentLimit(): number {
   return getMediaQuerySnapshot(COMPACT_VIEWPORT_QUERY)
     ? COMPACT_THREAD_TIMELINE_SEGMENT_LIMIT
-    : undefined;
+    : DESKTOP_THREAD_TIMELINE_SEGMENT_LIMIT;
 }
 
 async function fetchThreadTimeline({
@@ -963,9 +961,9 @@ async function fetchThreadTimeline({
 }: FetchThreadTimelineArgs): Promise<ThreadTimelineResponse> {
   const queryKey = threadTimelineQueryKey(threadId);
   const previous = queryClient.getQueryData<ThreadTimelineResponse>(queryKey);
-  const segmentLimit = resolveThreadTimelineSegmentLimit();
-  const pageArgs =
-    segmentLimit === undefined ? {} : { segmentLimit: String(segmentLimit) };
+  const pageArgs = {
+    segmentLimit: String(resolveThreadTimelineSegmentLimit()),
+  };
   const response = await sdk.threads.timeline({
     threadId,
     signal,

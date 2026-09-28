@@ -26,6 +26,7 @@ import {
 import { usePaletteRecentArchivedThreads } from "./palette-thread-queries";
 import {
   COMPACT_THREAD_TIMELINE_SEGMENT_LIMIT,
+  DESKTOP_THREAD_TIMELINE_SEGMENT_LIMIT,
   didThreadDetailBootstrapRefreshAfterMount,
   isPendingInteractionStateUnknown,
   useArchivedThreads,
@@ -245,6 +246,7 @@ describe("useThreadDetailBootstrap", () => {
     await waitFor(() => {
       expect(sdk.threads.timeline).toHaveBeenCalledWith({
         afterSequence: "7",
+        segmentLimit: String(DESKTOP_THREAD_TIMELINE_SEGMENT_LIMIT),
         signal: expect.any(AbortSignal),
         threadId: "thread-1",
       });
@@ -839,9 +841,9 @@ describe("useThreadTimeline segment limit", () => {
     });
   });
 
-  it("keeps the server default window on wide viewports", async () => {
+  it("bounds the first desktop window and keeps that bound for deltas", async () => {
     mockMatchMedia([]);
-    const { wrapper } = createQueryClientTestHarness();
+    const { queryClient, wrapper } = createQueryClientTestHarness();
 
     const { result } = renderHook(() => useThreadTimeline("thread-1"), {
       wrapper,
@@ -851,6 +853,17 @@ describe("useThreadTimeline segment limit", () => {
     });
     expect(vi.mocked(sdk.threads.timeline).mock.calls[0]?.[0]).toEqual({
       threadId: "thread-1",
+      segmentLimit: String(DESKTOP_THREAD_TIMELINE_SEGMENT_LIMIT),
+      signal: expect.any(AbortSignal),
+    });
+
+    await queryClient.refetchQueries({
+      queryKey: threadTimelineQueryKey("thread-1"),
+    });
+    expect(vi.mocked(sdk.threads.timeline).mock.calls[1]?.[0]).toEqual({
+      threadId: "thread-1",
+      segmentLimit: String(DESKTOP_THREAD_TIMELINE_SEGMENT_LIMIT),
+      afterSequence: "0",
       signal: expect.any(AbortSignal),
     });
   });
@@ -862,7 +875,8 @@ describe("palette lifecycle queries", () => {
     const archived = makeThreadListEntry({ id: "archived", archivedAt: 1 });
     vi.mocked(sdk.threads.list).mockResolvedValue([archived]);
     const { result, rerender } = renderHook(
-      ({ recent, selected }) => usePaletteRecentArchivedThreads({ enabled: recent && selected }),
+      ({ recent, selected }) =>
+        usePaletteRecentArchivedThreads({ enabled: recent && selected }),
       { wrapper, initialProps: { recent: true, selected: false } },
     );
     expect(sdk.threads.list).not.toHaveBeenCalled();
@@ -871,8 +885,9 @@ describe("palette lifecycle queries", () => {
     rerender({ recent: true, selected: true });
     await waitFor(() => expect(result.current.data).toEqual([archived]));
     expect(sdk.threads.list).toHaveBeenCalledExactlyOnceWith({
-      archived: true, limit: 20, signal: expect.any(AbortSignal),
+      archived: true,
+      limit: 20,
+      signal: expect.any(AbortSignal),
     });
   });
-
 });

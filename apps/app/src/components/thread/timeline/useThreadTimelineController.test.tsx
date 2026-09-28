@@ -790,9 +790,10 @@ describe("useThreadTimelineController", () => {
       ]);
     });
     const timelineRequests = vi.mocked(sdk.threads.timeline).mock.calls;
-    expect(timelineRequests[2]?.[0]).toMatchObject({
+    expect(timelineRequests[2]?.[0]).toEqual({
       beforeAnchorId: olderPageRow.id,
       beforeAnchorSeq: "0",
+      threadId: "thread-1",
     });
     expect(timelineRequests[3]?.[0]).toMatchObject({ afterSequence: "1" });
     expect(result.current.isLoadingOlderTimelineRows).toBe(false);
