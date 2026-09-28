@@ -339,16 +339,13 @@ function readTestTimeoutScale(): number {
 export function defineWorkspaceTestConfig(
   config: ViteUserConfig,
 ): ViteUserConfig {
-  const timeoutScale = readTestTimeoutScale();
-  return mergeConfig(
+  const merged = mergeConfig(
     {
       resolve: {
         alias: hugeiconsBundleAlias(),
         conditions: ["source"],
       },
       test: {
-        testTimeout: Math.ceil(5_000 * timeoutScale),
-        hookTimeout: Math.ceil(10_000 * timeoutScale),
         globalSetup: [
           fileURLToPath(new URL("./vitest.global-tmpdir.ts", import.meta.url)),
         ],
@@ -388,4 +385,18 @@ export function defineWorkspaceTestConfig(
     },
     config,
   );
+  const timeoutScale = readTestTimeoutScale();
+  if (timeoutScale === 1) return merged;
+  return {
+    ...merged,
+    test: {
+      ...merged.test,
+      testTimeout: Math.ceil(
+        (merged.test?.testTimeout ?? 5_000) * timeoutScale,
+      ),
+      hookTimeout: Math.ceil(
+        (merged.test?.hookTimeout ?? 10_000) * timeoutScale,
+      ),
+    },
+  };
 }
