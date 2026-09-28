@@ -37,6 +37,8 @@ interface ThreadTableOfContentsProps {
   onNavigateToRow?: (rowId: string) => void;
 }
 
+const EMPTY_TIMELINE_ROWS: readonly TimelineRow[] = [];
+
 const TOC_MIN_VISIBLE_WIDTH_PX = 56 * 16;
 const TOC_BOTTOM_ACTIVE_THRESHOLD_PX = 4;
 const TOC_MIN_USER_MESSAGES = 3;
@@ -511,8 +513,8 @@ export function ThreadTableOfContents({
       : outlineQuery.data?.items;
   const senderThreadMetadataById = useSenderThreadMetadataById();
   const { agentItems, userItems } = useConversationTocItems({
-    outlineItems,
-    timelineRows,
+    outlineItems: tocVisible ? outlineItems : undefined,
+    timelineRows: tocVisible ? timelineRows : EMPTY_TIMELINE_ROWS,
   });
   const [open, setOpen] = useState(false);
   const [tab, setTab] = useState<TocTab>("user");

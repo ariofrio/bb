@@ -413,6 +413,26 @@ describe("ThreadTableOfContents", () => {
     );
   });
 
+  it("does not prepare message previews while the TOC is hidden", async () => {
+    const readText = vi.fn((index: number) => `Preview ${index}`);
+    const rows = [1, 2, 3].map((index) => ({
+      ...userConversationRow(index),
+      get text() {
+        return readText(index);
+      },
+    }));
+    const view = render(<TocHost hostWidth={400} timelineRows={rows} />);
+
+    expect(readText).not.toHaveBeenCalled();
+
+    view.unmount();
+    render(<TocHost hostWidth={1200} timelineRows={rows} />);
+    openTocPanel();
+
+    expect(await screen.findByText("Preview 1")).not.toBeNull();
+    expect(readText).toHaveBeenCalledTimes(3);
+  });
+
   it("does not request the outline when padding hides the TOC", () => {
     render(
       <TocHost
