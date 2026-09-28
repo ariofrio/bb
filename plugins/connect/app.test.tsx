@@ -22,7 +22,28 @@ beforeEach(() => {
   });
 });
 
-afterEach(cleanup);
+afterEach(() => {
+  cleanup();
+  vi.unstubAllGlobals();
+});
+
+function stubMobilePairingRoute(
+  respond: () => { ok: true; result: unknown } | { ok: false; error: string },
+): ReturnType<typeof vi.fn> {
+  const fetchMock = vi.fn(async (input: RequestInfo | URL) => {
+    const url = String(input);
+    if (url.endsWith("/sealed/mobile-pairing")) {
+      const body = respond();
+      return new Response(JSON.stringify(body), {
+        status: body.ok ? 200 : 400,
+        headers: { "content-type": "application/json" },
+      });
+    }
+    return new Response("not found", { status: 404 });
+  });
+  vi.stubGlobal("fetch", fetchMock);
+  return fetchMock;
+}
 
 function status(overrides: Partial<ConnectStatus> = {}): ConnectStatus {
   return {
@@ -50,6 +71,12 @@ const connected = (overrides: Partial<ConnectStatus> = {}) =>
     since: 1_700_000_060_000,
     ...overrides,
   });
+
+const SEALED_PAIRING = {
+  serverKey: "c2VydmVyLWtleQ",
+  fingerprint: "AAAA-BBBB-CCCC-DDDD-EEEE-FFFF",
+  deviceCode: "WXYZ-2345",
+};
 
 describe("connect settings section", () => {
   it("uses the plugin page header instead of declaring a second title", () => {
@@ -380,6 +407,15 @@ describe("connect settings section", () => {
 
   it("add mobile device mints a machine code and shows the QR payload, the code, and a countdown", async () => {
     const expiresAt = Date.now() + 600_000;
+    const fetchMock = stubMobilePairingRoute(() => ({
+      ok: true,
+      result: {
+        code: "K7QP-2M4X",
+        expiresAt,
+        serverUrl: "https://workstation.getbb.app",
+        sealed: SEALED_PAIRING,
+      },
+    }));
     const slot = renderSlot(
       app.settingsSections[0]!,
       {},
@@ -387,11 +423,6 @@ describe("connect settings section", () => {
         rpc: {
           status: () => connected(),
           mobilePairing: () => ({ enabled: true }),
-          createMachineCode: () => ({
-            code: "K7QP-2M4X",
-            expiresAt,
-            serverUrl: "https://workstation.getbb.app",
-          }),
         },
       },
     );
@@ -402,12 +433,7 @@ describe("connect settings section", () => {
       await slot.findByRole("button", { name: "Add mobile device" }),
     );
 
-    await waitFor(() =>
-      expect(slot.rpcCalls).toContainEqual({
-        method: "createMachineCode",
-        input: null,
-      }),
-    );
+    await waitFor(() => expect(fetchMock).toHaveBeenCalledTimes(1));
     await slot.findByText("K7QP-2M4X");
     slot.getByRole("button", { name: "Copy pairing code" });
     slot.getByText(/Code expires in 9:5\d/);
@@ -420,6 +446,18 @@ describe("connect settings section", () => {
 
   it("an expired mobile pairing code offers a fresh one", async () => {
     let minted = 0;
+    stubMobilePairingRoute(() => {
+      minted += 1;
+      return {
+        ok: true,
+        result: {
+          code: minted === 1 ? "AAAA-1111" : "BBBB-2222",
+          expiresAt: Date.now() + (minted === 1 ? 1_200 : 600_000),
+          serverUrl: "https://workstation.getbb.app",
+          sealed: SEALED_PAIRING,
+        },
+      };
+    });
     const slot = renderSlot(
       app.settingsSections[0]!,
       {},
@@ -427,14 +465,6 @@ describe("connect settings section", () => {
         rpc: {
           status: () => connected(),
           mobilePairing: () => ({ enabled: true }),
-          createMachineCode: () => {
-            minted += 1;
-            return {
-              code: minted === 1 ? "AAAA-1111" : "BBBB-2222",
-              expiresAt: Date.now() + (minted === 1 ? 1_200 : 600_000),
-              serverUrl: "https://workstation.getbb.app",
-            };
-          },
         },
       },
     );
@@ -457,6 +487,7 @@ describe("connect settings section", () => {
   });
 
   it("explains the account machine limit with a dashboard link", async () => {
+    stubMobilePairingRoute(() => ({ ok: false, error: "machine_limit" }));
     const slot = renderSlot(
       app.settingsSections[0]!,
       {},
@@ -464,9 +495,6 @@ describe("connect settings section", () => {
         rpc: {
           status: () => connected(),
           mobilePairing: () => ({ enabled: true }),
-          createMachineCode: () => {
-            throw new Error("machine_limit");
-          },
         },
       },
     );

@@ -19,6 +19,38 @@ import {
   CONNECT_REALTIME_CHANNEL,
   REMOTE_ACTIVITY_INSTRUCTIONS_MS,
 } from "./types.js";
+import { createDeviceCodeIssuer } from "./sealed/device-codes.js";
+import { createKvDeviceRegistry } from "./sealed/devices.js";
+import { createKvServerIdentityStore } from "./sealed/identity.js";
+import { registerSealedRoutes } from "./sealed/route.js";
+import { SealedAccess } from "./sealed/sealed-access.js";
+import {
+  SEALED_HTTP_PREFIX,
+  SEALED_INFO_ROUTE_PATH,
+  SEALED_REALTIME_CHANNEL,
+} from "./sealed/types.js";
+
+const ALIAS_PROBE_TIMEOUT_MS = 1_500;
+
+async function portServesThisBb(
+  port: number,
+  info: () => Promise<{ publicKey: string }>,
+): Promise<boolean> {
+  try {
+    const response = await fetch(
+      `http://127.0.0.1:${port}${SEALED_HTTP_PREFIX}${SEALED_INFO_ROUTE_PATH}`,
+      { signal: AbortSignal.timeout(ALIAS_PROBE_TIMEOUT_MS) },
+    );
+    if (!response.ok) return false;
+    const body = (await response.json()) as { publicKey?: unknown };
+    return (
+      typeof body.publicKey === "string" &&
+      body.publicKey === (await info()).publicKey
+    );
+  } catch {
+    return false;
+  }
+}
 
 export default async function plugin(bb: BbPluginApi) {
   const settings = bb.settings.define({
@@ -36,6 +68,7 @@ export default async function plugin(bb: BbPluginApi) {
   });
   const store = createKvCredentialStore(bb.storage.kv);
   let tunnel!: ConnectTunnel;
+  let sealed!: SealedAccess;
   const hostResolver = new ShareHostResolver(() => bb.sdk);
   const getLoopbackBaseUrl = () =>
     resolveLocalCloudLoopbackUrl(
@@ -49,6 +82,7 @@ export default async function plugin(bb: BbPluginApi) {
     hostResolver,
     getLoopbackBaseUrl,
     getCredential: () => tunnel.getCredential(),
+    servesThisBb: (port) => portServesThisBb(port, () => sealed.info()),
     log: bb.log,
     onChange: () => {
       bb.realtime.publish(CONNECT_REALTIME_CHANNEL, tunnel.status());
@@ -70,6 +104,61 @@ export default async function plugin(bb: BbPluginApi) {
       bb.realtime.publish(CONNECT_REALTIME_CHANNEL, status);
       recheckServerAccess(status);
     },
+    guardStream: (stream) => sealed.guardStream(stream),
+    sealedRemoteClients: () => sealed.remoteClients,
+    onPaired: async () => {
+      if (await sealed.requireForNewPairing()) {
+        bb.log.info(
+          "sealed connections are required for this new pairing; approve devices with `bb connect approve-device` or a device code",
+        );
+      }
+    },
+  });
+
+  let publishSealed = Promise.resolve();
+  sealed = new SealedAccess({
+    identity: createKvServerIdentityStore(bb.storage.kv),
+    devices: createKvDeviceRegistry(bb.storage.kv),
+    codes: createDeviceCodeIssuer(),
+    policy: bb.storage.kv,
+    log: bb.log,
+    onChange: () => {
+      publishSealed = publishSealed
+        .then(() => sealed.status())
+        .then((status) => {
+          bb.realtime.publish(SEALED_REALTIME_CHANNEL, status);
+        })
+        .catch((error: unknown) => {
+          bb.log.warn(
+            `failed to publish sealed status: ${error instanceof Error ? error.message : String(error)}`,
+          );
+        });
+      tunnel.republish();
+    },
+    onRequired: () => {
+      const closed = tunnel.reguard();
+      if (closed > 0) {
+        bb.log.info(
+          `closed ${closed} readable Connect stream${closed === 1 ? "" : "s"} because encryption is now required`,
+        );
+      }
+    },
+  });
+
+  await sealed.load();
+
+  registerSealedRoutes({
+    bb,
+    access: sealed,
+    createMachineCode: () => tunnel.createMachineCode(),
+    getLoopbackBaseUrl,
+    getPublicOrigin: () => {
+      const url = tunnel.getCredential()?.serverUrl;
+      return url === undefined ? null : new URL(url).origin;
+    },
+    log: bb.log,
+    onActivity: (at) => tunnel.noteRemoteActivity(at),
+    onRemoteClientsChange: () => tunnel.republish(),
   });
 
   await registerServerAccess(bb, tunnel);
@@ -80,9 +169,9 @@ export default async function plugin(bb: BbPluginApi) {
 
   bb.rpc.register(
     connectRpcContract,
-    createRpcHandlers(tunnel, hostResolver, mobilePairing),
+    createRpcHandlers(tunnel, hostResolver, mobilePairing, sealed),
   );
-  registerConnectCli({ bb, tunnel, hostResolver, mobilePairing });
+  registerConnectCli({ bb, tunnel, hostResolver, mobilePairing, sealed });
 
   bb.agents.contributeInstructions(() => {
     if (!currentSettings.sendRemoteInstructions) return null;
@@ -101,6 +190,12 @@ export default async function plugin(bb: BbPluginApi) {
     );
   });
 
+  if (tunnel.getCredential() !== null && !sealed.hasPolicy) {
+    bb.status.needsConfiguration(
+      "This bb was paired before sealed connections existed. Decide whether to require them: Settings → Remote access, or `bb connect require-encryption on|off`. Until then the relay can still read API traffic.",
+    );
+  }
+
   bb.background.service("tunnel", {
     async start(signal) {
       await tunnel.start();
@@ -112,6 +207,7 @@ export default async function plugin(bb: BbPluginApi) {
         signal.addEventListener("abort", () => resolve(), { once: true });
       });
       tunnel.stop();
+      sealed.disconnectAll();
     },
   });
 }

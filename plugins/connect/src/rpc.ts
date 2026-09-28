@@ -10,6 +10,10 @@ import type { ConnectTunnel } from "./tunnel.js";
 import type { ConnectStatus, ShareListing } from "./types.js";
 import { MachineCodeError, type MachineCode } from "./machine-code.js";
 import type { ShareHostResolver } from "./hosts.js";
+import { DEVICE_SURFACES } from "@bb/sealed-channel";
+import { DEVICE_STATUSES } from "./sealed/devices.js";
+import type { SealedAccess } from "./sealed/sealed-access.js";
+import type { SealedDeviceSummary, SealedStatus } from "./sealed/types.js";
 
 const pairInputSchema = z.object({
   code: z.string().min(1),
@@ -95,6 +99,37 @@ const machineCodeSchema: z.ZodType<MachineCode> = z
   })
   .strict();
 
+const sealedDeviceSchema: z.ZodType<SealedDeviceSummary> = z
+  .object({
+    id: z.string(),
+    name: z.string(),
+    surface: z.enum(DEVICE_SURFACES),
+    status: z.enum(DEVICE_STATUSES),
+    fingerprint: z.string(),
+    createdAt: z.number(),
+    approvedAt: z.number().nullable(),
+    revokedAt: z.number().nullable(),
+    lastSeenAt: z.number().nullable(),
+    connected: z.boolean(),
+    parentId: z.string().nullable(),
+    approvedVia: z
+      .enum(["device-code", "manual", "delegation", "account-gate"])
+      .nullable(),
+  })
+  .strict();
+
+const sealedStatusSchema: z.ZodType<SealedStatus> = z
+  .object({
+    protocolVersion: z.number().int(),
+    publicKey: z.string(),
+    fingerprint: z.string(),
+    identityCreatedAt: z.number(),
+    required: z.boolean(),
+    activeChannels: z.number().int(),
+    devices: z.array(sealedDeviceSchema),
+  })
+  .strict();
+
 export const connectRpcContract = defineRpcContract({
   pair: { input: pairInputSchema, output: connectStatusSchema },
   status: { input: z.null(), output: connectStatusSchema },
@@ -123,6 +158,7 @@ export const connectRpcContract = defineRpcContract({
     input: revokeMachineInputSchema,
     output: z.object({ ok: z.literal(true) }).strict(),
   },
+  sealedStatus: { input: z.null(), output: sealedStatusSchema },
 });
 
 type ConnectRpcHandlers = PluginRpcHandlers<typeof connectRpcContract>;
@@ -147,8 +183,12 @@ export function createRpcHandlers(
   tunnel: ConnectTunnel,
   hostResolver: ShareHostResolver,
   mobilePairing: MobilePairingGate,
+  sealed: SealedAccess,
 ): ConnectRpcHandlers {
   return {
+    async sealedStatus() {
+      return sealed.status();
+    },
     async pair(args) {
       return rethrowErrorCode(
         () =>
