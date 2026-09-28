@@ -767,7 +767,11 @@ async function reconcileCandidates(
       state.generationByPluginId.set(pluginId, generation);
       await deps.applyCss(pluginId, candidate.bundle.cssUrl);
       const cssRelease =
-        collected.contentScripts.length > 0 ? deps.retainCss(pluginId) : null;
+        collected.contentScripts.length > 0 ||
+        collected.threadHeaderActions.length > 0 ||
+        collected.threadPanelActions.length > 0
+          ? deps.retainCss(pluginId)
+          : null;
       const disposeFailures = await deactivateCommittedGeneration(
         pluginId,
         state,

@@ -368,6 +368,45 @@ describe("reconcilePluginFrontends", () => {
     expect(stylesheetIsActive()).toBe(false);
   });
 
+  it.each(["header", "panel"] as const)(
+    "activates thread %s action CSS before the first thread opens",
+    async (kind) => {
+      const state = createPluginFrontendReconcileState();
+      const deps = makeDeps([candidate("thread-action", "v1")]);
+      deps.applyCss = applyPluginCss;
+      deps.retainCss = retainPluginCss;
+      deps.importModule.mockResolvedValue(
+        contentScriptModule((app) => {
+          if (kind === "header") {
+            app.slots.experimental_threadHeaderAction({
+              id: "details",
+              title: "Details",
+              component: () => null,
+            });
+          } else {
+            app.slots.threadPanelAction({
+              id: "details",
+              title: "Details",
+              icon: "Info",
+              component: () => null,
+            });
+          }
+        }),
+      );
+
+      await reconcilePluginFrontends(state, deps);
+      expect(
+        document.head.querySelector('link[data-bb-plugin-css="thread-action"]'),
+      ).not.toBeNull();
+
+      deps.fetchCandidates.mockResolvedValue([]);
+      await reconcilePluginFrontends(state, deps);
+      expect(
+        document.head.querySelector('link[data-bb-plugin-css="thread-action"]'),
+      ).toBeNull();
+    },
+  );
+
   it("keeps the active sheet through a real generation reload and a failed CSS replacement", async () => {
     const state = createPluginFrontendReconcileState();
     const deps = makeDeps([candidate("hello", "v1")]);
