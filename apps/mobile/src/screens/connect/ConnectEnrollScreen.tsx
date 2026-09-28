@@ -96,6 +96,7 @@ export function ConnectEnrollScreen() {
         apexUrl: target.apexUrl,
         code: target.code,
         label: reauth?.label,
+        sealed: target.sealed,
       });
       setPhase({ kind: "saving" });
       let profileId: string;
@@ -104,6 +105,9 @@ export function ConnectEnrollScreen() {
           serverUrl: redeemed.profile.serverUrl,
           handle: redeemed.profile.handle,
           credential: redeemed.profile.credential,
+          ...(redeemed.profile.sealed !== undefined
+            ? { sealed: redeemed.profile.sealed }
+            : {}),
         });
         profileId = updated.id;
       } else {
@@ -141,6 +145,7 @@ export function ConnectEnrollScreen() {
       code: input.code,
       server: input.serverUrl ?? server,
       apexUrl: input.apexUrl ?? apexUrl,
+      sealed: input.sealed,
     });
   };
 

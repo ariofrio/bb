@@ -146,7 +146,9 @@ export function ServersScreen() {
                 title={profile.label}
                 subtitle={
                   profile.mode === "connect"
-                    ? `@${profile.handle} · ${profile.serverUrl}`
+                    ? profile.sealed !== undefined
+                      ? `@${profile.handle} · sealed transport, ${profile.sealed.verified ? "verified" : "unverified"} key ${profile.sealed.fingerprint}`
+                      : `@${profile.handle} · ${profile.serverUrl}`
                     : profile.serverUrl
                 }
                 leading={profile.mode === "connect" ? "Globe" : "Laptop"}
