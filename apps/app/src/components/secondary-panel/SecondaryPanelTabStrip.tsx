@@ -190,27 +190,16 @@ export function SecondaryPanelTabStrip({
     );
   }, []);
 
-  const measureCapacity = useCallback(() => {
-    const strip = stripRef.current;
-    const viewport = viewportRef.current;
-    const content = contentRef.current;
-    if (strip === null || viewport === null || content === null) {
-      return;
-    }
-    const hasOverflow =
-      content.scrollWidth > strip.clientWidth + EDGE_EPSILON_PX;
-    hasOverflowRef.current = hasOverflow;
-    maxScrollLeftRef.current = hasOverflow
-      ? Math.max(0, viewport.scrollWidth - viewport.clientWidth)
-      : 0;
-    applyEdgeFlags();
-  }, [applyEdgeFlags]);
-
   useEffect(() => {
     const viewport = viewportRef.current;
-    if (viewport === null) {
+    const strip = stripRef.current;
+    const content = contentRef.current;
+    if (viewport === null || strip === null || content === null) {
       return;
     }
+    let stripWidth: number | null = null;
+    let viewportWidth: number | null = null;
+    let contentWidth: number | null = null;
     const handleScroll = () => {
       if (scrollFrameRef.current !== null) {
         return;
@@ -221,14 +210,31 @@ export function SecondaryPanelTabStrip({
       });
     };
     viewport.addEventListener("scroll", handleScroll, { passive: true });
-    const resizeObserver = new ResizeObserver(measureCapacity);
-    if (stripRef.current !== null) {
-      resizeObserver.observe(stripRef.current);
-    }
+    const resizeObserver = new ResizeObserver((entries) => {
+      for (const entry of entries) {
+        const width =
+          entry.borderBoxSize[0]?.inlineSize ?? entry.contentRect.width;
+        if (entry.target === strip) stripWidth = width;
+        if (entry.target === viewport) viewportWidth = width;
+        if (entry.target === content) contentWidth = width;
+      }
+      if (
+        stripWidth === null ||
+        viewportWidth === null ||
+        contentWidth === null
+      ) {
+        return;
+      }
+      const hasOverflow = contentWidth > stripWidth + EDGE_EPSILON_PX;
+      hasOverflowRef.current = hasOverflow;
+      maxScrollLeftRef.current = hasOverflow
+        ? Math.max(0, contentWidth - viewportWidth)
+        : 0;
+      applyEdgeFlags();
+    });
+    resizeObserver.observe(strip);
     resizeObserver.observe(viewport);
-    if (contentRef.current !== null) {
-      resizeObserver.observe(contentRef.current);
-    }
+    resizeObserver.observe(content);
     return () => {
       viewport.removeEventListener("scroll", handleScroll);
       resizeObserver.disconnect();
@@ -237,15 +243,7 @@ export function SecondaryPanelTabStrip({
         scrollFrameRef.current = null;
       }
     };
-  }, [applyEdgeFlags, measureCapacity]);
-
-  useEffect(() => {
-    measureCapacity();
-  }, [tabs, measureCapacity]);
-
-  useEffect(() => {
-    void document.fonts?.ready?.then(() => measureCapacity());
-  }, [measureCapacity]);
+  }, [applyEdgeFlags]);
 
   useLayoutEffect(() => {
     const activeTabElement = activeTabRef.current;

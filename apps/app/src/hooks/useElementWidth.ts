@@ -4,10 +4,15 @@ export function useElementWidth() {
   const [width, setWidth] = useState(0);
   const ref = useCallback((element: HTMLDivElement | null) => {
     if (element === null) return;
-    setWidth(element.getBoundingClientRect().width);
-    if (typeof ResizeObserver === "undefined") return;
-    const observer = new ResizeObserver(() => {
+    if (typeof ResizeObserver === "undefined") {
       setWidth(element.getBoundingClientRect().width);
+      return;
+    }
+    const observer = new ResizeObserver((entries) => {
+      const entry = entries.find((entry) => entry.target === element);
+      if (entry) {
+        setWidth(entry.borderBoxSize[0]?.inlineSize ?? entry.contentRect.width);
+      }
     });
     observer.observe(element);
     return () => observer.disconnect();

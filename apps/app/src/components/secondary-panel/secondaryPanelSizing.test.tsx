@@ -51,11 +51,25 @@ it("revalidates pixel minimums on container resize while preserving explicit col
   );
   vi.stubGlobal(
     "ResizeObserver",
-    class {
-      constructor(callback: () => void) {
-        notify = callback;
+    class implements ResizeObserver {
+      private target: Element | null = null;
+      constructor(callback: ResizeObserverCallback) {
+        notify = () => {
+          if (this.target === null) return;
+          const entry: ResizeObserverEntry = {
+            target: this.target,
+            contentRect: new DOMRect(0, 0, width, 600),
+            borderBoxSize: [{ inlineSize: width, blockSize: 600 }],
+            contentBoxSize: [{ inlineSize: width, blockSize: 600 }],
+            devicePixelContentBoxSize: [],
+          };
+          callback([entry], this);
+        };
       }
-      observe() {}
+      observe(target: Element) {
+        this.target = target;
+      }
+      unobserve() {}
       disconnect() {}
     },
   );
@@ -87,6 +101,7 @@ it("revalidates pixel minimums on container resize while preserving explicit col
       <Panels />
     </SecondaryPanelSizingProvider>,
   );
+  act(() => notify());
   const size = (id: string) =>
     Number(screen.getByTestId(id).getAttribute("data-panel-size"));
   expect(size("main")).toBeCloseTo(10);

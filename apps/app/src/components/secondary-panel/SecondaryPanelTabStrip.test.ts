@@ -181,20 +181,47 @@ describe("secondary panel tab-strip edge fades", () => {
     const rightFade = container.querySelector("[data-overflow-fade='right']");
     expect(rightFade?.classList.contains("opacity-0")).toBe(true);
     Object.defineProperties(viewport!, {
-      clientWidth: { configurable: true, value: 120 },
-      scrollWidth: { configurable: true, value: 240 },
+      clientWidth: {
+        configurable: true,
+        get: () => {
+          throw new Error("forced layout");
+        },
+      },
+      scrollWidth: {
+        configurable: true,
+        get: () => {
+          throw new Error("forced layout");
+        },
+      },
       scrollLeft: { configurable: true, value: 0, writable: true },
     });
     Object.defineProperty(strip!, "clientWidth", {
       configurable: true,
-      value: 120,
+      get: () => {
+        throw new Error("forced layout");
+      },
     });
     Object.defineProperty(content!, "scrollWidth", {
       configurable: true,
-      value: 240,
+      get: () => {
+        throw new Error("forced layout");
+      },
+    });
+    const resized = (
+      target: Element,
+      inlineSize: number,
+    ): ResizeObserverEntry => ({
+      target,
+      borderBoxSize: [{ inlineSize, blockSize: 28 }],
+      contentBoxSize: [],
+      devicePixelContentBoxSize: [],
+      contentRect: target.getBoundingClientRect(),
     });
     act(() => {
-      resizeCallback?.([], {} as ResizeObserver);
+      resizeCallback?.(
+        [resized(strip!, 120), resized(viewport!, 120), resized(content!, 240)],
+        {} as ResizeObserver,
+      );
     });
     expect(rightFade?.classList.contains("opacity-100")).toBe(true);
 
@@ -237,12 +264,8 @@ describe("secondary panel tab-strip edge fades", () => {
     expect(leftButton?.getAttribute("aria-hidden")).toBe("false");
     expect(document.activeElement).toBe(leftButton);
 
-    Object.defineProperty(content!, "scrollWidth", {
-      configurable: true,
-      value: 100,
-    });
     act(() => {
-      resizeCallback?.([], {} as ResizeObserver);
+      resizeCallback?.([resized(content!, 100)], {} as ResizeObserver);
     });
     expect(leftButton?.classList.contains("w-0")).toBe(true);
     expect(rightButton?.classList.contains("w-0")).toBe(true);
