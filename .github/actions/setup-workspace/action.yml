@@ -19,6 +19,14 @@ inputs:
 runs:
   using: composite
   steps:
+    # git commit and similar commands start a detached
+    # `git maintenance run --auto`. It can still be writing into .git/objects
+    # when a test deletes its temporary repository, failing cleanup with
+    # ENOTEMPTY.
+    - name: Disable background git maintenance
+      shell: bash
+      run: git config --global maintenance.auto false
+
     # A pinned release binary instead of pnpm/action-setup: the action
     # bootstraps through `npm ci` and `pnpm self-update`, two npm registry
     # round trips that cost 30 s at best and stalled for 7 minutes on every
