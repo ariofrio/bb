@@ -15,6 +15,7 @@ export {
 export {
   type NativeScreen,
   parsePageToShellMessage,
+  type BridgeRequest,
   type BridgeSharePayload,
   type PageToShellMessage,
 } from "./messages.js";
