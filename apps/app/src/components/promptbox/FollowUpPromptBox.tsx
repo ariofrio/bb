@@ -5,7 +5,6 @@ import {
   memo,
   useCallback,
   useEffect,
-  useLayoutEffect,
   useMemo,
   useRef,
   useState,
@@ -663,16 +662,13 @@ function FollowUpPromptBoxWithComposer({
     setStackHeight(measured);
   }, []);
 
-  useLayoutEffect(() => {
-    const element = stackRef.current;
-    if (element) {
-      applyStackHeight(element.offsetHeight);
-    }
-  }, [applyStackHeight]);
-
   useEffect(() => {
     const element = stackRef.current;
-    if (!element || typeof ResizeObserver === "undefined") return;
+    if (!element) return;
+    if (typeof ResizeObserver === "undefined") {
+      applyStackHeight(element.offsetHeight);
+      return;
+    }
     const observer = new ResizeObserver((entries) => {
       const entry = entries.find((candidate) => candidate.target === element);
       if (!entry) return;

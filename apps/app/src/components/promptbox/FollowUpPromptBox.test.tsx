@@ -175,7 +175,9 @@ vi.mock("@/components/promptbox/PromptBoxInternal", () => ({
         title={submission?.title}
         data-show-modifier-action={submission?.showModifierSubmitAction}
         onClick={
-          submission?.swapSubmitActions ? onSubmit : submission?.onModifierSubmit
+          submission?.swapSubmitActions
+            ? onSubmit
+            : submission?.onModifierSubmit
         }
       >
         Modifier submit
@@ -337,6 +339,58 @@ beforeEach(() => {
 });
 
 describe("FollowUpPromptBox", () => {
+  it("uses the observer without forcing a synchronous stack measurement on mount", () => {
+    const measuredElements: HTMLElement[] = [];
+    const offsetHeight = vi
+      .spyOn(HTMLElement.prototype, "offsetHeight", "get")
+      .mockImplementation(function (this: HTMLElement) {
+        measuredElements.push(this);
+        return 24;
+      });
+    render(
+      <FollowUpPromptBox
+        {...createFollowUpPromptBoxProps({ kind: "ready" })}
+        stack={<div data-testid="measured-stack">Stack</div>}
+      />,
+    );
+    const stackElement = screen.getByTestId("measured-stack").parentElement;
+    if (!stackElement) throw new Error("Expected measured composer stack");
+    const measuredOnMount = measuredElements.includes(stackElement);
+    offsetHeight.mockRestore();
+
+    expect(measuredOnMount).toBe(false);
+    act(() => {
+      resizeObserverCallback?.(
+        [
+          {
+            target: stackElement,
+            borderBoxSize: [{ blockSize: 24 }],
+            contentRect: { height: 999 },
+          } as unknown as ResizeObserverEntry,
+        ],
+        {} as ResizeObserver,
+      );
+    });
+    expect(screen.getByTestId("prompt-box").dataset.minHeight).toBe("76");
+  });
+
+  it("measures the stack after mount when ResizeObserver is unavailable", () => {
+    vi.stubGlobal("ResizeObserver", undefined);
+    const offsetHeight = vi
+      .spyOn(HTMLElement.prototype, "offsetHeight", "get")
+      .mockReturnValue(24);
+    render(
+      <FollowUpPromptBox
+        {...createFollowUpPromptBoxProps({ kind: "ready" })}
+        stack={<div>Stack</div>}
+      />,
+    );
+    const minHeight = screen.getByTestId("prompt-box").dataset.minHeight;
+    offsetHeight.mockRestore();
+
+    expect(minHeight).toBe("76");
+  });
+
   it("does not commit an unchanged measurement while a height update is pending", () => {
     const onRender = vi.fn();
     render(
