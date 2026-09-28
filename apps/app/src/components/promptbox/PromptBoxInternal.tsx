@@ -1998,8 +1998,14 @@ export function PromptBoxInternal({
       return;
     }
 
-    const handle = window.requestAnimationFrame(focusEditor);
-    return () => window.cancelAnimationFrame(handle);
+    let timer: number | undefined;
+    const handle = window.requestAnimationFrame(() => {
+      timer = window.setTimeout(focusEditor, 0);
+    });
+    return () => {
+      window.cancelAnimationFrame(handle);
+      if (timer !== undefined) window.clearTimeout(timer);
+    };
   }, [
     autoFocus,
     editor,

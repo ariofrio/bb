@@ -1070,6 +1070,33 @@ describe("PromptBoxInternal controlled value sync", () => {
     }
   });
 
+  it("waits until after paint before passive autofocus can force layout", async () => {
+    const restoreMatchMedia = mockPointerCoarse(false);
+    try {
+      const props = createPromptBoxProps({ autoFocus: false });
+      const view = render(<PromptBoxInternal {...props} />);
+      await waitFor(() =>
+        expect(getPromptEditorElement()).toBeInstanceOf(HTMLElement),
+      );
+      const frames: FrameRequestCallback[] = [];
+      vi.spyOn(window, "requestAnimationFrame").mockImplementation((callback) =>
+        frames.push(callback),
+      );
+      vi.useFakeTimers({ toFake: ["setTimeout", "clearTimeout"] });
+      view.rerender(<PromptBoxInternal {...props} autoFocus />);
+      act(() => {
+        for (const frame of frames.splice(0)) frame(performance.now());
+      });
+      expect(document.activeElement).not.toBe(getPromptEditorElement());
+      await act(() => vi.runOnlyPendingTimersAsync());
+      expect(document.activeElement).toBe(getPromptEditorElement());
+    } finally {
+      vi.useRealTimers();
+      vi.restoreAllMocks();
+      restoreMatchMedia();
+    }
+  });
+
   it("skips passive autofocus on coarse pointers", async () => {
     const restoreMatchMedia = mockPointerCoarse(true);
     try {
