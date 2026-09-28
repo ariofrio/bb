@@ -331,9 +331,15 @@ function hugeiconsBundleAlias(): { find: RegExp; replacement: string }[] {
   }
 }
 
+function readTestTimeoutScale(): number {
+  const parsed = Number(process.env.BB_TEST_TIMEOUT_SCALE ?? 1);
+  return Number.isFinite(parsed) && parsed > 0 ? parsed : 1;
+}
+
 export function defineWorkspaceTestConfig(
   config: ViteUserConfig,
 ): ViteUserConfig {
+  const timeoutScale = readTestTimeoutScale();
   return mergeConfig(
     {
       resolve: {
@@ -341,6 +347,8 @@ export function defineWorkspaceTestConfig(
         conditions: ["source"],
       },
       test: {
+        testTimeout: Math.ceil(5_000 * timeoutScale),
+        hookTimeout: Math.ceil(10_000 * timeoutScale),
         globalSetup: [
           fileURLToPath(new URL("./vitest.global-tmpdir.ts", import.meta.url)),
         ],

@@ -156,6 +156,8 @@ jobs:
 
       - name: Test
         run: ${{ matrix.shard == 'packages' && 'xvfb-run -a' || '' }} pnpm exec turbo run test ${{ matrix.filter }} --cache-dir=.turbo/cache --output-logs=new-only --concurrency=4 ${{ matrix.args }}
+        env:
+          BB_TEST_TIMEOUT_SCALE: "4"
 
   # Every other suite mocks the Agent SDK, so an upstream CLI release that
   # breaks the model probe passes CI silently. This runs it against a real,
@@ -192,7 +194,11 @@ jobs:
 
     # Fork pull requests cannot read secrets, so the probe would fail
     # unauthenticated for reasons unrelated to bb.
-    if: ${{ github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository }}
+    # Forks opt in with the RUN_PROVIDER_MODEL_LISTING variable once they add
+    # the CLAUDE_CODE_OAUTH_TOKEN secret.
+    if: >-
+      ${{ (github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository)
+      && (github.repository == 'get-bb/bb' || vars.RUN_PROVIDER_MODEL_LISTING == 'true') }}
 
     steps:
       - name: Checkout repository
