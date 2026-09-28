@@ -145,8 +145,11 @@ shows the upgrade command.
   launched; pass `--bundled` to run the launched copy regardless. bb keeps the
   running and previous versions and deletes older ones. Stable installs follow
   the `latest` dist-tag and nightly builds follow `nightly`.
-- **Source checkouts** update only from a clean `main` that fast-forwards to
-  `origin/main`. bb stops, fast-forwards, runs `pnpm install --frozen-lockfile`,
+- **Source checkouts** update only from a clean checkout of the repository's
+  default branch (the branch `origin/HEAD` names, else `main`) that
+  fast-forwards to its `origin` counterpart. A fork whose default branch is
+  `current` updates `current` from `origin/current`; run
+  `git remote set-head origin --auto` after changing the default. bb stops, fast-forwards, runs `pnpm install --frozen-lockfile`,
   rebuilds, and restarts. Other branches, local commits, and uncommitted tracked
   changes block the update with an explanation.
 

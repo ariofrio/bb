@@ -193,7 +193,7 @@ export function createLauncherAppUpdateController(
     if (args.repoRoot === null) {
       throw new Error("This bb is not running from a source checkout.");
     }
-    setStep("Checking origin/main");
+    setStep("Checking the source branch");
     const check = await inspectSourceCheckout({
       fetch: true,
       repoRoot: args.repoRoot,
@@ -202,7 +202,7 @@ export function createLauncherAppUpdateController(
     if (check.blocked !== null) throw new Error(check.blocked.message);
     if (check.incoming === null || check.incoming.commit !== target.commit) {
       throw new Error(
-        "origin/main changed since the update was offered. Check for updates again.",
+        "The source branch changed since the update was offered. Check for updates again.",
       );
     }
     return {

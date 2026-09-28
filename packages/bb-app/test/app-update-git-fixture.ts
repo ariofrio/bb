@@ -46,16 +46,18 @@ export async function commitVersion(
   return git(repo, "rev-parse", "HEAD");
 }
 
-export async function createGitCheckout(): Promise<GitCheckoutFixture> {
+export async function createGitCheckout(
+  branch = "main",
+): Promise<GitCheckoutFixture> {
   const root = mkdtempSync(join(tmpdir(), "bb-app-update-git-"));
   const origin = join(root, "origin.git");
   const upstream = join(root, "upstream");
   const checkout = join(root, "checkout");
-  await git(root, "init", "-q", "--bare", "-b", "main", origin);
-  await git(root, "init", "-q", "-b", "main", upstream);
+  await git(root, "init", "-q", "--bare", "-b", branch, origin);
+  await git(root, "init", "-q", "-b", branch, upstream);
   await git(upstream, "remote", "add", "origin", origin);
   await commitVersion(upstream, "1.0.0", "Initial commit");
-  await git(upstream, "push", "-q", "origin", "main");
+  await git(upstream, "push", "-q", "origin", branch);
   await git(root, "clone", "-q", origin, checkout);
   return {
     checkout,
@@ -71,6 +73,6 @@ export async function publish(
   subject: string,
 ): Promise<string> {
   const commit = await commitVersion(upstream, version, subject);
-  await git(upstream, "push", "-q", "origin", "main");
+  await git(upstream, "push", "-q", "origin", "HEAD");
   return commit;
 }
