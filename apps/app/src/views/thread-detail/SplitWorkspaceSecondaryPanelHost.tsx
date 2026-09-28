@@ -40,6 +40,7 @@ import {
   PANEL_RESIZE_HANDLE_LAYER_CLASS,
   PANEL_RESIZE_HIT_TARGET_CLASS,
 } from "@/components/secondary-panel/panelTransitionTokens";
+import { dispatchBrowserViewBoundsSync } from "@/lib/browser-view-bounds-sync";
 import { MACOS_APP_REGION_NO_DRAG_CLASS } from "@/lib/bb-desktop";
 import { PluginComposerHostProvider } from "@/components/plugin/plugin-composer-host";
 import { usePanelResizeSnap } from "@/components/secondary-panel/usePanelResizeSnap";
@@ -239,6 +240,15 @@ export function SplitWorkspaceSecondaryPanelHost({
             }
             minSize={minimumSize.min * 100}
             order={1}
+            onTransitionEnd={(event) => {
+              if (
+                event.target === event.currentTarget &&
+                (event.propertyName === "flex-grow" ||
+                  event.propertyName === "flex-basis")
+              ) {
+                dispatchBrowserViewBoundsSync();
+              }
+            }}
             className={cn(
               "min-w-0 overflow-clip transition-[flex-grow,flex-basis]",
               PANEL_COLLAPSE_TRANSITION_CLASS,

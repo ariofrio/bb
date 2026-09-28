@@ -10,7 +10,13 @@ import {
   within,
 } from "@testing-library/react";
 import { createStore, Provider as JotaiProvider } from "jotai";
-import { useContext, useMemo, useState, type ReactNode } from "react";
+import {
+  useContext,
+  useMemo,
+  useState,
+  type ReactNode,
+  type TransitionEventHandler,
+} from "react";
 import { MemoryRouter, useLocation, useNavigate } from "react-router-dom";
 import { QueryClientProvider } from "@tanstack/react-query";
 import { PERSONAL_PROJECT_ID } from "@bb/domain";
@@ -185,15 +191,21 @@ vi.mock("react-resizable-panels", async () => {
     id,
     onCollapse,
     onResize,
+    onTransitionEnd,
   }: {
     children?: ReactNode;
     id?: string;
     onCollapse?: () => void;
     onResize?: (size: number) => void;
+    onTransitionEnd?: TransitionEventHandler<HTMLDivElement>;
   }) => {
     if (id !== undefined) panelCallbacks.set(id, { onCollapse, onResize });
     return (
-      <div data-testid="workspace-panel" data-panel-id={id}>
+      <div
+        data-testid="workspace-panel"
+        data-panel-id={id}
+        onTransitionEnd={onTransitionEnd}
+      >
         {children}
       </div>
     );
@@ -722,6 +734,31 @@ afterEach(() => {
 });
 
 describe("SplitThreadArea", () => {
+  it("refreshes native bounds after the shared conversation panel finishes moving", async () => {
+    renderSplitArea({
+      path: "/projects/project-1/threads/thr-a",
+      layout: twoPaneLayout("pane-1"),
+    });
+    const main = await waitFor(() => {
+      const panel = document.querySelector(
+        '[data-panel-id="split-workspace-main-panel"]',
+      );
+      expect(panel).not.toBeNull();
+      return panel!;
+    });
+    expect(main).not.toBeNull();
+    const sync = vi.fn();
+    window.addEventListener("bb:browser-view-bounds-sync", sync);
+    try {
+      const event = new Event("transitionend", { bubbles: true });
+      Object.defineProperty(event, "propertyName", { value: "flex-grow" });
+      fireEvent(main, event);
+      expect(sync).toHaveBeenCalledTimes(1);
+    } finally {
+      window.removeEventListener("bb:browser-view-bounds-sync", sync);
+    }
+  });
+
   it("hosts Browser-tab navigation on compact plugin-panel routes", async () => {
     viewportState.compact = true;
 
@@ -2279,8 +2316,8 @@ describe("SplitThreadArea", () => {
     );
     await waitFor(() =>
       expect(
-        screen.getAllByRole("button", { name: "Close pane" })[0]
-          ?.parentElement?.nextElementSibling,
+        screen.getAllByRole("button", { name: "Close pane" })[0]?.parentElement
+          ?.nextElementSibling,
       ).toBeNull(),
     );
   });
