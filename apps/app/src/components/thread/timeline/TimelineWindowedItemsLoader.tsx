@@ -45,6 +45,7 @@ export interface TimelineWindowedItemsProps {
   gap: number;
   getScrollElement: (() => HTMLElement | null) | null;
   itemKeys: readonly string[];
+  initialScrollAnchor?: { key: string; align: "start" | "end" };
   measurements: Map<string, number>;
   minItemCount?: number;
   renderItem: (

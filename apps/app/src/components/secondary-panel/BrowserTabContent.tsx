@@ -97,17 +97,9 @@ interface BrowserChromeProps {
   pluginActions: ReactNode;
 }
 
-interface BrowserViewBoundsFromElementArgs {
-  element: HTMLElement;
-}
-
 interface BrowserViewBoundsEqualArgs {
   a: BbDesktopBrowserViewBounds;
   b: BbDesktopBrowserViewBounds;
-}
-
-interface SyncBrowserViewPlacementArgs {
-  force: boolean;
 }
 
 interface BrowserViewAttachIdentity {
@@ -144,15 +136,6 @@ function browserViewportBounds(): BbDesktopBrowserViewportBounds {
     width: window.innerWidth,
     height: window.innerHeight,
   };
-}
-
-function browserViewBoundsFromElement(
-  args: BrowserViewBoundsFromElementArgs,
-): BbDesktopBrowserViewBounds {
-  return clampBbDesktopBrowserViewBounds({
-    bounds: roundedBoundsFromRect(args.element.getBoundingClientRect()),
-    viewport: browserViewportBounds(),
-  });
 }
 
 function browserViewBoundsEqual(args: BrowserViewBoundsEqualArgs): boolean {
@@ -480,13 +463,9 @@ export function BrowserTabContent({
   const isBrowserDimmingModalOpen = useIsBrowserDimmingModalOpen();
   const lastSentBoundsRef = useRef<BbDesktopBrowserViewBounds | null>(null);
 
-  const readBounds = useCallback(() => {
-    const element = contentRef.current;
-    if (element === null) {
-      return null;
-    }
-    return browserViewBoundsFromElement({ element });
-  }, []);
+  const observedBoundsRef = useRef<BbDesktopBrowserViewBounds | null>(null);
+  const boundsObserverRef = useRef<IntersectionObserver | null>(null);
+  const [hasObservedBounds, setHasObservedBounds] = useState(false);
 
   const sendBounds = useCallback(
     (bounds: BbDesktopBrowserViewBounds) => {
@@ -499,38 +478,51 @@ export function BrowserTabContent({
     [desktopBrowser, tabId],
   );
 
-  const syncPlacement = useCallback(
-    ({ force }: SyncBrowserViewPlacementArgs) => {
-      const bounds = readBounds();
-      if (bounds === null) {
-        return;
-      }
-      const lastSentBounds = lastSentBoundsRef.current;
-      if (
-        !force &&
-        lastSentBounds !== null &&
-        browserViewBoundsEqual({ a: lastSentBounds, b: bounds })
-      ) {
-        return;
-      }
-      sendBounds(bounds);
-    },
-    [readBounds, sendBounds],
-  );
-
   const syncBounds = useCallback(() => {
-    syncPlacement({ force: true });
-  }, [syncPlacement]);
+    const bounds = observedBoundsRef.current;
+    if (bounds !== null) sendBounds(bounds);
+  }, [sendBounds]);
 
   const syncBoundsIfChanged = useCallback(() => {
-    syncPlacement({ force: false });
-  }, [syncPlacement]);
+    const element = contentRef.current;
+    const observer = boundsObserverRef.current;
+    if (element && observer) {
+      observer.unobserve(element);
+      observer.observe(element);
+    }
+  }, []);
 
   const syncInitialBounds = useCallback(() => {
-    const bounds = readBounds();
-    lastSentBoundsRef.current = bounds;
-    return bounds ?? EMPTY_BROWSER_VIEW_BOUNDS;
-  }, [readBounds]);
+    return observedBoundsRef.current ?? EMPTY_BROWSER_VIEW_BOUNDS;
+  }, []);
+
+  useEffect(() => {
+    const element = contentRef.current;
+    if (!element || desktopBrowser === null) return;
+    const observer = new IntersectionObserver((entries) => {
+      const entry = entries.find((entry) => entry.target === element);
+      if (!entry) return;
+      const bounds = clampBbDesktopBrowserViewBounds({
+        bounds: roundedBoundsFromRect(entry.boundingClientRect),
+        viewport: browserViewportBounds(),
+      });
+      observedBoundsRef.current = bounds;
+      setHasObservedBounds(bounds.width > 0 && bounds.height > 0);
+      const lastSent = lastSentBoundsRef.current;
+      if (
+        lastSent === null ||
+        !browserViewBoundsEqual({ a: lastSent, b: bounds })
+      ) {
+        sendBounds(bounds);
+      }
+    });
+    boundsObserverRef.current = observer;
+    observer.observe(element);
+    return () => {
+      observer.disconnect();
+      boundsObserverRef.current = null;
+    };
+  }, [desktopBrowser, sendBounds]);
 
   useEffect(() => {
     if (desktopBrowser === null) {
@@ -648,6 +640,7 @@ export function BrowserTabContent({
   }, [desktopBrowser, syncBoundsIfChanged]);
 
   const isViewVisible =
+    hasObservedBounds &&
     canShowNativeBrowserView &&
     (canHandleBrowserCommands || supportsNativePaneFocus) &&
     hasPage &&

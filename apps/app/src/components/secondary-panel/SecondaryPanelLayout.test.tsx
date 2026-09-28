@@ -391,7 +391,28 @@ describe("SecondaryPanelLayout", () => {
     expect(panelGroupState.setLayout).toHaveBeenLastCalledWith([60, 40]);
   });
 
-  it("owns the desktop open, closed, and conversation-collapse layouts", () => {
+  it("does not mount a closed desktop panel for a newly selected thread", async () => {
+    const renderPanel = vi.fn(() => <div data-testid="deferred-panel" />);
+    const view = renderLayout({
+      open: false,
+      isCompactViewport: false,
+      resetKey: "thread-a",
+      renderPanel,
+    });
+    expect(renderPanel).not.toHaveBeenCalled();
+    view.rerenderWith({ open: true });
+    const panel = await screen.findByTestId("deferred-panel");
+    view.rerenderWith({ open: false });
+    expect(screen.getByTestId("deferred-panel")).toBe(panel);
+    renderPanel.mockClear();
+    view.rerenderWith({ resetKey: "thread-b" });
+    expect(renderPanel).not.toHaveBeenCalled();
+    expect(screen.queryByTestId("deferred-panel")).toBeNull();
+    view.rerenderWith({ open: true });
+    expect(await screen.findByTestId("deferred-panel")).not.toBe(panel);
+  });
+
+  it("owns the desktop open, closed, and conversation-collapse layouts", async () => {
     const renderPanel = createPanelRenderer();
     const view = renderLayout({
       collapseActive: false,
@@ -403,13 +424,12 @@ describe("SecondaryPanelLayout", () => {
 
     expect(panelGroupState.setLayout).toHaveBeenCalledTimes(1);
     expect(panelGroupState.setLayout).toHaveBeenLastCalledWith([100, 0]);
-    expect(renderPanel).toHaveBeenLastCalledWith(
-      expect.objectContaining({ canShowNativeBrowserView: false }),
-    );
-    const mountedPanel = screen.getByTestId("inline-secondary-panel");
+    expect(renderPanel).not.toHaveBeenCalled();
+    expect(screen.queryByTestId("inline-secondary-panel")).toBeNull();
 
     panelGroupState.setLayout.mockClear();
     view.rerenderWith({ open: true });
+    const mountedPanel = await screen.findByTestId("inline-secondary-panel");
     expect(panelGroupState.setLayout).toHaveBeenCalledTimes(1);
     expect(panelGroupState.setLayout).toHaveBeenLastCalledWith([60, 40]);
     expect(renderPanel).toHaveBeenLastCalledWith(

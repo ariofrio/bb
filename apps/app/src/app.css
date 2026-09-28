@@ -1,5 +1,6 @@
 @import "@fontsource-variable/inter";
 @import "@/components/ui/theme.css";
+@import "@/components/promptbox/editor/prompt-editor.css";
 
 @layer base {
   /*

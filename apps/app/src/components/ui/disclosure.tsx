@@ -148,6 +148,7 @@ function AnimatedExpandablePanelContent({
   const contentRef = useRef<HTMLDivElement>(null);
   const toggleAnimationDeadlineRef = useRef(0);
   const isFirstToggleEffectRef = useRef(true);
+  const measuredExpandedRef = useRef(isBodyExpanded);
   useBrowserLayoutEffect(() => {
     if (isFirstToggleEffectRef.current) {
       isFirstToggleEffectRef.current = false;
@@ -183,7 +184,13 @@ function AnimatedExpandablePanelContent({
       region.style.height = `${heightPx}px`;
     };
 
-    writeHeightSync(readHeightSync(undefined));
+    const toggled = measuredExpandedRef.current !== isBodyExpanded;
+    measuredExpandedRef.current = isBodyExpanded;
+    if (toggled || typeof ResizeObserver === "undefined") {
+      writeHeightSync(readHeightSync(undefined));
+    } else {
+      region.style.transitionDuration = "0s";
+    }
 
     if (typeof ResizeObserver === "undefined") {
       return;

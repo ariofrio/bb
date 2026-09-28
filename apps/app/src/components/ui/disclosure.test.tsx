@@ -58,6 +58,35 @@ function fireResize(): void {
 }
 
 describe("ExpandablePanel body height", () => {
+  it("measures mounted and updated content in the observer instead of the commit", () => {
+    vi.stubGlobal("ResizeObserver", ResizeObserverStub);
+    const height = vi
+      .spyOn(HTMLElement.prototype, "offsetHeight", "get")
+      .mockReturnValue(80);
+    const view = renderPanel(true);
+    expect(height).not.toHaveBeenCalled();
+    fireResize();
+    const region =
+      view.getByText("Expanded body").parentElement?.parentElement
+        ?.parentElement;
+    expect(region?.style.height).toBe("80px");
+    height.mockClear();
+    view.rerender(
+      <ExpandablePanel
+        isExpanded
+        summaryContent="Tool call"
+        headerToneClass="text-foreground"
+        collapsedContent={<span>Changed summary</span>}
+      >
+        <span>Updated body</span>
+      </ExpandablePanel>,
+    );
+    expect(height).not.toHaveBeenCalled();
+    height.mockReturnValue(120);
+    fireResize();
+    expect(region?.style.height).toBe("120px");
+  });
+
   it("snaps content growth inside an open body but eases the toggle", () => {
     vi.stubGlobal("ResizeObserver", ResizeObserverStub);
     const view = renderPanel(true);
@@ -149,6 +178,7 @@ describe("ExpandablePanel deferred body realization", () => {
   });
 
   it("keeps the preview, its height and the in-flight window until the body's commit", () => {
+    vi.stubGlobal("ResizeObserver", ResizeObserverStub);
     vi.spyOn(HTMLElement.prototype, "offsetHeight", "get").mockImplementation(
       function (this: HTMLElement) {
         return this.textContent?.length ?? 0;
@@ -161,6 +191,7 @@ describe("ExpandablePanel deferred body realization", () => {
         <TogglablePanel collapsedContent={<span>Collapsed summary</span>} />
       </Provider>,
     );
+    fireResize();
     const header = screen.getByRole("button", { name: "Tool call" });
     const preview = screen.getByText("Collapsed summary");
     const region = preview.parentElement?.parentElement;

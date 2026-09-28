@@ -960,6 +960,58 @@ describe("PromptBoxInternal controlled value sync", () => {
     },
   );
 
+  it("uses static editor styles across thread mounts", async () => {
+    const view = render(<PromptBoxInternal {...createPromptBoxProps()} />);
+    await waitFor(() =>
+      expect(getPromptEditorElement()).toBeInstanceOf(HTMLElement),
+    );
+    expect(document.querySelector("style[data-tiptap-style]")).toBeNull();
+    view.unmount();
+    expect(document.querySelector("style[data-tiptap-style]")).toBeNull();
+  });
+
+  it("mounts the current-node placeholder without hit-testing the document", async () => {
+    const hitTest = vi.spyOn(EditorView.prototype, "posAtCoords");
+    render(<PromptBoxInternal {...createPromptBoxProps()} />);
+    await waitFor(() =>
+      expect(getPromptEditorElement()).toBeInstanceOf(HTMLElement),
+    );
+    expect(hitTest).not.toHaveBeenCalled();
+    hitTest.mockRestore();
+  });
+
+  it("does not rewrite the editor's existing contenteditable attribute on mount", async () => {
+    const write = vi.spyOn(Element.prototype, "setAttribute");
+    render(<PromptBoxInternal {...createPromptBoxProps()} />);
+    await waitFor(() =>
+      expect(getPromptEditorElement()).toBeInstanceOf(HTMLElement),
+    );
+    const editor = getPromptEditorElement();
+    const writes = write.mock.calls.filter(
+      ([name], index) =>
+        name === "contenteditable" && write.mock.contexts[index] === editor,
+    );
+    expect(writes).toHaveLength(1);
+    write.mockRestore();
+  });
+
+  it("destroys the editor before unmounting its selected DOM", async () => {
+    const view = render(<PromptBoxInternal {...createPromptBoxProps()} />);
+    await waitFor(() =>
+      expect(getPromptEditorElement()).toBeInstanceOf(HTMLElement),
+    );
+    const editor = getPromptEditorElement();
+    act(() => editor.focus());
+    expect(document.activeElement).toBe(editor);
+    const blur = vi.spyOn(editor, "blur");
+    const setAttribute = vi.spyOn(editor, "setAttribute");
+    view.unmount();
+    expect(blur).toHaveBeenCalledTimes(1);
+    expect(
+      setAttribute.mock.calls.filter(([name]) => name === "contenteditable"),
+    ).toEqual([]);
+  });
+
   it("honors early focusEnd requests once the editor is ready", async () => {
     const restoreMatchMedia = mockPointerCoarse(false);
     try {
@@ -1449,49 +1501,52 @@ describe("PromptBoxInternal submit shortcuts", () => {
     }
   });
 
-  describe.each([false, true])("swapped submit actions: %s", (swapSubmitActions) => {
-    it.each(["", "Follow up"])(
-      "sends with the same action and queues only draft input (%j)",
-      (value) => {
-        const onSubmit = vi.fn();
-        const onModifierSubmit = vi.fn();
-        const onStop = vi.fn();
-        render(
-          <PromptBoxInternal
-            {...createPromptBoxProps({
-              value,
-              onSubmit,
-              submission: {
-                onModifierSubmit,
-                swapSubmitActions,
-                isRunning: true,
-                onStop,
-              },
-            })}
-          />,
-        );
+  describe.each([false, true])(
+    "swapped submit actions: %s",
+    (swapSubmitActions) => {
+      it.each(["", "Follow up"])(
+        "sends with the same action and queues only draft input (%j)",
+        (value) => {
+          const onSubmit = vi.fn();
+          const onModifierSubmit = vi.fn();
+          const onStop = vi.fn();
+          render(
+            <PromptBoxInternal
+              {...createPromptBoxProps({
+                value,
+                onSubmit,
+                submission: {
+                  onModifierSubmit,
+                  swapSubmitActions,
+                  isRunning: true,
+                  onStop,
+                },
+              })}
+            />,
+          );
 
-        const editor = getPromptEditorElement();
-        fireEvent.keyDown(editor, {
-          key: "Enter",
-          metaKey: !swapSubmitActions,
-        });
-        expect(onModifierSubmit).toHaveBeenCalledOnce();
-        expect(onSubmit).not.toHaveBeenCalled();
+          const editor = getPromptEditorElement();
+          fireEvent.keyDown(editor, {
+            key: "Enter",
+            metaKey: !swapSubmitActions,
+          });
+          expect(onModifierSubmit).toHaveBeenCalledOnce();
+          expect(onSubmit).not.toHaveBeenCalled();
 
-        fireEvent.keyDown(editor, {
-          key: "Enter",
-          metaKey: swapSubmitActions,
-        });
-        expect(onSubmit).toHaveBeenCalledTimes(value ? 1 : 0);
-        expect(onModifierSubmit).toHaveBeenCalledOnce();
-        if (!value) {
-          fireEvent.click(screen.getByRole("button", { name: "Stop run" }));
-          expect(onStop).toHaveBeenCalledOnce();
-        }
-      },
-    );
-  });
+          fireEvent.keyDown(editor, {
+            key: "Enter",
+            metaKey: swapSubmitActions,
+          });
+          expect(onSubmit).toHaveBeenCalledTimes(value ? 1 : 0);
+          expect(onModifierSubmit).toHaveBeenCalledOnce();
+          if (!value) {
+            fireEvent.click(screen.getByRole("button", { name: "Stop run" }));
+            expect(onStop).toHaveBeenCalledOnce();
+          }
+        },
+      );
+    },
+  );
 
   it.each([
     { swapSubmitActions: false, touch: true },
@@ -1594,10 +1649,7 @@ describe("PromptBoxInternal submit shortcuts", () => {
         expect(onModifierSubmit).not.toHaveBeenCalled();
         expect(
           screen.getAllByRole("menuitem").map((item) => item.textContent),
-        ).toEqual([
-          swapSubmitActions ? "Queue" : "Steer",
-          "Send later",
-        ]);
+        ).toEqual([swapSubmitActions ? "Queue" : "Steer", "Send later"]);
         const alternateAction = screen.getByRole("menuitem", {
           name: swapSubmitActions ? "Queue" : "Steer",
         });
@@ -1671,7 +1723,9 @@ describe("PromptBoxInternal submit shortcuts", () => {
             })}
           />,
         );
-        expect(screen.queryByRole("button", { name: "Send options" })).toBeNull();
+        expect(
+          screen.queryByRole("button", { name: "Send options" }),
+        ).toBeNull();
         const submit = screen.getByRole("button", { name: "Submit (Enter)" });
         vi.spyOn(submit, "getBoundingClientRect").mockReturnValue(
           new DOMRect(0, 0, 40, 40),

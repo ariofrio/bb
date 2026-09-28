@@ -233,7 +233,7 @@ describe("BottomAnchoredScrollBody settle tail", () => {
     expect(frames.hasPending()).toBe(false);
   });
 
-  it("spends at most one live read when the settle tail corrects drift", () => {
+  it("uses observed geometry when the settle tail corrects drift", () => {
     const { scrollArea } = growContentWhilePinned();
     scrollArea.scrollTop = 390;
     const { readScrollHeight, readClientHeight } = installGeometryReadCounters(
@@ -247,13 +247,13 @@ describe("BottomAnchoredScrollBody settle tail", () => {
     expect(readClientHeight).not.toHaveBeenCalled();
 
     frames.runFrame();
-    expect(readScrollHeight).toHaveBeenCalledTimes(1);
-    expect(readClientHeight).toHaveBeenCalledTimes(1);
+    expect(readScrollHeight).not.toHaveBeenCalled();
+    expect(readClientHeight).not.toHaveBeenCalled();
     expect(scrollArea.scrollTop).toBe(400);
 
     frames.runFrame();
-    expect(readScrollHeight).toHaveBeenCalledTimes(1);
-    expect(readClientHeight).toHaveBeenCalledTimes(1);
+    expect(readScrollHeight).not.toHaveBeenCalled();
+    expect(readClientHeight).not.toHaveBeenCalled();
     expect(frames.hasPending()).toBe(false);
   });
 

@@ -247,11 +247,31 @@ export function SecondaryPanelTabStrip({
 
   useLayoutEffect(() => {
     const activeTabElement = activeTabRef.current;
-    if (activeTabElement === null) {
+    const viewport = viewportRef.current;
+    if (
+      !activeTabElement ||
+      !viewport ||
+      !isPanelOpen ||
+      !overflow.hasOverflow
+    ) {
       return;
     }
-    activeTabElement.scrollIntoView({ inline: "nearest", block: "nearest" });
-  }, [activeTabId, overflow.hasOverflow]);
+    const observer = new IntersectionObserver(
+      (entries) => {
+        const entry = entries.find(
+          (entry) => entry.target === activeTabElement,
+        );
+        if (!entry?.rootBounds) return;
+        const left = entry.boundingClientRect.left - entry.rootBounds.left;
+        const right = entry.boundingClientRect.right - entry.rootBounds.right;
+        const delta = left < 0 ? left : right > 0 ? right : 0;
+        if (delta !== 0) viewport.scrollBy({ left: delta, behavior: "auto" });
+      },
+      { root: viewport, threshold: 1 },
+    );
+    observer.observe(activeTabElement);
+    return () => observer.disconnect();
+  }, [activeTabId, isPanelOpen, overflow.hasOverflow]);
 
   useLayoutEffect(() => {
     const focusedElement = document.activeElement;

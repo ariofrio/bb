@@ -142,6 +142,7 @@ interface HeightTransitionProps {
 }
 
 export function HeightTransition({ visible, children }: HeightTransitionProps) {
+  const mountedRef = useRef(false);
   const wrapperRef = useRef<HTMLDivElement>(null);
   const innerRef = useRef<HTMLDivElement>(null);
   const store = useStore();
@@ -149,8 +150,14 @@ export function HeightTransition({ visible, children }: HeightTransitionProps) {
     const wrapper = wrapperRef.current;
     const inner = innerRef.current;
     if (!wrapper || !inner) return;
-    wrapper.style.height = visible ? `${inner.offsetHeight}px` : "0px";
-    if (typeof ResizeObserver === "undefined") return;
+    const canObserve = typeof ResizeObserver !== "undefined";
+    wrapper.style.height = !visible
+      ? "0px"
+      : !mountedRef.current && canObserve
+        ? "auto"
+        : `${inner.offsetHeight}px`;
+    mountedRef.current = true;
+    if (!canObserve) return;
     let lastWidth: number | null = null;
     let pendingVisibilitySnap = false;
     const snapState: SnapState = { savedDuration: null, restoreFrame: null };
@@ -257,7 +264,9 @@ export function AutoHeightContainer({
     const snapToCurrentHeight = () => {
       cancelIntrinsicHeightRestore(resizeState);
       resizeState.usingIntrinsicHeight = false;
-      applyHeight(wrapper, `${inner.offsetHeight}px`, true, snapState);
+      pendingVisibilitySnap = true;
+      enterSnapMode(wrapper, snapState);
+      wrapper.style.height = "auto";
     };
     snapToCurrentHeightRef.current = snapToCurrentHeight;
     const deferInitialSettleComplete = () => {

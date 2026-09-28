@@ -324,12 +324,17 @@ function FollowUpPromptBoxWithComposer({
       isWidePromptBoxCollapsed,
     ],
   );
-  const setInteractionExpanded = useCallback((nextExpanded: boolean) => {
-    if (interactionExpandedRef.current === nextExpanded) return;
-    interactionExpandedRef.current = nextExpanded;
-    promptBoxRef.current?.captureHeightForLayoutChange();
-    setIsInteractionExpanded(nextExpanded);
-  }, []);
+  const setInteractionExpanded = useCallback(
+    (nextExpanded: boolean) => {
+      if (interactionExpandedRef.current === nextExpanded) return;
+      interactionExpandedRef.current = nextExpanded;
+      if (isCompactViewport || isWidePromptBoxCollapsed) {
+        promptBoxRef.current?.captureHeightForLayoutChange();
+      }
+      setIsInteractionExpanded(nextExpanded);
+    },
+    [isCompactViewport, isWidePromptBoxCollapsed],
+  );
   const cancelPendingFocusExpansion = useCallback(() => {
     pendingFocusExpansionCleanupRef.current?.();
     pendingFocusExpansionCleanupRef.current = null;

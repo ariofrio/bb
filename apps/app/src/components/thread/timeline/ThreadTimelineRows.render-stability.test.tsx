@@ -72,6 +72,43 @@ afterEach(() => {
 });
 
 describe("ThreadTimelineRows render stability", () => {
+  it("keeps rich rows out of the urgent mount commit", () => {
+    let rowsAtMount: number | null = null;
+    const view = render(
+      <MemoryRouter>
+        <QueryClientProvider client={new QueryClient()}>
+          <Profiler
+            id="deferred-timeline"
+            onRender={(_id, phase) => {
+              if (phase === "mount")
+                rowsAtMount = document.querySelectorAll(
+                  '[data-timeline-row-id="deferred-message"]',
+                ).length;
+            }}
+          >
+            <ThreadTimelineRows
+              threadId="thr_deferred"
+              timelineRows={[
+                conversationRow({
+                  id: "deferred-message",
+                  role: "assistant",
+                  text: "The deferred answer.",
+                  sourceSeqStart: 1,
+                  sourceSeqEnd: 1,
+                  threadId: "thr_deferred",
+                }),
+              ]}
+              threadRuntimeDisplayStatus="idle"
+              workspaceRootPath={undefined}
+            />
+          </Profiler>
+        </QueryClientProvider>
+      </MemoryRouter>,
+    );
+    expect(rowsAtMount).toBe(0);
+    expect(view.getByText("The deferred answer.")).toBeTruthy();
+  });
+
   it("routes a personal-project sender pill directly from sender metadata", async () => {
     const getThread = vi.spyOn(sdk.threads, "get");
     const queryClient = new QueryClient();

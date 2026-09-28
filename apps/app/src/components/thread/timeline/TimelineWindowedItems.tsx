@@ -10,6 +10,8 @@ import {
 import { useComposedRefs } from "@radix-ui/react-compose-refs";
 import {
   defaultRangeExtractor,
+  observeElementRect,
+  elementScroll,
   useVirtualizer,
   type Range,
 } from "@tanstack/react-virtual";
@@ -19,12 +21,34 @@ import {
   type TimelineWindowedItemsProps,
 } from "./TimelineWindowedItemsLoader.js";
 
-const TIMELINE_WINDOW_OVERSCAN_ITEMS = 8;
+const TIMELINE_WINDOW_OVERSCAN_ITEMS = 2;
 const TIMELINE_WINDOW_MAX_INTERACTION_PINS = 24;
 
 const EMPTY_KEY_SET: ReadonlySet<string> = new Set();
 const GET_NO_SCROLL_ELEMENT = () => null;
 const NOOP_ITEM_REF = () => {};
+
+const observeTimelineScrollRect: typeof observeElementRect = (
+  instance,
+  callback,
+) => {
+  if (typeof ResizeObserver === "undefined")
+    return observeElementRect(instance, callback);
+  const element = instance.scrollElement;
+  if (element === null) return;
+  const observer = new ResizeObserver((entries) => {
+    for (const entry of entries) {
+      if (entry.target !== element) continue;
+      const box = entry.borderBoxSize[0];
+      callback({
+        width: Math.round(box?.inlineSize ?? entry.contentRect.width),
+        height: Math.round(box?.blockSize ?? entry.contentRect.height),
+      });
+    }
+  });
+  observer.observe(element, { box: "border-box" });
+  return () => observer.disconnect();
+};
 
 function measureBorderBox(
   element: HTMLElement,
@@ -54,6 +78,7 @@ export function TimelineWindowedItems({
   gap,
   getScrollElement,
   itemKeys,
+  initialScrollAnchor,
   measurements,
   minItemCount = DEFAULT_WINDOWING_MIN_ITEM_COUNT,
   renderItem,
@@ -61,6 +86,7 @@ export function TimelineWindowedItems({
   const configured =
     itemKeys.length >= minItemCount && getScrollElement !== null;
   const [scrollRootUsable, setScrollRootUsable] = useState(true);
+  const [, refreshScrollRoot] = useState(0);
   const [scrollMargin, setScrollMargin] = useState(0);
   const [interactionPins, setInteractionPins] = useState<readonly string[]>([]);
   const containerElementRef = useRef<HTMLDivElement>(null);
@@ -103,6 +129,9 @@ export function TimelineWindowedItems({
       entry: ResizeObserverEntry | undefined,
     ): number => {
       const index = Number(element.dataset.index);
+      if (entry === undefined && typeof ResizeObserver !== "undefined") {
+        return estimateSize(index);
+      }
       const height = measureBorderBox(element, entry);
       const key = Number.isInteger(index) ? itemKeys[index] : undefined;
       if (
@@ -124,9 +153,48 @@ export function TimelineWindowedItems({
     },
     [forcedIndexes],
   );
-  const initialOffset = useCallback(
-    () => resolvedGetScrollElement()?.scrollTop ?? 0,
-    [resolvedGetScrollElement],
+  const initialOffset = useCallback(() => {
+    if (initialScrollAnchor === undefined)
+      return resolvedGetScrollElement()?.scrollTop ?? 0;
+    const index = indexByKey.get(initialScrollAnchor.key);
+    if (index === undefined) return 0;
+    let offset = 0;
+    for (let item = 0; item < index; item += 1)
+      offset += estimateSize(item) + gap;
+    if (initialScrollAnchor.align === "end")
+      offset +=
+        estimateSize(index) -
+        (typeof window === "undefined" ? 0 : window.innerHeight);
+    return Math.max(0, offset);
+  }, [
+    estimateSize,
+    gap,
+    indexByKey,
+    initialScrollAnchor,
+    resolvedGetScrollElement,
+  ]);
+
+  const initialScrollWritePendingRef = useRef(false);
+  const observeScrollRect = useCallback<typeof observeElementRect>(
+    (instance, callback) => {
+      initialScrollWritePendingRef.current = true;
+      return observeTimelineScrollRect(instance, callback);
+    },
+    [],
+  );
+  const scrollToFn = useCallback<typeof elementScroll>(
+    (offset, options, instance) => {
+      const isInitialWrite = initialScrollWritePendingRef.current;
+      initialScrollWritePendingRef.current = false;
+      if (
+        isInitialWrite &&
+        options.adjustments === undefined &&
+        options.behavior === undefined
+      )
+        return;
+      elementScroll(offset, options, instance);
+    },
+    [],
   );
 
   const virtualizer = useVirtualizer<HTMLElement, HTMLDivElement>({
@@ -139,7 +207,13 @@ export function TimelineWindowedItems({
     getItemKey,
     getScrollElement: resolvedGetScrollElement,
     initialOffset,
+    initialRect: {
+      width: 0,
+      height: typeof window === "undefined" ? 0 : window.innerHeight,
+    },
     measureElement,
+    observeElementRect: observeScrollRect,
+    scrollToFn,
     overscan: TIMELINE_WINDOW_OVERSCAN_ITEMS,
     rangeExtractor,
     scrollMargin,
@@ -150,54 +224,85 @@ export function TimelineWindowedItems({
     virtualizer.containerRef,
   );
 
-  const updateScrollGeometry = useCallback(() => {
+  const refreshGeometryRef = useRef<(() => void) | null>(null);
+  useLayoutEffect(() => {
     if (!configured) return;
-    const container = containerElementRef.current;
-    const scrollElement = resolvedGetScrollElement();
-    if (container === null || scrollElement === null) return;
-    const nextMargin =
-      container.getBoundingClientRect().top -
-      scrollElement.getBoundingClientRect().top +
-      scrollElement.scrollTop -
-      scrollElement.clientTop;
-    setScrollMargin((previous) =>
-      Math.abs(previous - nextMargin) < 0.5 ? previous : nextMargin,
-    );
+    let frame: number | null = null;
+    let resizeObserver: ResizeObserver | null = null;
+    let intersectionObserver: IntersectionObserver | null = null;
+    const updateMargin = (margin: number) => {
+      setScrollMargin((previous) =>
+        Math.abs(previous - margin) < 0.5 ? previous : margin,
+      );
+    };
+    const connect = () => {
+      const scrollElement = resolvedGetScrollElement();
+      const container = containerElementRef.current;
+      if (scrollElement === null || container === null) {
+        frame = requestAnimationFrame(connect);
+        return;
+      }
+      refreshScrollRoot((revision) => revision + 1);
+      if (
+        typeof IntersectionObserver === "undefined" ||
+        typeof ResizeObserver === "undefined"
+      ) {
+        const measure = () => {
+          setScrollRootUsable(scrollElement.clientHeight > 0);
+          updateMargin(
+            container.getBoundingClientRect().top -
+              scrollElement.getBoundingClientRect().top +
+              scrollElement.scrollTop -
+              scrollElement.clientTop,
+          );
+        };
+        refreshGeometryRef.current = measure;
+        measure();
+        return;
+      }
+      intersectionObserver = new IntersectionObserver(
+        (entries) => {
+          for (const entry of entries) {
+            if (entry.target === container && entry.rootBounds !== null) {
+              updateMargin(
+                entry.boundingClientRect.top -
+                  entry.rootBounds.top +
+                  scrollElement.scrollTop,
+              );
+            }
+          }
+        },
+        { root: scrollElement },
+      );
+      const observePosition = () => {
+        intersectionObserver?.unobserve(container);
+        intersectionObserver?.observe(container);
+      };
+      refreshGeometryRef.current = observePosition;
+      observePosition();
+      resizeObserver = new ResizeObserver((entries) => {
+        for (const entry of entries) {
+          if (entry.target === scrollElement)
+            setScrollRootUsable(entry.contentRect.height > 0);
+        }
+        observePosition();
+      });
+      resizeObserver.observe(scrollElement);
+      if (container.parentElement !== null)
+        resizeObserver.observe(container.parentElement);
+    };
+    connect();
+    return () => {
+      if (frame !== null) cancelAnimationFrame(frame);
+      resizeObserver?.disconnect();
+      intersectionObserver?.disconnect();
+      refreshGeometryRef.current = null;
+    };
   }, [configured, resolvedGetScrollElement]);
 
   useLayoutEffect(() => {
-    if (!configured) return;
-    const updateRootUsability = () => {
-      const scrollElement = resolvedGetScrollElement();
-      if (scrollElement !== null) {
-        setScrollRootUsable(scrollElement.clientHeight > 0);
-      }
-    };
-    const scrollElement = resolvedGetScrollElement();
-    if (scrollElement === null) {
-      setScrollRootUsable(false);
-      const frame = requestAnimationFrame(() => {
-        updateRootUsability();
-        updateScrollGeometry();
-      });
-      return () => cancelAnimationFrame(frame);
-    }
-    updateRootUsability();
-    updateScrollGeometry();
-    if (typeof ResizeObserver === "undefined") return;
-    const observer = new ResizeObserver(() => {
-      updateRootUsability();
-      updateScrollGeometry();
-    });
-    observer.observe(scrollElement);
-    const containerParent = containerElementRef.current?.parentElement;
-    if (containerParent !== null && containerParent !== undefined) {
-      observer.observe(containerParent);
-    }
-    return () => observer.disconnect();
-  }, [configured, resolvedGetScrollElement, updateScrollGeometry]);
-
-  useLayoutEffect(updateScrollGeometry);
+    refreshGeometryRef.current?.();
+  });
 
   const retainInteractedItem = useCallback(
     (event: SyntheticEvent<HTMLDivElement>) => {

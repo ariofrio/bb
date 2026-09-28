@@ -49,6 +49,34 @@ describe("HeightTransition", () => {
     );
   });
 
+  it("uses observed height for initially visible content", () => {
+    vi.stubGlobal("ResizeObserver", ResizeObserverStub);
+    const readHeight = vi
+      .spyOn(HTMLElement.prototype, "offsetHeight", "get")
+      .mockReturnValue(40);
+    const view = render(
+      <HeightTransition visible>
+        <span>Initial content</span>
+      </HeightTransition>,
+    );
+    expect(readHeight).not.toHaveBeenCalled();
+    const inner = view.getByText("Initial content").parentElement!;
+    const observer = ResizeObserverStub.instances[0]!;
+    act(() => observer.callback([makeResizeEntry(inner, 40, 40)], observer));
+    expect(inner.parentElement?.style.height).toBe("40px");
+    view.rerender(
+      <HeightTransition visible={false}>
+        <span>Initial content</span>
+      </HeightTransition>,
+    );
+    view.rerender(
+      <HeightTransition visible>
+        <span>Initial content</span>
+      </HeightTransition>,
+    );
+    expect(inner.parentElement?.style.height).toBe("40px");
+  });
+
   it("snap-syncs its height after a mobile pageshow restore", () => {
     vi.stubGlobal("ResizeObserver", ResizeObserverStub);
     const offsetHeight = vi
@@ -62,6 +90,9 @@ describe("HeightTransition", () => {
     const wrapper =
       view.getByTestId("restored-child").parentElement?.parentElement;
 
+    const inner = view.getByTestId("restored-child").parentElement!;
+    const observer = ResizeObserverStub.instances[0]!;
+    act(() => observer.callback([makeResizeEntry(inner, 40, 40)], observer));
     expect(wrapper?.style.height).toBe("40px");
     offsetHeight.mockReturnValue(80);
 
@@ -155,16 +186,19 @@ describe("AutoHeightContainer", () => {
     expect(wrapper?.style.height).toBe("");
     expect(observer).toBeDefined();
 
-    Object.defineProperty(inner, "offsetHeight", {
-      configurable: true,
-      value: 480,
-    });
+    const heightRead = vi.spyOn(HTMLElement.prototype, "offsetHeight", "get");
     view.rerender(
       <AutoHeightContainer snapRevision="completed-turn:1:2000">
         <span>Completed response</span>
       </AutoHeightContainer>,
     );
 
+    expect(heightRead).not.toHaveBeenCalled();
+    expect(wrapper?.style.height).toBe("auto");
+    if (!inner || !observer) throw new Error("Missing observed content");
+    act(() => {
+      observer.callback([makeResizeEntry(inner, 480, 480)], observer);
+    });
     expect(wrapper?.style.height).toBe("480px");
     expect(wrapper?.style.transitionDuration).toBe("0s");
     expect(ResizeObserverStub.instances).toEqual([observer]);

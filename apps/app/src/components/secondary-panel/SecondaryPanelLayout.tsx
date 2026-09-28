@@ -10,6 +10,7 @@ import {
   type Key,
   type ReactNode,
 } from "react";
+import { DeferredContent } from "@/components/ui/deferred-content";
 import { useAtomValue } from "jotai";
 import {
   Panel,
@@ -264,18 +265,31 @@ export function SecondaryPanelLayout({
       ? undefined
       : `thread-detail-secondary-panel-${paneContext.paneId}`;
 
+  const [realizedInlineContent, setRealizedInlineContent] = useState<{
+    key: string;
+  } | null>(null);
+  useEffect(() => {
+    if (open && !renderAsDrawer) setRealizedInlineContent({ key: contentKey });
+  }, [open, renderAsDrawer, contentKey]);
+  const shouldRenderInlinePanel =
+    open || realizedInlineContent?.key === contentKey;
+
   const inlinePanel = useMemo(
     () =>
-      renderAsDrawer
-        ? null
-        : renderPanel({
+      renderAsDrawer || !shouldRenderInlinePanel ? null : (
+        <DeferredContent key={contentKey} afterPaint>
+          {renderPanel({
             presentation: "inline",
             canShowNativeBrowserView,
             isMainCollapsed,
             onToggleMainCollapse: collapse?.onToggle ?? noopToggleMainCollapse,
             resizablePanelId,
-          }),
+          })}
+        </DeferredContent>
+      ),
     [
+      shouldRenderInlinePanel,
+      contentKey,
       canShowNativeBrowserView,
       collapse?.onToggle,
       isMainCollapsed,

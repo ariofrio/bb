@@ -26,6 +26,7 @@ import { makePluginRegistrationSet } from "@/test/fixtures/plugins";
 const mocks = vi.hoisted(() => {
   const values = {
     executionControls: vi.fn(),
+    captureHeightForLayoutChange: vi.fn(),
     isCompactViewport: false,
     isPointerCoarse: false,
     scrollToBottom: vi.fn(),
@@ -141,7 +142,8 @@ vi.mock("@/components/promptbox/PromptBoxInternal", () => ({
           if (!promptBoxRef) return;
           promptBoxRef.current = node
             ? {
-                captureHeightForLayoutChange: () => {},
+                captureHeightForLayoutChange:
+                  mocks.captureHeightForLayoutChange,
                 focusEnd: () => {
                   node.focus();
                   node.setSelectionRange(node.value.length, node.value.length);
@@ -950,6 +952,18 @@ describe("FollowUpPromptBox", () => {
         disabled: true,
       }),
     );
+  });
+
+  it("does not measure an already expanded desktop composer when it receives focus", () => {
+    render(
+      <FollowUpPromptBox
+        {...createFollowUpPromptBoxProps({ kind: "ready" })}
+      />,
+    );
+    act(() =>
+      screen.getByRole("textbox", { name: "Follow-up prompt" }).focus(),
+    );
+    expect(mocks.captureHeightForLayoutChange).not.toHaveBeenCalled();
   });
 
   it("starts as a single compact row on mobile without size controls", () => {

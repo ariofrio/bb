@@ -9,25 +9,31 @@ import { useAutoLoadOlderRows } from "./useAutoLoadOlderRows.js";
 
 interface ObserverHandle {
   emit: (isIntersecting: boolean) => void;
+  active: boolean;
 }
 
 let observers: ObserverHandle[] = [];
 
 function installIntersectionObserverStub(): void {
   class ControllableIntersectionObserver {
+    private handle: ObserverHandle;
     constructor(private readonly callback: IntersectionObserverCallback) {
-      observers.push({
+      this.handle = {
+        active: true,
         emit: (isIntersecting: boolean) => {
           this.callback(
             [{ isIntersecting } as IntersectionObserverEntry],
             this as unknown as IntersectionObserver,
           );
         },
-      });
+      };
+      observers.push(this.handle);
     }
     observe(): void {}
     unobserve(): void {}
-    disconnect(): void {}
+    disconnect(): void {
+      this.handle.active = false;
+    }
     takeRecords(): IntersectionObserverEntry[] {
       return [];
     }
@@ -38,7 +44,7 @@ function installIntersectionObserverStub(): void {
 function emitIntersection(isIntersecting: boolean): void {
   act(() => {
     for (const observer of observers) {
-      observer.emit(isIntersecting);
+      if (observer.active) observer.emit(isIntersecting);
     }
   });
 }
@@ -126,6 +132,21 @@ describe("useAutoLoadOlderRows", () => {
     expect(anchor.captureScrollAnchor).toHaveBeenCalledTimes(1);
   });
 
+  it("uses fresh intersection entries without forcing geometry", () => {
+    const onLoadOlderRows = vi.fn();
+    const anchor = createBottomAnchor();
+    const { sentinel } = renderAutoLoad({ anchor, onLoadOlderRows });
+    const sentinelRead = vi.spyOn(sentinel, "getBoundingClientRect");
+    const rootRead = vi.spyOn(
+      anchor.getScrollElement()!,
+      "getBoundingClientRect",
+    );
+    emitIntersection(true);
+    expect(onLoadOlderRows).toHaveBeenCalledTimes(1);
+    expect(sentinelRead).not.toHaveBeenCalled();
+    expect(rootRead).not.toHaveBeenCalled();
+  });
+
   it("stays manual with no bottom anchor to keep the reading position", () => {
     const onLoadOlderRows = vi.fn(() => Promise.resolve());
     const { result } = renderAutoLoad({ anchor: null, onLoadOlderRows });
@@ -158,6 +179,8 @@ describe("useAutoLoadOlderRows", () => {
     await act(async () => {
       rerender({ isLoading: false });
     });
+    expect(onLoadOlderRows).toHaveBeenCalledTimes(1);
+    emitIntersection(true);
     expect(onLoadOlderRows).toHaveBeenCalledTimes(2);
   });
 
@@ -184,6 +207,8 @@ describe("useAutoLoadOlderRows", () => {
       rerender({ isLoading: false });
     });
 
+    expect(onLoadOlderRows).toHaveBeenCalledTimes(1);
+    emitIntersection(false);
     expect(onLoadOlderRows).toHaveBeenCalledTimes(1);
     expect(anchor.captureScrollAnchor).toHaveBeenCalledTimes(1);
   });

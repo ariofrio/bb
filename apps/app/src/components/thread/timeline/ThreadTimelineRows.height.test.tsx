@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
 
-import { cleanup, render } from "@testing-library/react";
+import { act, cleanup, render } from "@testing-library/react";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { MemoryRouter } from "react-router-dom";
 import { afterEach, expect, it, vi } from "vitest";
@@ -8,30 +8,47 @@ import { conversationRow, turnRow } from "@/test/fixtures/thread-timeline-rows";
 import { ThreadTimelineRows } from "./ThreadTimelineRows";
 
 class ResizeObserverStub implements ResizeObserver {
-  constructor(readonly callback: ResizeObserverCallback) {}
+  static instances: ResizeObserverStub[] = [];
+  readonly targets: Element[] = [];
+  constructor(readonly callback: ResizeObserverCallback) {
+    ResizeObserverStub.instances.push(this);
+  }
+  trigger() {
+    this.callback(
+      this.targets.map((target) => {
+        const height =
+          target.querySelectorAll(
+            '[data-timeline-row-list="top-level"] > [data-timeline-items] > [data-timeline-row-id]',
+          ).length * 100;
+        const size = [{ blockSize: height, inlineSize: 100 }];
+        return {
+          target,
+          contentRect: new DOMRect(0, 0, 100, height),
+          borderBoxSize: size,
+          contentBoxSize: size,
+          devicePixelContentBoxSize: size,
+        };
+      }),
+      this,
+    );
+  }
 
-  observe: ResizeObserver["observe"] = vi.fn();
+  observe: ResizeObserver["observe"] = vi.fn((target) => {
+    this.targets.push(target);
+  });
   unobserve: ResizeObserver["unobserve"] = vi.fn();
   disconnect: ResizeObserver["disconnect"] = vi.fn();
 }
 
 afterEach(() => {
   cleanup();
+  ResizeObserverStub.instances = [];
   vi.unstubAllGlobals();
   vi.restoreAllMocks();
 });
 
 it("snap-syncs the timeline height when older rows are prepended", () => {
   vi.stubGlobal("ResizeObserver", ResizeObserverStub);
-  vi.spyOn(HTMLElement.prototype, "offsetHeight", "get").mockImplementation(
-    function (this: HTMLElement) {
-      return (
-        this.querySelectorAll(
-          '[data-timeline-row-list="top-level"] > [data-timeline-items] > [data-timeline-row-id]',
-        ).length * 100
-      );
-    },
-  );
 
   const latestRows = [
     conversationRow({
@@ -70,10 +87,16 @@ it("snap-syncs the timeline height when older rows are prepended", () => {
   );
   const heightWrapper = rowList?.parentElement?.parentElement;
 
+  act(() =>
+    ResizeObserverStub.instances.forEach((observer) => observer.trigger()),
+  );
   expect(heightWrapper?.style.height).toBe("200px");
 
   view.rerender(timeline([...olderRows, ...latestRows]));
 
+  act(() =>
+    ResizeObserverStub.instances.forEach((observer) => observer.trigger()),
+  );
   expect(heightWrapper?.style.height).toBe("400px");
   expect(heightWrapper?.style.transitionDuration).toBe("0s");
 });

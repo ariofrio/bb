@@ -567,10 +567,60 @@ export function ThreadTableOfContents({
       }
       activeIdsRef.current = nextActiveIds;
     };
+    let observedRows: HTMLElement[] = [];
+    const visibleRows = new Set<Element>();
+    const userIds = new Set(userItems.map((item) => item.id));
+    const agentIds = new Set(agentItems.map((item) => item.id));
+    const publishObservedItems = () => {
+      const next: ActiveItemIds = { user: null, agent: null };
+      for (const row of observedRows) {
+        if (!visibleRows.has(row)) continue;
+        const id = row.dataset.timelineRowId;
+        if (id === undefined) continue;
+        if (userIds.has(id) && (bottomAnchor?.isAtBottom || next.user === null))
+          next.user = id;
+        if (
+          agentIds.has(id) &&
+          (bottomAnchor?.isAtBottom || next.agent === null)
+        )
+          next.agent = id;
+      }
+      publishActiveItems(next);
+    };
+    const intersectionObserver =
+      typeof IntersectionObserver === "undefined"
+        ? null
+        : new IntersectionObserver(
+            (entries) => {
+              for (const entry of entries) {
+                if (entry.isIntersecting && entry.intersectionRect.height > 0)
+                  visibleRows.add(entry.target);
+                else visibleRows.delete(entry.target);
+              }
+              publishObservedItems();
+            },
+            { root: scrollElement },
+          );
     const updateActiveItems = () => {
-      publishActiveItems(
-        findActiveItemIds({ agentItems, scrollElement, userItems }),
-      );
+      if (intersectionObserver === null) {
+        publishActiveItems(
+          findActiveItemIds({ agentItems, scrollElement, userItems }),
+        );
+        return;
+      }
+      const nextRows = findTimelineRowElements(scrollElement);
+      const nextSet = new Set(nextRows);
+      const previousSet = new Set(observedRows);
+      for (const row of observedRows) {
+        if (nextSet.has(row)) continue;
+        intersectionObserver.unobserve(row);
+        visibleRows.delete(row);
+      }
+      observedRows = nextRows;
+      for (const row of nextRows) {
+        if (!previousSet.has(row)) intersectionObserver.observe(row);
+      }
+      publishObservedItems();
     };
     let updateTimeout: number | null = null;
     const scheduleActiveItemsUpdate = () => {
@@ -591,8 +641,18 @@ export function ThreadTableOfContents({
         ? null
         : new ResizeObserver(scheduleActiveItemsUpdate);
     resizeObserver?.observe(scrollElement);
+    const mutationObserver =
+      intersectionObserver === null
+        ? null
+        : new MutationObserver(scheduleActiveItemsUpdate);
+    mutationObserver?.observe(scrollElement, {
+      childList: true,
+      subtree: true,
+    });
 
     return () => {
+      intersectionObserver?.disconnect();
+      mutationObserver?.disconnect();
       scrollElement.removeEventListener("scroll", scheduleActiveItemsUpdate);
       resizeObserver?.disconnect();
       if (updateTimeout !== null) {

@@ -250,6 +250,12 @@ afterEach(() => {
 });
 
 describe("BottomAnchoredScrollBody scroll preservation", () => {
+  it("waits for the first observed geometry before restoring a newly mounted timeline", () => {
+    const readHeight = vi.spyOn(Element.prototype, "scrollHeight", "get");
+    renderTimeline({ threadId: "thread-a", rowIds: ["row-a", "row-b"] });
+    expect(readHeight).not.toHaveBeenCalled();
+  });
+
   it("shows the thread scrollbar only while scroll events are active", () => {
     vi.useFakeTimers();
     const { scrollArea } = renderTimeline({
@@ -464,6 +470,32 @@ describe("BottomAnchoredScrollBody scroll preservation", () => {
     ).toBeLessThanOrEqual(8);
   });
 
+  it("keeps bottom pinning without measuring a prepend anchor while older rows load", () => {
+    const { getByRole, rerenderRows, scrollArea } = renderTimeline({
+      threadId: "thread-a",
+      rowIds: ["row-a", "row-b", "row-c"],
+      showCapturePrependAnchorControl: true,
+    });
+    setScrollMetrics(scrollArea, {
+      scrollHeight: 400,
+      clientHeight: 100,
+      scrollTop: 300,
+    });
+    getLatestResizeObserver().trigger();
+    const height = vi.spyOn(scrollArea, "scrollHeight", "get");
+    fireEvent.click(getByRole("button", { name: "Capture prepend anchor" }));
+    rerenderRows(["row-a", "row-b", "row-c"]);
+    expect(height).not.toHaveBeenCalled();
+    setScrollMetrics(scrollArea, {
+      scrollHeight: 500,
+      clientHeight: 100,
+      scrollTop: 300,
+    });
+    rerenderRows(["older-row", "row-a", "row-b", "row-c"]);
+    getLatestResizeObserver().trigger();
+    expect(scrollArea.scrollTop).toBe(400);
+  });
+
   it("does not treat a native-anchor jump during prepend as bottom intent", () => {
     const { getByRole, rerenderRows, scrollArea } = renderTimeline({
       threadId: "thread-a",
@@ -561,6 +593,40 @@ describe("BottomAnchoredScrollBody scroll preservation", () => {
     expect(scrollArea.scrollTop).toBe(220);
   });
 
+  it("keeps a restored row anchored through late virtual row measurements", () => {
+    getDefaultStore().set(threadTimelineScrollAnchorAtomFamily("thread-a"), {
+      rowId: "row-b",
+      offsetWithinRow: 20,
+      atBottom: false,
+    });
+    const { scrollArea, getRow } = renderTimeline({
+      threadId: "thread-a",
+      rowIds: ["row-a", "row-b", "row-c"],
+    });
+    mockScrollAreaRect(scrollArea);
+    let rowOffset = 200;
+    vi.spyOn(getRow("row-b"), "getBoundingClientRect").mockImplementation(
+      () => new DOMRect(0, rowOffset - scrollArea.scrollTop, 100, 100),
+    );
+    setScrollMetrics(scrollArea, {
+      scrollHeight: 1000,
+      clientHeight: 100,
+      scrollTop: 0,
+    });
+    const observer = getLatestResizeObserver();
+    for (let resize = 0; resize < 12; resize += 1) observer.trigger();
+    expect(scrollArea.scrollTop).toBe(220);
+    rowOffset = 500;
+    observer.trigger();
+    expect(scrollArea.scrollTop).toBe(520);
+    fireEvent.wheel(scrollArea);
+    scrollArea.scrollTop = 400;
+    fireEvent.scroll(scrollArea);
+    rowOffset = 600;
+    observer.trigger();
+    expect(scrollArea.scrollTop).toBe(400);
+  });
+
   it("returns to the bottom when the thread was left at the bottom", () => {
     const { scrollArea } = renderTimeline({
       threadId: "thread-a",
@@ -581,6 +647,39 @@ describe("BottomAnchoredScrollBody scroll preservation", () => {
       offsetWithinRow: 0,
       atBottom: true,
     });
+  });
+
+  it("keeps a saved row pending while an older page is still loading", () => {
+    const anchor = { rowId: "row-b", offsetWithinRow: 20, atBottom: false };
+    getDefaultStore().set(
+      threadTimelineScrollAnchorAtomFamily("thread-a"),
+      anchor,
+    );
+    const { scrollArea, rerenderRows, getRow } = renderTimeline({
+      threadId: "thread-a",
+      rowIds: [],
+    });
+    setScrollMetrics(scrollArea, {
+      scrollHeight: 100,
+      clientHeight: 100,
+      scrollTop: 0,
+    });
+    rerenderRows(["row-c"]);
+    for (let resize = 0; resize < 12; resize += 1) {
+      getLatestResizeObserver().trigger();
+      fireEvent.scroll(scrollArea);
+    }
+    expect(readAnchor("thread-a")).toEqual(anchor);
+    rerenderRows(["row-a", "row-b"]);
+    mockScrollAreaRect(scrollArea);
+    mockRowRect(getRow("row-b"), { top: 200, bottom: 300 });
+    setScrollMetrics(scrollArea, {
+      scrollHeight: 500,
+      clientHeight: 100,
+      scrollTop: 0,
+    });
+    getLatestResizeObserver().trigger();
+    expect(scrollArea.scrollTop).toBe(220);
   });
 
   it("does not restore a row when the saved anchor is at the bottom", () => {
@@ -609,16 +708,17 @@ describe("BottomAnchoredScrollBody scroll preservation", () => {
     expect(rowBScrollSpy).not.toHaveBeenCalled();
   });
 
-  it("falls back to the bottom when the saved row never appears", () => {
+  it("allows explicitly returning to the bottom while a saved row is missing", () => {
     getDefaultStore().set(threadTimelineScrollAnchorAtomFamily("thread-a"), {
       rowId: "row-gone",
       offsetWithinRow: 20,
       atBottom: false,
     });
 
-    const { scrollArea } = renderTimeline({
+    const { scrollArea, getByRole } = renderTimeline({
       threadId: "thread-a",
       rowIds: ["row-a", "row-b"],
+      showScrollToBottomControl: true,
     });
     mockScrollAreaRect(scrollArea);
     setScrollMetrics(scrollArea, {
@@ -632,6 +732,8 @@ describe("BottomAnchoredScrollBody scroll preservation", () => {
       observer.trigger();
     }
 
+    expect(scrollArea.scrollTop).toBe(0);
+    fireEvent.click(getByRole("button", { name: "Bottom" }));
     expect(scrollArea.scrollTop).toBe(300);
   });
 
@@ -754,19 +856,22 @@ describe("BottomAnchoredScrollBody scroll preservation", () => {
     getLatestResizeObserver().trigger();
     const readScrollHeight = vi.fn(() => 400);
     const readClientHeight = vi.fn(() => 100);
+    const readScrollTop = vi.fn(() => 300);
     Object.defineProperties(scrollArea, {
+      scrollTop: { configurable: true, get: readScrollTop },
       scrollHeight: { configurable: true, get: readScrollHeight },
       clientHeight: { configurable: true, get: readClientHeight },
     });
 
     unmount();
 
+    expect(readScrollTop).not.toHaveBeenCalled();
     expect(readScrollHeight).not.toHaveBeenCalled();
     expect(readClientHeight).not.toHaveBeenCalled();
     expect(readAnchor("thread-a")?.atBottom).toBe(true);
   });
 
-  it("checks live geometry when detached content shrinks before unmount", () => {
+  it("does not measure a detached timeline again on unmount", () => {
     const { scrollArea, unmount } = renderTimeline({
       threadId: "thread-a",
       rowIds: ["row-a"],
@@ -780,15 +885,13 @@ describe("BottomAnchoredScrollBody scroll preservation", () => {
     scrollArea.scrollTop = 150;
     fireEvent.wheel(scrollArea);
     fireEvent.scroll(scrollArea);
-    setScrollMetrics(scrollArea, {
-      scrollHeight: 250,
-      clientHeight: 100,
-      scrollTop: 150,
-    });
-
+    const savedAnchor = readAnchor("thread-a");
+    const readScrollHeight = vi.spyOn(scrollArea, "scrollHeight", "get");
+    const readRect = vi.spyOn(scrollArea, "getBoundingClientRect");
     unmount();
-
-    expect(readAnchor("thread-a")?.atBottom).toBe(true);
+    expect(readScrollHeight).not.toHaveBeenCalled();
+    expect(readRect).not.toHaveBeenCalled();
+    expect(readAnchor("thread-a")).toEqual(savedAnchor);
   });
 
   it("preserves a user-scrolled row when unmounting before the scroll event", () => {

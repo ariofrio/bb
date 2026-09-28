@@ -206,7 +206,49 @@ describe("BrowserTabDeck native browser first-show ordering", () => {
   const originalGetBoundingClientRect = Element.prototype.getBoundingClientRect;
   const originalMatchMedia = window.matchMedia;
 
+  let deliverBoundsAutomatically = true;
+  const boundObservers = new Set<() => void>();
+
   beforeEach(() => {
+    deliverBoundsAutomatically = true;
+    boundObservers.clear();
+    vi.stubGlobal(
+      "IntersectionObserver",
+      class {
+        constructor(private callback: IntersectionObserverCallback) {}
+        private target: Element | null = null;
+        deliver = () => {
+          if (!this.target) return;
+          this.callback(
+            [
+              {
+                target: this.target,
+                boundingClientRect: BROWSER_PANEL_RECT,
+                rootBounds: BROWSER_PANEL_RECT,
+                intersectionRect: BROWSER_PANEL_RECT,
+                isIntersecting: true,
+                intersectionRatio: 1,
+                time: 0,
+              },
+            ],
+            this as unknown as IntersectionObserver,
+          );
+        };
+        observe(target: Element) {
+          this.target = target;
+          boundObservers.add(this.deliver);
+          if (deliverBoundsAutomatically) queueMicrotask(this.deliver);
+        }
+        unobserve() {
+          this.target = null;
+        }
+        disconnect() {
+          this.target = null;
+          boundObservers.delete(this.deliver);
+        }
+      },
+    );
+
     Object.defineProperty(Element.prototype, "getBoundingClientRect", {
       configurable: true,
       value: () => BROWSER_PANEL_RECT,
@@ -219,6 +261,7 @@ describe("BrowserTabDeck native browser first-show ordering", () => {
   });
 
   afterEach(() => {
+    vi.unstubAllGlobals();
     cleanup();
     vi.restoreAllMocks();
     resetBrowserViewPersistence();
@@ -274,6 +317,27 @@ describe("BrowserTabDeck native browser first-show ordering", () => {
     },
   );
 
+  it("waits for observed placement before showing a native view", async () => {
+    const { api, attachments, visibilityWithoutFocus } =
+      createRecordingBrowserApi();
+    installDesktopBrowser(api);
+    deliverBoundsAutomatically = false;
+    const readBounds = vi.spyOn(Element.prototype, "getBoundingClientRect");
+    renderBrowserDeck({ canShowNativeBrowserView: true });
+    await waitFor(() => expect(attachments).toHaveLength(1));
+    expect(readBounds).not.toHaveBeenCalled();
+    expect(visibilityWithoutFocus.some((request) => request.visible)).toBe(
+      false,
+    );
+    act(() => {
+      for (const deliver of boundObservers) deliver();
+    });
+    expect(readBounds).not.toHaveBeenCalled();
+    expect(visibilityWithoutFocus.some((request) => request.visible)).toBe(
+      true,
+    );
+  });
+
   it("attaches a URL-bearing tab hidden and shows only after attach plus compact drawer readiness", async () => {
     const {
       api,
@@ -295,11 +359,11 @@ describe("BrowserTabDeck native browser first-show ordering", () => {
       tabId: "tab-url",
       threadId: "thread-1",
       url: "https://example.com",
-      bounds: { x: 12, y: 24, width: 420, height: 260 },
+      bounds: { x: 0, y: 0, width: 0, height: 0 },
       visible: false,
     });
     expect(visibility.some((request) => request.visible)).toBe(false);
-    expect(bounds).toHaveLength(0);
+    expect(bounds).toHaveLength(1);
 
     view.rerender(
       <BrowserTabDeck

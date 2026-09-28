@@ -60,7 +60,6 @@ const SCROLLBAR_IDLE_DELAY_MS = 600;
 const BOTTOM_RESTORE_SETTLE_FRAME_COUNT = 3;
 const SCROLL_ANCHOR_CAPTURE_THROTTLE_MS = 100;
 const COARSE_SCROLL_ANCHOR_CAPTURE_THROTTLE_MS = 250;
-const SCROLL_ANCHOR_RESTORE_MAX_ATTEMPTS = 8;
 const TIMELINE_ROW_ID_SELECTOR = "[data-timeline-row-id]";
 const TOP_LEVEL_TIMELINE_ROW_LIST_SELECTOR =
   '[data-timeline-row-list="top-level"]';
@@ -248,8 +247,6 @@ export function BottomAnchoredScrollBody({
   } | null>(null);
   const pendingScrollRestoreRef = useRef<{
     anchor: ScrollAnchor;
-    attemptsRemaining: number;
-    lastAppliedScrollTop: number | null;
   } | null>(null);
   const scrollAnchorCaptureThrottleRef = useRef<{
     lastWriteAt: number;
@@ -316,6 +313,11 @@ export function BottomAnchoredScrollBody({
   const restoreBottomFromCacheOnce = useCallback(() => {
     const scrollArea = scrollAreaRef.current;
     if (!scrollArea || !shouldStickToBottomRef.current) return false;
+    if (
+      typeof ResizeObserver !== "undefined" &&
+      !resizeObserverHasDeliveredRef.current
+    )
+      return false;
     const maxScrollOffset = readMaxScrollOffset(scrollArea);
     if (isScrolledNearBottom(maxScrollOffset, scrollArea.scrollTop)) {
       return false;
@@ -341,7 +343,7 @@ export function BottomAnchoredScrollBody({
         restoreFramesRemainingRef.current = 0;
         return;
       }
-      if (!useLiveRead) {
+      if (!useLiveRead && !resizeObserverHasDeliveredRef.current) {
         restoreTailLiveReadRef.current = true;
       }
       restoreFramesRemainingRef.current -= 1;
@@ -369,6 +371,7 @@ export function BottomAnchoredScrollBody({
 
   const scrollElementIntoView = useCallback(
     ({ element, options }: ScrollElementIntoViewArgs) => {
+      cancelPendingScrollRestore();
       const scrollArea = scrollAreaRef.current;
       if (
         scrollArea &&
@@ -385,11 +388,12 @@ export function BottomAnchoredScrollBody({
         scrollArea.dispatchEvent(new Event("scroll"));
       }
     },
-    [cancelQueuedRestore],
+    [cancelPendingScrollRestore, cancelQueuedRestore],
   );
 
   const scrollElementIntoViewClampedToMaxScroll = useCallback(
     ({ element }: ScrollElementIntoViewClampedToMaxScrollArgs) => {
+      cancelPendingScrollRestore();
       const scrollArea = scrollAreaRef.current;
       if (!scrollArea) {
         element.scrollIntoView({ block: "start", inline: "nearest" });
@@ -416,13 +420,25 @@ export function BottomAnchoredScrollBody({
 
       cancelQueuedRestore();
     },
-    [cancelQueuedRestore, queueBottomRestore, refreshMaxScrollOffset],
+    [
+      cancelPendingScrollRestore,
+      cancelQueuedRestore,
+      queueBottomRestore,
+      refreshMaxScrollOffset,
+    ],
   );
 
   const captureScrollAnchor = useCallback(() => {
     const scrollArea = scrollAreaRef.current;
     if (!scrollArea) return;
     userScrollInputPendingRef.current = false;
+    if (
+      shouldStickToBottomRef.current ||
+      pendingScrollRestoreRef.current !== null
+    ) {
+      pendingPrependAnchorRef.current = null;
+      return;
+    }
     pendingPrependAnchorRef.current = {
       scrollHeight: scrollArea.scrollHeight,
       scrollTop: scrollArea.scrollTop,
@@ -464,9 +480,25 @@ export function BottomAnchoredScrollBody({
 
   const writeScrollAnchor = useCallback(
     (scrollAreaOverride?: HTMLElement) => {
-      if (scrollAnchorThreadId === undefined) return;
+      if (
+        scrollAnchorThreadId === undefined ||
+        pendingScrollRestoreRef.current !== null
+      )
+        return;
       const scrollArea = scrollAreaOverride ?? scrollAreaRef.current;
       if (!scrollArea) return;
+      if (
+        shouldStickToBottomRef.current &&
+        !userDetachedFromBottomRef.current &&
+        !hasRecentUserScrollIntent()
+      ) {
+        store.set(threadTimelineScrollAnchorAtomFamily(scrollAnchorThreadId), {
+          rowId: "",
+          offsetWithinRow: 0,
+          atBottom: true,
+        });
+        return;
+      }
       let atBottomByGeometry = isScrolledNearBottom(
         readMaxScrollOffset(scrollArea),
         scrollArea.scrollTop,
@@ -642,6 +674,8 @@ export function BottomAnchoredScrollBody({
     const hasDirectUserScrollInput =
       userScrollInputPendingRef.current || pointerScrollIntentRef.current;
     userScrollInputPendingRef.current = false;
+    if (pendingScrollRestoreRef.current !== null && !hasDirectUserScrollInput)
+      return;
 
     if (
       pendingPrependAnchorRef.current !== null &&
@@ -700,25 +734,9 @@ export function BottomAnchoredScrollBody({
   const advancePendingScrollRestore = useCallback((): boolean => {
     const pending = pendingScrollRestoreRef.current;
     if (!pending) return false;
-    pending.attemptsRemaining -= 1;
-    const appliedScrollTop = applyScrollRestore(pending.anchor);
-    if (appliedScrollTop !== null) {
-      if (pending.lastAppliedScrollTop === appliedScrollTop) {
-        pendingScrollRestoreRef.current = null;
-        return true;
-      }
-      pending.lastAppliedScrollTop = appliedScrollTop;
-    }
-    if (pending.attemptsRemaining <= 0) {
-      pendingScrollRestoreRef.current = null;
-      if (appliedScrollTop === null) {
-        shouldStickToBottomRef.current = true;
-        setIsAtBottom(true);
-        queueBottomRestore();
-      }
-    }
+    applyScrollRestore(pending.anchor);
     return true;
-  }, [applyScrollRestore, queueBottomRestore]);
+  }, [applyScrollRestore]);
 
   const handleScrollAreaResize = useCallback(
     (entries: ResizeObserverEntry[]) => {
@@ -785,8 +803,6 @@ export function BottomAnchoredScrollBody({
     setIsAtBottom(false);
     pendingScrollRestoreRef.current = {
       anchor,
-      attemptsRemaining: SCROLL_ANCHOR_RESTORE_MAX_ATTEMPTS,
-      lastAppliedScrollTop: null,
     };
     advancePendingScrollRestore();
   }, [scrollAnchorThreadId, store, advancePendingScrollRestore]);
@@ -813,19 +829,21 @@ export function BottomAnchoredScrollBody({
   const flushScrollAnchorCapture = useCallback(
     (scrollArea: HTMLElement) => {
       const captureThrottle = scrollAnchorCaptureThrottleRef.current;
+      const capturePending = captureThrottle.trailingTimeout !== null;
       if (captureThrottle.trailingTimeout !== null) {
         window.clearTimeout(captureThrottle.trailingTimeout);
         captureThrottle.trailingTimeout = null;
       }
       if (
-        resizeObserverHasDeliveredRef.current &&
-        !shouldStickToBottomRef.current
+        shouldStickToBottomRef.current ||
+        capturePending ||
+        userScrollInputPendingRef.current ||
+        !resizeObserverHasDeliveredRef.current
       ) {
-        refreshMaxScrollOffset(scrollArea);
+        writeScrollAnchor(scrollArea);
       }
-      writeScrollAnchor(scrollArea);
     },
-    [refreshMaxScrollOffset, writeScrollAnchor],
+    [writeScrollAnchor],
   );
 
   useLayoutEffect(() => {

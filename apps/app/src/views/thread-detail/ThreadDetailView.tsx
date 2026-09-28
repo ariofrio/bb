@@ -1,3 +1,4 @@
+import { DeferredContent } from "@/components/ui/deferred-content";
 import {
   useCallback,
   useEffect,
@@ -2894,7 +2895,11 @@ function ThreadDetailViewInternal(props: ThreadRoutePathArgs) {
       >
         <AppNavigationHostProvider capabilities={appNavigationCapabilities}>
           <ThreadDetailSecondaryContent
-            footer={composerFooter}
+            footer={
+              <DeferredContent key={thread.id} afterPaint>
+                {composerFooter}
+              </DeferredContent>
+            }
             header={timelineHeader}
             isMetadataLoading={environmentQuery.isLoading}
             isSecondaryPanelOpen={isSecondaryPanelOpen}

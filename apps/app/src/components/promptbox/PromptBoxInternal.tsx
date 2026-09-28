@@ -14,6 +14,7 @@ import {
   useContext,
   useEffect,
   useImperativeHandle,
+  useInsertionEffect,
   useLayoutEffect,
   useMemo,
   useRef,
@@ -338,7 +339,10 @@ function PromptSubmitButton({
       )}
     >
       {isBusy ? (
-        <Icon name="Loading" className="size-4 animate-spin motion-reduce:animate-none" />
+        <Icon
+          name="Loading"
+          className="size-4 animate-spin motion-reduce:animate-none"
+        />
       ) : (
         <>
           <Icon name={icon ?? "CornerDownLeft"} className="size-4" />
@@ -1312,6 +1316,16 @@ export function PromptBoxInternal({
     );
   }, [containerCompactPlaceholder]);
   const editorRef = useRef<Editor | null>(null);
+  useInsertionEffect(
+    () => () => {
+      const editor = editorRef.current;
+      if (editor && !editor.isDestroyed) {
+        editor.view.dom.blur();
+        editor.destroy();
+      }
+    },
+    [],
+  );
   const editorScrollContainerRef = useRef<HTMLDivElement>(null);
   const revealSelectionFrameRef = useRef<number | null>(null);
   const promptActionFocusFrameRef = useRef<number | null>(null);
@@ -1720,6 +1734,7 @@ export function PromptBoxInternal({
       extensions: editorExtensions,
       content: initialEditorContent.content,
       immediatelyRender: false,
+      injectCSS: false,
       editorProps: {
         attributes: {
           "aria-label": effectivePlaceholder,

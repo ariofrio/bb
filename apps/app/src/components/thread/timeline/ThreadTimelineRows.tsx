@@ -3,6 +3,7 @@ import {
   memo,
   useCallback,
   useContext,
+  useDeferredValue,
   useEffect,
   useMemo,
   useRef,
@@ -1847,9 +1848,17 @@ function TimelineRowsList({
             gap={spacing === "bundle" ? 0 : 8}
             getScrollElement={getWindowingScrollElement}
             itemKeys={itemKeys}
+            initialScrollAnchor={
+              isTopLevelList
+                ? {
+                    key: scrollRestoreRowId ?? itemKeys.at(-1) ?? "",
+                    align: scrollRestoreRowId === null ? "end" : "start",
+                  }
+                : undefined
+            }
             measurements={measurements}
             minItemCount={
-              spacing === "top-level" ? (isCompactViewport ? 40 : 60) : 20
+              spacing === "top-level" ? (isCompactViewport ? 40 : 8) : 20
             }
             renderItem={(index, windowedState) => {
               const item = items[index];
@@ -1909,8 +1918,28 @@ function ThreadTimelineRowsComponent(props: ThreadTimelineRowsProps) {
   const ownerKey = props.threadId ?? props.timelineRows[0]?.threadId ?? "";
   return (
     <TimelineImageGallery key={ownerKey}>
-      <ThreadTimelineRowsForTimelineView {...props} />
+      <DeferredThreadTimelineRows {...props} />
     </TimelineImageGallery>
+  );
+}
+
+const EMPTY_TIMELINE_ROWS: TimelineRow[] = [];
+const SUBSCRIBE_STATIC_RENDER = () => () => {};
+const CLIENT_STATIC_RENDER = () => false;
+const SERVER_STATIC_RENDER = () => true;
+
+function DeferredThreadTimelineRows(props: ThreadTimelineRowsProps) {
+  const isStaticRender = useSyncExternalStore(
+    SUBSCRIBE_STATIC_RENDER,
+    CLIENT_STATIC_RENDER,
+    SERVER_STATIC_RENDER,
+  );
+  const timelineRows = useDeferredValue(
+    props.timelineRows,
+    isStaticRender ? props.timelineRows : EMPTY_TIMELINE_ROWS,
+  );
+  return (
+    <ThreadTimelineRowsForTimelineView {...props} timelineRows={timelineRows} />
   );
 }
 

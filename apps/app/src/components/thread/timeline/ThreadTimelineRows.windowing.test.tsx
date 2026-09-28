@@ -156,6 +156,49 @@ describe("ThreadTimelineRows windowing", () => {
     });
   });
 
+  it("windows a desktop transcript below the old sixty-row threshold", async () => {
+    const scrollElement = document.createElement("div");
+    scrollElement.setAttribute("data-test-main-scroll", "");
+    const bottomAnchor: BottomAnchorContextValue = {
+      captureScrollAnchor: vi.fn(),
+      getScrollElement: () => scrollElement,
+      isAtBottom: false,
+      scrollElementIntoView: vi.fn(),
+      scrollElementIntoViewClampedToMaxScroll: vi.fn(),
+      scrollToBottom: vi.fn(),
+    };
+    const rows = Array.from({ length: 30 }, (_, index) =>
+      conversationRow({
+        id: `desktop-${index}`,
+        role: index % 2 === 0 ? "user" : "assistant",
+        sourceSeqStart: index + 1,
+        sourceSeqEnd: index + 1,
+        text: `Desktop message ${index}`,
+        threadId: "thr_desktop",
+      }),
+    );
+    const view = render(
+      <MemoryRouter>
+        <QueryClientProvider client={new QueryClient()}>
+          <BottomAnchorContext.Provider value={bottomAnchor}>
+            <CompactViewportOverrideProvider isCompactViewport={false}>
+              <ThreadTimelineRows
+                threadId="thr_desktop"
+                timelineRows={rows}
+                threadRuntimeDisplayStatus="idle"
+                workspaceRootPath={undefined}
+              />
+            </CompactViewportOverrideProvider>
+          </BottomAnchorContext.Provider>
+        </QueryClientProvider>
+      </MemoryRouter>,
+    );
+    await waitFor(() => {
+      expect(view.container.textContent).toContain("Desktop message 0");
+      expect(view.container.textContent).not.toContain("Desktop message 25");
+    });
+  });
+
   it("keeps offscreen search and outline targets realized", async () => {
     const scrollElement = document.createElement("div");
     scrollElement.setAttribute("data-test-main-scroll", "");

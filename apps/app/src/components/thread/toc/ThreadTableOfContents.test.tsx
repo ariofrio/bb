@@ -296,6 +296,7 @@ function openTocPanel(): void {
 }
 
 beforeEach(() => {
+  vi.stubGlobal("IntersectionObserver", undefined);
   vi.stubGlobal("ResizeObserver", ResizeObserverMock);
   vi.stubGlobal(
     "requestAnimationFrame",
@@ -393,7 +394,9 @@ describe("ThreadTableOfContents", () => {
       { enabled: false },
     );
 
-    view.rerender(<TocHost timelineRows={[userConversationRow(1)]} />);
+    view.rerender(
+      <TocHost timelineRows={[1, 2, 3].map(userConversationRow)} />,
+    );
 
     expect(useThreadConversationOutline).toHaveBeenLastCalledWith(
       "thr_toc_test",
@@ -1200,6 +1203,59 @@ describe("ThreadTableOfContents timeline item cache", () => {
       }),
     ).not.toBeNull();
     expect(screen.getByText("Image attachment")).not.toBeNull();
+  });
+
+  it("observes active rows without synchronously measuring the timeline", () => {
+    vi.useFakeTimers();
+    const callbacks: IntersectionObserverCallback[] = [];
+    vi.stubGlobal(
+      "IntersectionObserver",
+      class {
+        constructor(callback: IntersectionObserverCallback) {
+          callbacks.push(callback);
+        }
+        observe() {}
+        unobserve() {}
+        disconnect() {}
+      },
+    );
+    scrollElement = createScrollElement({
+      clientHeight: 100,
+      rows: [{ id: "row_user_1", top: 0, bottom: 50 }],
+      scrollHeight: 1000,
+      scrollTop: 400,
+    });
+    const measure = vi.spyOn(scrollElement, "getBoundingClientRect");
+    render(<TocHost timelineRows={[1, 2, 3].map(userConversationRow)} />);
+    act(() => {
+      vi.advanceTimersByTime(120);
+    });
+    expect(measure).not.toHaveBeenCalled();
+    expect(callbacks.length).toBeGreaterThan(0);
+    const row = scrollElement.querySelector<HTMLElement>(
+      "[data-timeline-row-id]",
+    )!;
+    const notify = (isIntersecting: boolean) =>
+      act(() =>
+        callbacks.at(-1)!(
+          [
+            {
+              target: row,
+              isIntersecting,
+              intersectionRect: new DOMRect(0, 0, 100, isIntersecting ? 50 : 0),
+              boundingClientRect: new DOMRect(0, 0, 100, 50),
+              rootBounds: new DOMRect(0, 0, 100, 100),
+              intersectionRatio: isIntersecting ? 1 : 0,
+              time: 0,
+            },
+          ],
+          {} as IntersectionObserver,
+        ),
+      );
+    notify(true);
+    expect(activeRailTickIndexes()).toEqual([0]);
+    notify(false);
+    expect(activeRailTickIndexes()).toEqual([]);
   });
 
   it("re-measures the active item 120 ms after an update that only changes work rows", () => {

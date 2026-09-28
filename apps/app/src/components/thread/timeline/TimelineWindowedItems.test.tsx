@@ -51,17 +51,34 @@ class ResizeObserverStub implements ResizeObserver {
   constructor(readonly callback: ResizeObserverCallback) {
     ResizeObserverStub.instances.push(this);
   }
-  disconnect(): void {}
+  disconnect(): void {
+    this.observed.clear();
+  }
   observe(element: Element): void {
     this.observed.add(element);
   }
-  unobserve(): void {}
+  unobserve(element: Element): void {
+    this.observed.delete(element);
+  }
+}
+
+function observeScrollHeight(height: number) {
+  act(() => {
+    for (const observer of [...ResizeObserverStub.instances]) {
+      if (observer.observed.has(scrollElement))
+        observer.callback([resizeEntry(scrollElement, height)], observer);
+    }
+  });
 }
 
 function renderWindowedItems(options?: {
   alwaysMountedKeys?: ReadonlySet<string>;
   clientHeight?: number;
   measurements?: Map<string, number>;
+  onReadViewport?: () => void;
+  deferObservation?: boolean;
+  initialScrollAnchor?: { key: string; align: "start" | "end" };
+  onRender?: (index: number) => void;
 }) {
   const measurements = options?.measurements ?? new Map<string, number>();
   Object.defineProperty(scrollElement, "clientHeight", {
@@ -70,18 +87,23 @@ function renderWindowedItems(options?: {
   });
   Object.defineProperty(scrollElement, "offsetHeight", {
     configurable: true,
-    value: options?.clientHeight ?? 96,
+    get: () => {
+      options?.onReadViewport?.();
+      return options?.clientHeight ?? 96;
+    },
   });
-  return {
-    ...render(
-      <TimelineWindowedItems
-        alwaysMountedKeys={options?.alwaysMountedKeys}
-        estimateItemHeight={() => 32}
-        gap={0}
-        getScrollElement={() => scrollElement}
-        itemKeys={ITEM_KEYS}
-        measurements={measurements}
-        renderItem={(index: number, state: TimelineWindowedItemRenderState) => (
+  const rendered = render(
+    <TimelineWindowedItems
+      alwaysMountedKeys={options?.alwaysMountedKeys}
+      initialScrollAnchor={options?.initialScrollAnchor}
+      estimateItemHeight={() => 32}
+      gap={0}
+      getScrollElement={() => scrollElement}
+      itemKeys={ITEM_KEYS}
+      measurements={measurements}
+      renderItem={(index: number, state: TimelineWindowedItemRenderState) => {
+        options?.onRender?.(index);
+        return (
           <div
             key={ITEM_KEYS[index]}
             ref={state.itemRef}
@@ -97,12 +119,14 @@ function renderWindowedItems(options?: {
               </button>
             ) : null}
           </div>
-        )}
-      />,
-      { container: scrollElement },
-    ),
-    measurements,
-  };
+        );
+      }}
+    />,
+    { container: scrollElement },
+  );
+  if (!options?.deferObservation)
+    observeScrollHeight(options?.clientHeight ?? 96);
+  return { ...rendered, measurements };
 }
 
 beforeEach(() => {
@@ -152,8 +176,84 @@ afterEach(() => {
 });
 
 describe("TimelineWindowedItems", () => {
+  it("waits for observed geometry instead of measuring during a virtualized commit", () => {
+    vi.stubGlobal(
+      "IntersectionObserver",
+      class {
+        observe() {}
+        unobserve() {}
+        disconnect() {}
+      },
+    );
+    const readRect = vi.mocked(HTMLElement.prototype.getBoundingClientRect);
+    readRect.mockClear();
+    const readViewport = vi.fn();
+    renderWindowedItems({
+      onReadViewport: readViewport,
+      deferObservation: true,
+    });
+    expect(readRect).not.toHaveBeenCalled();
+    expect(readViewport).not.toHaveBeenCalled();
+  });
+  it("keeps the first commit windowed while the scroll root ref is pending", async () => {
+    let attachedRoot: HTMLElement | null = null;
+    Object.defineProperty(scrollElement, "clientHeight", {
+      configurable: true,
+      value: 96,
+    });
+    Object.defineProperty(scrollElement, "offsetHeight", {
+      configurable: true,
+      value: 96,
+    });
+    render(
+      <TimelineWindowedItems
+        estimateItemHeight={() => 32}
+        gap={0}
+        getScrollElement={() => attachedRoot}
+        itemKeys={ITEM_KEYS}
+        measurements={new Map()}
+        renderItem={(index, state) => (
+          <div
+            key={ITEM_KEYS[index]}
+            ref={state.itemRef}
+            data-index={state.itemIndex}
+            data-testid={`pending-row-${index}`}
+            style={state.itemStyle}
+          />
+        )}
+      />,
+      { container: scrollElement },
+    );
+
+    expect(screen.getAllByTestId(/^pending-row-/).length).toBeLessThan(60);
+    attachedRoot = scrollElement;
+    await waitFor(() =>
+      expect(
+        ResizeObserverStub.instances.some((observer) =>
+          observer.observed.has(scrollElement),
+        ),
+      ).toBe(true),
+    );
+    observeScrollHeight(96);
+    await waitFor(() =>
+      expect(screen.getAllByTestId(/^pending-row-/).length).toBeLessThan(30),
+    );
+    expect(screen.queryByTestId("pending-row-99")).toBeNull();
+  });
+
+  it("starts rendering near a saved row before the scroll observer attaches", () => {
+    const rendered: number[] = [];
+    renderWindowedItems({
+      initialScrollAnchor: { key: "row-80", align: "start" },
+      onRender: (index) => rendered.push(index),
+      deferObservation: true,
+    });
+    expect(rendered[0]).toBeGreaterThan(70);
+  });
+
   it("does not synchronously measure every row while mounting an unwindowed timeline", () => {
     renderWindowedItems({ clientHeight: 0 });
+    observeScrollHeight(0);
 
     const rectSpy = vi.mocked(HTMLElement.prototype.getBoundingClientRect);
     const measuredRows = rectSpy.mock.instances.filter(
@@ -185,6 +285,7 @@ describe("TimelineWindowedItems", () => {
       { container: scrollElement },
     );
 
+    observeScrollHeight(0);
     expect(measurements.size).toBe(0);
     const rowObserver = ResizeObserverStub.instances.find((observer) =>
       [...observer.observed].some((element) =>
@@ -251,6 +352,20 @@ describe("TimelineWindowedItems", () => {
     await waitFor(() =>
       expect(screen.getAllByTestId(/^input-/)).toHaveLength(20),
     );
+    const windowedRowObserver = ResizeObserverStub.instances.find((observer) =>
+      [...observer.observed].some(
+        (element) => element.getAttribute("data-index") === "19",
+      ),
+    );
+    expect(windowedRowObserver).toBeDefined();
+    act(() =>
+      windowedRowObserver!.callback(
+        [...windowedRowObserver!.observed].map((target) =>
+          resizeEntry(target, 32),
+        ),
+        windowedRowObserver!,
+      ),
+    );
     inputs.forEach((input, index) => {
       expect(screen.getByTestId(`input-${index}`)).toBe(input);
     });
@@ -291,6 +406,15 @@ describe("TimelineWindowedItems", () => {
 
     await waitFor(() => expect(screen.getByTestId("content-50")).toBeTruthy());
     expect(screen.queryByTestId("wrapper-0")).toBeNull();
+  });
+
+  it("does not reapply the existing scroll offset during mount", () => {
+    const scrollTo = vi.fn();
+    scrollElement.scrollTo = scrollTo;
+    scrollElement.scrollTop = 1600;
+    renderWindowedItems();
+    expect(scrollTo).not.toHaveBeenCalled();
+    expect(scrollElement.scrollTop).toBe(1600);
   });
 
   it("preserves an existing scroll offset when a nested virtualizer mounts", async () => {
@@ -352,6 +476,7 @@ describe("TimelineWindowedItems", () => {
 
   it("renders everything when its scrollport has no usable geometry", async () => {
     renderWindowedItems({ clientHeight: 0 });
+    observeScrollHeight(0);
 
     await waitFor(() =>
       expect(screen.getAllByTestId(/^content-/)).toHaveLength(100),

@@ -15,22 +15,6 @@ interface AutoLoadOlderRows {
   loadOlderRows: () => void;
 }
 
-function isSentinelWithinPrefetchRange({
-  scrollElement,
-  sentinel,
-}: {
-  scrollElement: HTMLElement;
-  sentinel: HTMLElement;
-}): boolean {
-  const scrollRect = scrollElement.getBoundingClientRect();
-  const sentinelRect = sentinel.getBoundingClientRect();
-  return (
-    sentinelRect.bottom >=
-      scrollRect.top - AUTO_LOAD_OLDER_ROWS_PREFETCH_MARGIN_PX &&
-    sentinelRect.top <= scrollRect.bottom
-  );
-}
-
 export function useAutoLoadOlderRows({
   hasOlderTimelineRows,
   isLoadingOlderTimelineRows,
@@ -38,9 +22,7 @@ export function useAutoLoadOlderRows({
 }: UseAutoLoadOlderRowsArgs): AutoLoadOlderRows {
   const bottomAnchor = useBottomAnchoredScroll();
   const sentinelNodeRef = useRef<HTMLElement | null>(null);
-  const isIntersectingRef = useRef(false);
   const [sentinelVersion, setSentinelVersion] = useState(0);
-  const [intersectionTick, setIntersectionTick] = useState(0);
   const [autoLoadFailed, setAutoLoadFailed] = useState(false);
 
   const sentinelRef = useCallback((node: HTMLElement | null) => {
@@ -74,21 +56,16 @@ export function useAutoLoadOlderRows({
   }, [startLoad]);
 
   useEffect(() => {
-    if (!isAutoLoadEnabled) {
-      isIntersectingRef.current = false;
-      return;
-    }
+    if (!isAutoLoadEnabled || isLoadingOlderTimelineRows) return;
     const sentinel = sentinelNodeRef.current;
-    if (!sentinel) {
-      return;
-    }
+    if (!sentinel) return;
+    let active = true;
     const observer = new IntersectionObserver(
       (entries) => {
-        const entry = entries.at(-1);
-        isIntersectingRef.current = entry?.isIntersecting ?? false;
-        if (isIntersectingRef.current) {
-          setIntersectionTick((tick) => tick + 1);
-        }
+        if (!active || !entries.at(-1)?.isIntersecting) return;
+        active = false;
+        observer.disconnect();
+        startLoad();
       },
       {
         root: bottomAnchor?.getScrollElement() ?? null,
@@ -96,32 +73,15 @@ export function useAutoLoadOlderRows({
       },
     );
     observer.observe(sentinel);
-    return () => observer.disconnect();
-  }, [bottomAnchor, isAutoLoadEnabled, sentinelVersion]);
-
-  useEffect(() => {
-    if (
-      !isAutoLoadEnabled ||
-      isLoadingOlderTimelineRows ||
-      !isIntersectingRef.current
-    ) {
-      return;
-    }
-    const sentinel = sentinelNodeRef.current;
-    const scrollElement = bottomAnchor?.getScrollElement();
-    if (!sentinel || !scrollElement) {
-      return;
-    }
-    if (!isSentinelWithinPrefetchRange({ scrollElement, sentinel })) {
-      isIntersectingRef.current = false;
-      return;
-    }
-    startLoad();
+    return () => {
+      active = false;
+      observer.disconnect();
+    };
   }, [
     bottomAnchor,
-    intersectionTick,
     isAutoLoadEnabled,
     isLoadingOlderTimelineRows,
+    sentinelVersion,
     startLoad,
   ]);
 
