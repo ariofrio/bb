@@ -741,6 +741,31 @@ describe("BottomAnchoredScrollBody scroll preservation", () => {
     });
   });
 
+  it("uses observed scroll geometry when saving the anchor on unmount", () => {
+    const { scrollArea, unmount } = renderTimeline({
+      threadId: "thread-a",
+      rowIds: ["row-a"],
+    });
+    setScrollMetrics(scrollArea, {
+      scrollHeight: 400,
+      clientHeight: 100,
+      scrollTop: 300,
+    });
+    getLatestResizeObserver().trigger();
+    const readScrollHeight = vi.fn(() => 400);
+    const readClientHeight = vi.fn(() => 100);
+    Object.defineProperties(scrollArea, {
+      scrollHeight: { configurable: true, get: readScrollHeight },
+      clientHeight: { configurable: true, get: readClientHeight },
+    });
+
+    unmount();
+
+    expect(readScrollHeight).not.toHaveBeenCalled();
+    expect(readClientHeight).not.toHaveBeenCalled();
+    expect(readAnchor("thread-a")?.atBottom).toBe(true);
+  });
+
   it("preserves a user-scrolled row when unmounting before the scroll event", () => {
     const { scrollArea, rowElements, unmount } = renderTimeline({
       threadId: "thread-a",
