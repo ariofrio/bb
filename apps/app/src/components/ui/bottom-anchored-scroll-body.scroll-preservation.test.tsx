@@ -766,6 +766,31 @@ describe("BottomAnchoredScrollBody scroll preservation", () => {
     expect(readAnchor("thread-a")?.atBottom).toBe(true);
   });
 
+  it("checks live geometry when detached content shrinks before unmount", () => {
+    const { scrollArea, unmount } = renderTimeline({
+      threadId: "thread-a",
+      rowIds: ["row-a"],
+    });
+    setScrollMetrics(scrollArea, {
+      scrollHeight: 400,
+      clientHeight: 100,
+      scrollTop: 300,
+    });
+    getLatestResizeObserver().trigger();
+    scrollArea.scrollTop = 150;
+    fireEvent.wheel(scrollArea);
+    fireEvent.scroll(scrollArea);
+    setScrollMetrics(scrollArea, {
+      scrollHeight: 250,
+      clientHeight: 100,
+      scrollTop: 150,
+    });
+
+    unmount();
+
+    expect(readAnchor("thread-a")?.atBottom).toBe(true);
+  });
+
   it("preserves a user-scrolled row when unmounting before the scroll event", () => {
     const { scrollArea, rowElements, unmount } = renderTimeline({
       threadId: "thread-a",

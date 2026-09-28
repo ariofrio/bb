@@ -817,9 +817,15 @@ export function BottomAnchoredScrollBody({
         window.clearTimeout(captureThrottle.trailingTimeout);
         captureThrottle.trailingTimeout = null;
       }
+      if (
+        resizeObserverHasDeliveredRef.current &&
+        !shouldStickToBottomRef.current
+      ) {
+        refreshMaxScrollOffset(scrollArea);
+      }
       writeScrollAnchor(scrollArea);
     },
-    [writeScrollAnchor],
+    [refreshMaxScrollOffset, writeScrollAnchor],
   );
 
   useLayoutEffect(() => {
