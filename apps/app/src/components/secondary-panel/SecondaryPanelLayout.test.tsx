@@ -1,7 +1,13 @@
 // @vitest-environment jsdom
 
-import type { ReactNode } from "react";
-import { act, cleanup, render, screen } from "@testing-library/react";
+import type { ReactNode, TransitionEventHandler } from "react";
+import {
+  act,
+  cleanup,
+  fireEvent,
+  render,
+  screen,
+} from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { CompactViewportOverrideProvider } from "@bb/shared-ui/hooks/use-compact-viewport";
 import { dispatchBrowserViewBoundsSync } from "@/lib/browser-view-bounds-sync";
@@ -61,8 +67,18 @@ vi.mock("react-resizable-panels", async () => {
   });
   PanelGroup.displayName = "MockPanelGroup";
 
-  const Panel = ({ children }: { children?: ReactNode }) =>
-    React.createElement("div", { "data-testid": "main-panel" }, children);
+  const Panel = ({
+    children,
+    onTransitionEnd,
+  }: {
+    children?: ReactNode;
+    onTransitionEnd?: TransitionEventHandler<HTMLDivElement>;
+  }) =>
+    React.createElement(
+      "div",
+      { "data-testid": "main-panel", onTransitionEnd },
+      children,
+    );
 
   return { Panel, PanelGroup };
 });
@@ -301,6 +317,29 @@ beforeEach(() => {
 });
 
 describe("SecondaryPanelLayout", () => {
+  it("refreshes native browser bounds when the conversation panel moves its sibling", () => {
+    renderLayout({
+      isCompactViewport: false,
+      open: true,
+      renderPanel: createPanelRenderer(),
+      resetKey: "thread-a",
+    });
+    const main = screen.getByTestId("main-panel");
+    vi.mocked(dispatchBrowserViewBoundsSync).mockClear();
+    const transition = (target: Element, propertyName: string) => {
+      const event = new Event("transitionend", { bubbles: true });
+      Object.defineProperty(event, "propertyName", { value: propertyName });
+      fireEvent(target, event);
+    };
+    transition(main, "opacity");
+    transition(main.firstElementChild!, "flex-grow");
+    expect(dispatchBrowserViewBoundsSync).not.toHaveBeenCalled();
+    transition(main, "flex-grow");
+    expect(dispatchBrowserViewBoundsSync).toHaveBeenCalledTimes(1);
+    transition(main, "flex-basis");
+    expect(dispatchBrowserViewBoundsSync).toHaveBeenCalledTimes(2);
+  });
+
   it("registers the thread and right panel as one two-pane resize grid", () => {
     renderLayout({
       isCompactViewport: false,

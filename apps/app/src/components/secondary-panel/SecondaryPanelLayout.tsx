@@ -388,6 +388,15 @@ export function SecondaryPanelLayout({
             }
             minSize={minimumSize.min * 100}
             order={1}
+            onTransitionEnd={(event) => {
+              if (
+                event.target === event.currentTarget &&
+                (event.propertyName === "flex-grow" ||
+                  event.propertyName === "flex-basis")
+              ) {
+                dispatchBrowserViewBoundsSync();
+              }
+            }}
             className={cn(
               "min-w-0 overflow-clip transition-[flex-grow,flex-basis]",
               PANEL_COLLAPSE_TRANSITION_CLASS,
