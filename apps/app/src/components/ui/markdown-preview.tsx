@@ -1,3 +1,4 @@
+import { remarkCachedMarkdownParse } from "./markdown-parse-cache.js";
 import {
   Children,
   cloneElement,
@@ -1419,7 +1420,7 @@ function setMarkdownContentWidthVariable({
 
 interface MarkdownTableGeometryRegistration {
   breakout: HTMLElement;
-  clip: HTMLElement | null;
+  clip: HTMLElement | null | undefined;
   content: HTMLElement;
   lastClipWidth: number;
   lastContentWidth: number;
@@ -1460,7 +1461,10 @@ function measureMarkdownTableGeometry(
     registration.lastClipWidth = clipWidth;
     measurements.push({
       breakout,
-      breakoutLimit: readMarkdownTableBreakoutLimit({ breakout, clip }),
+      breakoutLimit: readMarkdownTableBreakoutLimit({
+        breakout,
+        clip: clip ?? null,
+      }),
       contentWidth,
     });
   }
@@ -1485,31 +1489,46 @@ function getSharedMarkdownTableResizeObserver(): ResizeObserver {
         registrations.add(registration);
       }
     }
+    const clips = new Map<HTMLElement, HTMLElement | null>();
+    for (const registration of registrations) {
+      if (registration.clip !== undefined) continue;
+      if (!clips.has(registration.content)) {
+        clips.set(
+          registration.content,
+          findHorizontalClipAncestor(registration.content),
+        );
+      }
+      registration.clip = clips.get(registration.content) ?? null;
+      if (registration.clip && registration.clip !== registration.content) {
+        observeMarkdownTableElement(registration.clip, registration);
+      }
+    }
     measureMarkdownTableGeometry(registrations);
   });
   return sharedMarkdownTableResizeObserver;
 }
 
+function observeMarkdownTableElement(
+  element: HTMLElement,
+  registration: MarkdownTableGeometryRegistration,
+): void {
+  let registrations = markdownTableRegistrationsByElement.get(element);
+  if (!registrations) {
+    registrations = new Set();
+    markdownTableRegistrationsByElement.set(element, registrations);
+    getSharedMarkdownTableResizeObserver().observe(element);
+  }
+  registrations.add(registration);
+}
+
 function observeMarkdownTableGeometry(
   registration: MarkdownTableGeometryRegistration,
 ): () => void {
-  const elements =
-    registration.clip === null || registration.clip === registration.content
-      ? [registration.content]
-      : [registration.content, registration.clip];
-  const observer = getSharedMarkdownTableResizeObserver();
-  for (const element of elements) {
-    let registrations = markdownTableRegistrationsByElement.get(element);
-    if (!registrations) {
-      registrations = new Set();
-      markdownTableRegistrationsByElement.set(element, registrations);
-      observer.observe(element);
-    }
-    registrations.add(registration);
-  }
-
+  observeMarkdownTableElement(registration.content, registration);
   return () => {
+    const elements = new Set([registration.content, registration.clip]);
     for (const element of elements) {
+      if (!element) continue;
       const registrations = markdownTableRegistrationsByElement.get(element);
       registrations?.delete(registration);
       if (registrations?.size === 0) {
@@ -1533,16 +1552,16 @@ function useMarkdownTableContentWidthVariable() {
     if (!breakout || !content) {
       return;
     }
-    const clip = findHorizontalClipAncestor(content);
     const registration: MarkdownTableGeometryRegistration = {
       breakout,
-      clip,
+      clip: undefined,
       content,
       lastClipWidth: -1,
       lastContentWidth: -1,
     };
 
     if (typeof ResizeObserver === "undefined") {
+      registration.clip = findHorizontalClipAncestor(content);
       measureMarkdownTableGeometry([registration]);
       return;
     }
@@ -1804,6 +1823,10 @@ function MarkdownPreviewComponent({
     if (hasMessageDirectives) {
       plugins.push(remarkDirective);
     }
+    plugins.push([
+      remarkCachedMarkdownParse,
+      hasMessageDirectives ? "directives" : "standard",
+    ]);
     return plugins;
   }, [threadMentions, promptMentions, hasMessageDirectives]);
   const remarkPlugins = useMemo(

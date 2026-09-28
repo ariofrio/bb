@@ -120,6 +120,7 @@ describe("MarkdownPreview", () => {
     expect(observed).toHaveLength(0);
     plain.unmount();
 
+    const styleRead = vi.spyOn(window, "getComputedStyle");
     const { container } = render(
       <>
         <MarkdownPreview content={"| A |\n| - |\n| B |"} />
@@ -131,6 +132,7 @@ describe("MarkdownPreview", () => {
       (table) => table.parentElement?.parentElement,
     );
 
+    expect(styleRead).not.toHaveBeenCalled();
     expect(observerCount()).toBe(1);
     expect(observed).toHaveLength(2);
     expect(
