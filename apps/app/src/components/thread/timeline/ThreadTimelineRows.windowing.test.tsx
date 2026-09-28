@@ -194,8 +194,8 @@ describe("ThreadTimelineRows windowing", () => {
       </MemoryRouter>,
     );
     await waitFor(() => {
-      expect(view.container.textContent).toContain("Desktop message 0");
-      expect(view.container.textContent).not.toContain("Desktop message 25");
+      expect(view.container.textContent).toContain("Desktop message 29");
+      expect(view.container.textContent).not.toContain("Desktop message 0");
     });
   });
 

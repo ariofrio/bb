@@ -15,6 +15,18 @@ import {
   type TimelineWindowedItemRenderState,
 } from "./TimelineWindowedItemsLoader.js";
 
+const bottomAnchorState = vi.hoisted(() => ({ pinned: false, nested: false }));
+vi.mock("@/components/ui/bottom-anchored-scroll-body.js", () => ({
+  useBottomAnchoredScroll: () =>
+    bottomAnchorState.pinned
+      ? {
+          isAtBottom: true,
+          getScrollElement: () =>
+            bottomAnchorState.nested ? document.body : scrollElement,
+        }
+      : null,
+}));
+
 const ITEM_KEYS = Array.from({ length: 100 }, (_, index) => `row-${index}`);
 
 let scrollElement: HTMLDivElement;
@@ -130,6 +142,8 @@ function renderWindowedItems(options?: {
 }
 
 beforeEach(() => {
+  bottomAnchorState.pinned = false;
+  bottomAnchorState.nested = false;
   ResizeObserverStub.instances = [];
   itemHeights = new Map();
   scrollElement = document.createElement("div");
@@ -301,6 +315,91 @@ describe("TimelineWindowedItems", () => {
     expect(measurements.get("row-99")).toBe(32);
   });
 
+  it("keeps observed list positions consistent when scroll changes before delivery", async () => {
+    const observers: {
+      callback: IntersectionObserverCallback;
+      targets: Set<Element>;
+    }[] = [];
+    vi.stubGlobal(
+      "IntersectionObserver",
+      class {
+        targets = new Set<Element>();
+        constructor(readonly callback: IntersectionObserverCallback) {
+          observers.push(this);
+        }
+        observe(target: Element) {
+          this.targets.add(target);
+        }
+        unobserve(target: Element) {
+          this.targets.delete(target);
+        }
+        disconnect() {
+          this.targets.clear();
+        }
+      },
+    );
+    scrollElement.scrollTop = 420;
+    renderWindowedItems();
+    expect(screen.getByTestId("content-13")).toBeTruthy();
+    act(() => {
+      for (const observer of observers) {
+        observer.callback(
+          [...observer.targets].map((target) => ({
+            target,
+            boundingClientRect: rect(-100, 3200),
+            rootBounds: rect(0, 96),
+            intersectionRect: rect(0, 96),
+            isIntersecting: true,
+            intersectionRatio: 0.03,
+            time: 0,
+          })),
+          observer as unknown as IntersectionObserver,
+        );
+      }
+    });
+    await waitFor(() => expect(screen.getByTestId("content-13")).toBeTruthy());
+    expect(screen.queryByTestId("content-3")).toBeNull();
+  });
+
+  it("keeps nested scroll roots independent of the outer bottom anchor", () => {
+    bottomAnchorState.pinned = true;
+    bottomAnchorState.nested = true;
+    renderWindowedItems();
+    expect(screen.getByTestId("content-0")).toBeTruthy();
+    expect(screen.queryByTestId("content-99")).toBeNull();
+  });
+
+  it("retains the bottom viewport while a shrinking row awaits scroll clamping", async () => {
+    bottomAnchorState.pinned = true;
+    scrollElement.scrollTop = 3424;
+    const measurements = new Map([["row-95", 352]]);
+    renderWindowedItems({ measurements });
+    const row = screen.getByTestId("wrapper-95");
+    const observer = ResizeObserverStub.instances.find((candidate) =>
+      candidate.observed.has(row),
+    )!;
+    act(() => observer.callback([resizeEntry(row, 32)], observer));
+    await waitFor(() => expect(measurements.get("row-95")).toBe(32));
+    expect(screen.getByTestId("wrapper-95")).toBe(row);
+    expect(screen.getByTestId("content-99")).toBeTruthy();
+  });
+
+  it("does not resize the virtual spacer during ResizeObserver delivery", async () => {
+    renderWindowedItems();
+    const row = screen.getByTestId("wrapper-0");
+    const spacer = scrollElement.querySelector<HTMLElement>(
+      "[data-timeline-virtual-spacer]",
+    )!;
+    const initialHeight = spacer.style.height;
+    const observer = ResizeObserverStub.instances.find((candidate) =>
+      candidate.observed.has(row),
+    )!;
+    expect(observer).toBeDefined();
+    act(() => observer.callback([resizeEntry(row, 96)], observer));
+    expect(spacer.style.height).toBe(initialHeight);
+    await waitFor(() => expect(spacer.style.height).not.toBe(initialHeight));
+  });
+
   it("preserves visible row identity when crossing the windowing threshold in either direction", async () => {
     Object.defineProperty(scrollElement, "clientHeight", {
       configurable: true,
@@ -370,10 +469,13 @@ describe("TimelineWindowedItems", () => {
       expect(screen.getByTestId(`input-${index}`)).toBe(input);
     });
     expect(screen.getByDisplayValue("unsaved edit")).toBe(inputs[0]);
-    expect(
-      scrollElement.querySelector<HTMLElement>("[data-timeline-virtual-spacer]")
-        ?.style.height,
-    ).toBe("640px");
+    await waitFor(() =>
+      expect(
+        scrollElement.querySelector<HTMLElement>(
+          "[data-timeline-virtual-spacer]",
+        )?.style.height,
+      ).toBe("640px"),
+    );
 
     view.rerender(list(19));
     inputs.forEach((input, index) => {

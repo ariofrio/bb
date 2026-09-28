@@ -7,6 +7,7 @@ import {
   useState,
   type SyntheticEvent,
 } from "react";
+import { useBottomAnchoredScroll } from "@/components/ui/bottom-anchored-scroll-body.js";
 import { useComposedRefs } from "@radix-ui/react-compose-refs";
 import {
   defaultRangeExtractor,
@@ -14,6 +15,7 @@ import {
   elementScroll,
   useVirtualizer,
   type Range,
+  type Virtualizer,
 } from "@tanstack/react-virtual";
 import {
   DEFAULT_WINDOWING_MIN_ITEM_COUNT,
@@ -83,6 +85,7 @@ export function TimelineWindowedItems({
   minItemCount = DEFAULT_WINDOWING_MIN_ITEM_COUNT,
   renderItem,
 }: TimelineWindowedItemsProps) {
+  const bottomAnchor = useBottomAnchoredScroll();
   const configured =
     itemKeys.length >= minItemCount && getScrollElement !== null;
   const [scrollRootUsable, setScrollRootUsable] = useState(true);
@@ -145,14 +148,32 @@ export function TimelineWindowedItems({
     },
     [estimateSize, itemKeys, measurements],
   );
-  const rangeExtractor = useCallback(
-    (range: Range) => {
-      const indexes = new Set(defaultRangeExtractor(range));
-      for (const index of forcedIndexes) indexes.add(index);
-      return [...indexes].sort((left, right) => left - right);
-    },
-    [forcedIndexes],
-  );
+  const virtualizerRef = useRef<Virtualizer<
+    HTMLElement,
+    HTMLDivElement
+  > | null>(null);
+  const rangeExtractor = (range: Range) => {
+    const instance = virtualizerRef.current;
+    if (
+      instance &&
+      bottomAnchor?.isAtBottom &&
+      resolvedGetScrollElement() === bottomAnchor.getScrollElement()
+    ) {
+      const measured = instance.measurementsCache;
+      const last = measured.at(-1);
+      if (last) {
+        const viewportStart =
+          last.end - (instance.scrollRect?.height ?? window.innerHeight);
+        let startIndex = last.index;
+        while (startIndex > 0 && measured[startIndex - 1]!.end >= viewportStart)
+          startIndex -= 1;
+        range = { ...range, startIndex, endIndex: last.index };
+      }
+    }
+    const indexes = new Set(defaultRangeExtractor(range));
+    for (const index of forcedIndexes) indexes.add(index);
+    return [...indexes].sort((left, right) => left - right);
+  };
   const initialOffset = useCallback(() => {
     if (initialScrollAnchor === undefined)
       return resolvedGetScrollElement()?.scrollTop ?? 0;
@@ -218,7 +239,9 @@ export function TimelineWindowedItems({
     rangeExtractor,
     scrollMargin,
     useFlushSync: false,
+    useAnimationFrameWithResizeObserver: true,
   });
+  virtualizerRef.current = virtualizer;
   const containerRef = useComposedRefs(
     containerElementRef,
     virtualizer.containerRef,
@@ -260,23 +283,34 @@ export function TimelineWindowedItems({
         measure();
         return;
       }
+      const scrollContent = scrollElement.firstElementChild ?? container;
+      const positionTargets = new Set([container, scrollContent]);
       intersectionObserver = new IntersectionObserver(
         (entries) => {
+          let listEntry: IntersectionObserverEntry | undefined;
+          let contentEntry: IntersectionObserverEntry | undefined;
           for (const entry of entries) {
-            if (entry.target === container && entry.rootBounds !== null) {
-              updateMargin(
-                entry.boundingClientRect.top -
-                  entry.rootBounds.top +
-                  scrollElement.scrollTop,
-              );
-            }
+            if (entry.target === container) listEntry = entry;
+            if (entry.target === scrollContent) contentEntry = entry;
+          }
+          if (
+            listEntry &&
+            contentEntry &&
+            listEntry.time === contentEntry.time
+          ) {
+            updateMargin(
+              listEntry.boundingClientRect.top -
+                contentEntry.boundingClientRect.top,
+            );
           }
         },
         { root: scrollElement },
       );
       const observePosition = () => {
-        intersectionObserver?.unobserve(container);
-        intersectionObserver?.observe(container);
+        for (const target of positionTargets) {
+          intersectionObserver?.unobserve(target);
+          intersectionObserver?.observe(target);
+        }
       };
       refreshGeometryRef.current = observePosition;
       observePosition();
