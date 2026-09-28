@@ -725,10 +725,12 @@ export const SURFACE_GROUPS: SurfaceGroup[] = [
           "Receive the thread and project it was invoked from, when bb knows them",
           "Make the plugin usable from scripts and automations, not only from the UI",
           "Declare commands, arguments and options once and get parsing, `--help`, nearest-name suggestions and JSON errors",
+          "Learn from `ctx.experimental_remoteCaller` whether the command arrived through bb Connect, so trust-changing commands can insist on a local caller",
         ],
         apiSymbols: [
           "PluginCli",
           "PluginCliResult",
+          "PluginCliContext",
           "defineCli",
           "cliCommand",
           "PluginCliError",

@@ -51,7 +51,11 @@ talks to a server over the same HTTP + WebSocket contract as the web app.
   machine (QR / code from Settings → Remote access or
   `bb connect machine-code`, both behind the `mobileApp` experiment during
   early access), keeps the credential in the device keychain, and mints
-  short-lived sessions; see [multiple-devices.md](multiple-devices.md).
+  short-lived sessions. The QR code also pins the server's encryption key, so
+  the app's own requests and realtime socket travel in a sealed connection the
+  relay cannot read; the web view page inside the app has the browser's
+  limits. See [multiple-devices.md](multiple-devices.md) and
+  [connect-end-to-end-encryption.md](connect-end-to-end-encryption.md).
 - Distribution: developer builds from source (Xcode 26.2, iOS 26 simulator
   runtime) today; TestFlight / Play builds go through EAS once the Expo
   account exists (see `apps/mobile/README.md`). No store release yet.
