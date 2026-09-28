@@ -239,6 +239,7 @@ export function BottomAnchoredScrollBody({
   const userScrollInputPendingRef = useRef(false);
   const pointerScrollIntentRef = useRef(false);
   const restoreFrameRef = useRef<number | null>(null);
+  const restoreTimerRef = useRef<number | null>(null);
   const restoreFramesRemainingRef = useRef(0);
   const restoreTailLiveReadRef = useRef(false);
   const pendingPrependAnchorRef = useRef<{
@@ -248,6 +249,8 @@ export function BottomAnchoredScrollBody({
   const pendingScrollRestoreRef = useRef<{
     anchor: ScrollAnchor;
   } | null>(null);
+  const restorePositionObserverRef = useRef<IntersectionObserver | null>(null);
+  useEffect(() => () => restorePositionObserverRef.current?.disconnect(), []);
   const scrollAnchorCaptureThrottleRef = useRef<{
     lastWriteAt: number;
     trailingTimeout: number | null;
@@ -292,9 +295,12 @@ export function BottomAnchoredScrollBody({
   }, []);
 
   const cancelQueuedRestore = useCallback(() => {
-    if (restoreFrameRef.current === null) return;
-    window.cancelAnimationFrame(restoreFrameRef.current);
+    if (restoreFrameRef.current !== null)
+      window.cancelAnimationFrame(restoreFrameRef.current);
+    if (restoreTimerRef.current !== null)
+      window.clearTimeout(restoreTimerRef.current);
     restoreFrameRef.current = null;
+    restoreTimerRef.current = null;
     restoreFramesRemainingRef.current = 0;
     restoreTailLiveReadRef.current = false;
   }, []);
@@ -331,9 +337,16 @@ export function BottomAnchoredScrollBody({
     restoreBottomFromCacheOnce();
     restoreFramesRemainingRef.current = BOTTOM_RESTORE_SETTLE_FRAME_COUNT;
     restoreTailLiveReadRef.current = false;
-    if (restoreFrameRef.current !== null) return;
+    if (restoreFrameRef.current !== null || restoreTimerRef.current !== null)
+      return;
+    const scheduleRestore = () => {
+      restoreFrameRef.current = window.requestAnimationFrame(() => {
+        restoreFrameRef.current = null;
+        restoreTimerRef.current = window.setTimeout(runQueuedRestore, 0);
+      });
+    };
     const runQueuedRestore = () => {
-      restoreFrameRef.current = null;
+      restoreTimerRef.current = null;
       const useLiveRead = restoreTailLiveReadRef.current;
       restoreTailLiveReadRef.current = false;
       const restored = useLiveRead
@@ -348,11 +361,10 @@ export function BottomAnchoredScrollBody({
       }
       restoreFramesRemainingRef.current -= 1;
       if (restoreFramesRemainingRef.current > 0) {
-        restoreFrameRef.current =
-          window.requestAnimationFrame(runQueuedRestore);
+        scheduleRestore();
       }
     };
-    restoreFrameRef.current = window.requestAnimationFrame(runQueuedRestore);
+    scheduleRestore();
   }, [restoreBottomOnce, restoreBottomFromCacheOnce]);
 
   const scrollToBottom = useCallback(() => {
@@ -587,6 +599,48 @@ export function BottomAnchoredScrollBody({
       shouldStickToBottomRef.current = false;
       setIsAtBottom(false);
       cancelQueuedRestore();
+      const scrollContent = scrollContentRef.current;
+      if (typeof IntersectionObserver !== "undefined" && scrollContent) {
+        restorePositionObserverRef.current?.disconnect();
+        const pending = pendingScrollRestoreRef.current;
+        const observer = new IntersectionObserver(
+          (entries) => {
+            if (
+              restorePositionObserverRef.current !== observer ||
+              pendingScrollRestoreRef.current !== pending ||
+              !resizeObserverHasDeliveredRef.current ||
+              !rowElement.isConnected
+            )
+              return;
+            const rowEntry = entries.find(
+              (entry) => entry.target === rowElement,
+            );
+            const contentEntry = entries.find(
+              (entry) => entry.target === scrollContent,
+            );
+            if (
+              !rowEntry ||
+              !contentEntry ||
+              rowEntry.time !== contentEntry.time
+            )
+              return;
+            const offset = Math.max(
+              0,
+              rowEntry.boundingClientRect.top -
+                contentEntry.boundingClientRect.top,
+            );
+            scrollArea.scrollTop = Math.min(
+              readMaxScrollOffset(scrollArea),
+              offset + anchor.offsetWithinRow,
+            );
+          },
+          { root: scrollArea },
+        );
+        restorePositionObserverRef.current = observer;
+        observer.observe(scrollContent);
+        observer.observe(rowElement);
+        return null;
+      }
       const revealOffset = getScrollOffsetToRevealElement({
         element: rowElement,
         scrollArea,
@@ -598,7 +652,7 @@ export function BottomAnchoredScrollBody({
       scrollArea.scrollTop = targetScrollTop;
       return targetScrollTop;
     },
-    [cancelQueuedRestore, refreshMaxScrollOffset],
+    [cancelQueuedRestore, readMaxScrollOffset, refreshMaxScrollOffset],
   );
 
   const markUserScrollIntent = useCallback(() => {
@@ -862,6 +916,7 @@ export function BottomAnchoredScrollBody({
 
     let scrollbarIdleTimeout: number | null = null;
     const handleScrollEvent = () => {
+      handleScroll();
       if (scrollArea.dataset.scrollbarScrolling !== "true") {
         scrollArea.dataset.scrollbarScrolling = "true";
       }
@@ -872,7 +927,6 @@ export function BottomAnchoredScrollBody({
         scrollbarIdleTimeout = null;
         scrollArea.removeAttribute("data-scrollbar-scrolling");
       }, SCROLLBAR_IDLE_DELAY_MS);
-      handleScroll();
     };
 
     let resizeObserver: ResizeObserver | undefined;
@@ -884,6 +938,7 @@ export function BottomAnchoredScrollBody({
 
     scrollArea.addEventListener("scroll", handleScrollEvent, {
       passive: true,
+      capture: true,
     });
     scrollArea.addEventListener("wheel", markWheelScrollIntent, {
       passive: true,
@@ -905,7 +960,7 @@ export function BottomAnchoredScrollBody({
 
     return () => {
       resizeObserver?.disconnect();
-      scrollArea.removeEventListener("scroll", handleScrollEvent);
+      scrollArea.removeEventListener("scroll", handleScrollEvent, true);
       scrollArea.removeEventListener("wheel", markWheelScrollIntent);
       scrollArea.removeEventListener("touchstart", markTouchStartScrollIntent);
       scrollArea.removeEventListener("touchmove", markTouchMoveScrollIntent);

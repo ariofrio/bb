@@ -37,7 +37,7 @@ function getLatestResizeObserver(): ResizeObserverMock {
 }
 
 interface ManualAnimationFrames {
-  runFrame: () => void;
+  runFrame: (flushAfterPaint?: boolean) => void;
   hasPending: () => boolean;
 }
 
@@ -60,12 +60,13 @@ function installManualAnimationFrames(): ManualAnimationFrames {
     }),
   );
   return {
-    runFrame() {
+    runFrame(flushAfterPaint = true) {
       const callbacks = [...pending.values()];
       pending.clear();
       for (const callback of callbacks) {
         callback(window.performance.now());
       }
+      if (flushAfterPaint) vi.runOnlyPendingTimers();
     },
     hasPending() {
       return pending.size > 0;
@@ -161,6 +162,7 @@ function renderScrollBody() {
 let frames: ManualAnimationFrames;
 
 beforeEach(() => {
+  vi.useFakeTimers();
   ResizeObserverMock.instances = [];
   vi.stubGlobal("ResizeObserver", ResizeObserverMock);
   frames = installManualAnimationFrames();
@@ -171,6 +173,7 @@ afterEach(() => {
   getDefaultStore().set(threadTimelineScrollAnchorAtomFamily(THREAD_ID), null);
   vi.unstubAllGlobals();
   vi.restoreAllMocks();
+  vi.useRealTimers();
 });
 
 function growContentWhilePinned() {
@@ -195,6 +198,15 @@ function growContentWhilePinned() {
 }
 
 describe("BottomAnchoredScrollBody settle tail", () => {
+  it("waits until after paint before settling a changed scroll offset", () => {
+    const { scrollArea } = growContentWhilePinned();
+    scrollArea.scrollTop = 300;
+    frames.runFrame(false);
+    expect(scrollArea.scrollTop).toBe(300);
+    vi.runOnlyPendingTimers();
+    expect(scrollArea.scrollTop).toBe(400);
+  });
+
   it("uses observed geometry when restoring after a resize", () => {
     const { scrollArea, scrollContent } = renderScrollBody();
     scrollArea.scrollTop = 200;

@@ -235,6 +235,7 @@ function readAnchor(threadId: string) {
 beforeEach(() => {
   ResizeObserverMock.instances = [];
   vi.stubGlobal("ResizeObserver", ResizeObserverMock);
+  vi.stubGlobal("IntersectionObserver", undefined);
   installAnimationFrameMocks();
 });
 
@@ -564,6 +565,78 @@ describe("BottomAnchoredScrollBody scroll preservation", () => {
     rerenderRows(["older-row", "row-a", "row-b", "row-c"]);
 
     expect(scrollArea.scrollTop).toBe(200);
+  });
+
+  it("restores detached rows from coherent observer positions without live layout reads", () => {
+    const observers: Array<{
+      callback: IntersectionObserverCallback;
+      targets: Set<Element>;
+      disconnect: () => void;
+    }> = [];
+    vi.stubGlobal(
+      "IntersectionObserver",
+      class {
+        record: (typeof observers)[number];
+        constructor(callback: IntersectionObserverCallback) {
+          this.record = { callback, targets: new Set(), disconnect: vi.fn() };
+          observers.push(this.record);
+        }
+        observe(target: Element) {
+          this.record.targets.add(target);
+        }
+        disconnect() {
+          this.record.disconnect();
+        }
+      },
+    );
+    getDefaultStore().set(threadTimelineScrollAnchorAtomFamily("thread-a"), {
+      rowId: "row-b",
+      offsetWithinRow: 20,
+      atBottom: false,
+    });
+    const readRect = vi.spyOn(HTMLElement.prototype, "getBoundingClientRect");
+    const { scrollArea, getRow, unmount } = renderTimeline({
+      threadId: "thread-a",
+      rowIds: ["row-a", "row-b", "row-c"],
+    });
+    expect(readRect).not.toHaveBeenCalled();
+    setScrollMetrics(scrollArea, {
+      scrollHeight: 1000,
+      clientHeight: 100,
+      scrollTop: 140,
+    });
+    getLatestResizeObserver().trigger();
+    const deliver = (rowTop: number, contentTop: number) => {
+      const observer = observers.at(-1)!;
+      const entries = [...observer.targets].map(
+        (target) =>
+          ({
+            target,
+            time: 1,
+            boundingClientRect: new DOMRect(
+              0,
+              target === getRow("row-b") ? rowTop : contentTop,
+              100,
+              100,
+            ),
+          }) as IntersectionObserverEntry,
+      );
+      observer.callback(entries, {} as IntersectionObserver);
+    };
+    deliver(100, -100);
+    expect(scrollArea.scrollTop).toBe(220);
+    expect(readRect).not.toHaveBeenCalled();
+    getLatestResizeObserver().trigger();
+    deliver(280, -220);
+    expect(scrollArea.scrollTop).toBe(520);
+    fireEvent.wheel(scrollArea);
+    scrollArea.scrollTop = 400;
+    fireEvent.scroll(scrollArea);
+    deliver(380, -220);
+    expect(scrollArea.scrollTop).toBe(400);
+    const observer = observers.at(-1)!;
+    unmount();
+    expect(observer.disconnect).toHaveBeenCalled();
   });
 
   it("restores near the saved row when returning to a thread", () => {
