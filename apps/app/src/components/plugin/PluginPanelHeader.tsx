@@ -1,3 +1,4 @@
+import { pluginScopeProps } from "@/lib/plugin-css-scope";
 import { Component, type ReactNode } from "react";
 import type { PluginNavPanelChrome } from "@/lib/plugin-nav-panel-chrome";
 import type { PluginNavPanelSlot } from "@/lib/plugin-slots";
@@ -75,6 +76,7 @@ export function PluginPanelHeaderActions({
             <div
               data-bb-plugin-root=""
               data-bb-plugin={panel.pluginId}
+              {...pluginScopeProps(panel.pluginId)}
               className="flex shrink-0 items-center gap-2"
             >
               <HeaderContent subPath={subPath} />

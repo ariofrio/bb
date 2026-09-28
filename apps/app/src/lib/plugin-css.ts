@@ -1,4 +1,8 @@
 import { useInsertionEffect } from "react";
+import {
+  optimizePluginCssScope,
+  resetPluginCssScopesForTest,
+} from "./plugin-css-scope";
 
 const CSS_MARKER = "data-bb-plugin-css";
 const CSS_PRELOAD_MARKER = "data-bb-plugin-css-preload";
@@ -104,6 +108,7 @@ function activateStylesheet(
       if (record.pendingStylesheet === link) record.pendingStylesheet = null;
       return;
     }
+    if (link.sheet !== null) optimizePluginCssScope(pluginId, link.sheet);
     previous?.remove();
     record.stylesheet = link;
     record.pendingStylesheet = null;
@@ -206,6 +211,7 @@ export function usePluginCss(pluginId: string | null): void {
 }
 
 export function resetPluginCssForTest(): void {
+  resetPluginCssScopesForTest();
   for (const record of recordsByPluginId.values()) {
     cancelDeferredDeactivate(record);
     removeLink(record.preload);

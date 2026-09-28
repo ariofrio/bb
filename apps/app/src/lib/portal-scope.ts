@@ -1,4 +1,5 @@
 import { useContext } from "react";
+import { pluginScopeProps } from "./plugin-css-scope";
 import { PluginContext } from "@/components/plugin/plugin-context";
 
 export function usePortalScopeProps(): {
@@ -13,5 +14,6 @@ export function usePortalScopeProps(): {
         "data-bb-portaled-overlay": "",
         "data-bb-plugin-root": "",
         "data-bb-plugin": pluginId,
+        ...pluginScopeProps(pluginId),
       };
 }

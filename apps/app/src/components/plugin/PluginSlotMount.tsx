@@ -1,3 +1,4 @@
+import { pluginScopeProps } from "@/lib/plugin-css-scope";
 import { Component, type ErrorInfo, type ReactNode } from "react";
 import { Pill } from "@bb/shared-ui/pill";
 import { useRouteAnchorDelegate } from "@/components/ui/app-route-anchor";
@@ -197,6 +198,7 @@ export function PluginSlotMount({
         <div
           data-bb-plugin-root=""
           data-bb-plugin={pluginId}
+          {...pluginScopeProps(pluginId)}
           className="contents"
           onClick={onRouteAnchorClick}
         >

@@ -407,6 +407,69 @@ describe("reconcilePluginFrontends", () => {
     },
   );
 
+  it.each(["directive", "renderer", "browser", "composer"] as const)(
+    "keeps thread %s CSS active between thread mounts",
+    async (kind) => {
+      const state = createPluginFrontendReconcileState();
+      const deps = makeDeps([candidate("inline-content", "v1")]);
+      deps.applyCss = applyPluginCss;
+      deps.retainCss = retainPluginCss;
+      deps.importModule.mockResolvedValue(
+        contentScriptModule((app) => {
+          if (kind === "directive")
+            app.slots.messageDirective({
+              id: "preview",
+              component: () => null,
+            });
+          else if (kind === "renderer")
+            app.slots.experimental_timelineRenderer({
+              kind: "tool",
+              component: () => null,
+            });
+          else if (kind === "composer")
+            app.composer.customize({
+              id: "send-later",
+              scopes: ["thread"],
+              plusMenu: [
+                {
+                  id: "schedule",
+                  label: "Schedule",
+                  icon: "Calendar",
+                  run: () => {},
+                },
+              ],
+            });
+          else
+            app.slots.experimental_browserToolbarAction({
+              id: "annotation",
+              title: "Annotate",
+              component: () => null,
+            });
+        }),
+      );
+      await reconcilePluginFrontends(state, deps);
+      expect(
+        document.head.querySelector(
+          'link[data-bb-plugin-css="inline-content"]',
+        ),
+      ).not.toBeNull();
+      const release = retainPluginCss("inline-content");
+      release();
+      expect(
+        document.head.querySelector(
+          'link[data-bb-plugin-css="inline-content"]',
+        ),
+      ).not.toBeNull();
+      deps.fetchCandidates.mockResolvedValue([]);
+      await reconcilePluginFrontends(state, deps);
+      expect(
+        document.head.querySelector(
+          'link[data-bb-plugin-css="inline-content"]',
+        ),
+      ).toBeNull();
+    },
+  );
+
   it("keeps the active sheet through a real generation reload and a failed CSS replacement", async () => {
     const state = createPluginFrontendReconcileState();
     const deps = makeDeps([candidate("hello", "v1")]);
