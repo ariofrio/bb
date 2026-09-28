@@ -32,7 +32,7 @@ concurrency:
 jobs:
   macos:
     name: macOS arm64 desktop artifacts
-    runs-on: blacksmith-6vcpu-macos-15
+    runs-on: macos-15
     timeout-minutes: 45
     outputs:
       has_signing_secrets: ${{ steps.signing.outputs.has_signing_secrets }}
@@ -117,6 +117,7 @@ jobs:
 
       - name: Package arm64 desktop artifacts
         env:
+          BB_DESKTOP_RELEASE_REPOSITORY: ${{ github.repository }}
           CSC_LINK: ${{ secrets.MACOS_CERTIFICATE_P12 }}
           CSC_KEY_PASSWORD: ${{ secrets.MACOS_CERTIFICATE_PASSWORD }}
           CSC_NAME: ${{ secrets.MACOS_CERTIFICATE_NAME }}
@@ -148,7 +149,7 @@ jobs:
     # Pinned rather than ubuntu-latest so the glibc the AppImage links against
     # changes only when we choose it: the build machine's glibc sets the
     # minimum distro version users need.
-    runs-on: blacksmith-4vcpu-ubuntu-2204
+    runs-on: ubuntu-22.04
     timeout-minutes: 45
 
     steps:
@@ -191,6 +192,8 @@ jobs:
       - name: Package x64 AppImage
         # No --force: the packaging task is already cache: false, and forcing also
         # rebuilds its cached bb-app/@bb/desktop dependencies a second time.
+        env:
+          BB_DESKTOP_RELEASE_REPOSITORY: ${{ github.repository }}
         run: pnpm exec turbo run desktop:build:linux --filter=@bb/desktop --output-logs=new-only
 
       - name: Smoke test packaged desktop app
@@ -222,7 +225,7 @@ jobs:
     needs:
       - macos
       - linux
-    runs-on: blacksmith-4vcpu-ubuntu-2404
+    runs-on: ubuntu-24.04
     timeout-minutes: 20
     permissions:
       contents: write
@@ -393,6 +396,6 @@ jobs:
             echo "- prerelease version: ${IS_PRERELEASE}"
             echo "- stable release publication requested and allowed: ${SHOULD_PUBLISH}"
             echo "- macOS release binary upload enabled: ${PUBLISH_MACOS_BINARIES}"
-            echo "- macOS feed URL: https://github.com/get-bb/bb/releases/download/desktop-latest/desktop-version.json"
-            echo "- Linux feed URL: https://github.com/get-bb/bb/releases/download/desktop-latest/desktop-version-linux.json"
+            echo "- macOS feed URL: ${GITHUB_SERVER_URL}/${GITHUB_REPOSITORY}/releases/download/desktop-latest/desktop-version.json"
+            echo "- Linux feed URL: ${GITHUB_SERVER_URL}/${GITHUB_REPOSITORY}/releases/download/desktop-latest/desktop-version-linux.json"
           } >> "$GITHUB_STEP_SUMMARY"
