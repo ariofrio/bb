@@ -1012,6 +1012,53 @@ describe("PromptBoxInternal controlled value sync", () => {
     ).toEqual([]);
   });
 
+  it("does not redispatch an unchanged selection when focusing the composer", async () => {
+    const restoreMatchMedia = mockPointerCoarse(false);
+    const promptBoxRef = createRef<PromptBoxHandle>();
+    try {
+      render(
+        <PromptBoxInternal
+          {...createPromptBoxProps({ value: "Draft text" })}
+          promptBoxRef={promptBoxRef}
+        />,
+      );
+      await waitForPromptFocus();
+      const editor = (getPromptEditorElement() as TiptapEditorHTMLElement)
+        .editor;
+      if (!editor) throw new Error("Prompt editor was not mounted");
+      const dispatch = vi.spyOn(editor.view, "dispatch");
+      await focusPromptEnd(promptBoxRef);
+      expect(
+        dispatch.mock.calls.filter(
+          ([transaction]) =>
+            transaction.selectionSet || transaction.scrolledIntoView,
+        ),
+      ).toHaveLength(0);
+      act(() =>
+        editor.view.dispatch(
+          editor.state.tr.setSelection(
+            TextSelection.create(editor.state.doc, 1),
+          ),
+        ),
+      );
+      dispatch.mockClear();
+      await focusPromptEnd(promptBoxRef);
+      expect(
+        editor.state.selection.eq(TextSelection.atEnd(editor.state.doc)),
+      ).toBe(true);
+      expect(
+        dispatch.mock.calls.filter(([transaction]) => transaction.selectionSet),
+      ).toHaveLength(1);
+      expect(
+        dispatch.mock.calls.every(
+          ([transaction]) => !transaction.scrolledIntoView,
+        ),
+      ).toBe(true);
+    } finally {
+      restoreMatchMedia();
+    }
+  });
+
   it("honors early focusEnd requests once the editor is ready", async () => {
     const restoreMatchMedia = mockPointerCoarse(false);
     try {

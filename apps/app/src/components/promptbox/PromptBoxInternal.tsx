@@ -1167,10 +1167,10 @@ export function suppressPromptEditorAnchorActivation(event: Event): boolean {
 }
 
 function focusEditorAtEnd(editor: Editor): void {
-  const transaction = editor.state.tr
-    .setSelection(TextSelection.atEnd(editor.state.doc))
-    .scrollIntoView();
-  editor.view.dispatch(transaction);
+  const selection = TextSelection.atEnd(editor.state.doc);
+  if (!editor.state.selection.eq(selection)) {
+    editor.view.dispatch(editor.state.tr.setSelection(selection));
+  }
   editor.view.focus();
 }
 
