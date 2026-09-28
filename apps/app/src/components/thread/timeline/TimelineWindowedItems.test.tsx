@@ -372,15 +372,16 @@ describe("TimelineWindowedItems", () => {
   it("retains the bottom viewport while a shrinking row awaits scroll clamping", async () => {
     bottomAnchorState.pinned = true;
     scrollElement.scrollTop = 3424;
-    const measurements = new Map([["row-95", 352]]);
+    const measurements = new Map([["row-97", 352]]);
     renderWindowedItems({ measurements });
-    const row = screen.getByTestId("wrapper-95");
+    expect(screen.queryByTestId("content-95")).toBeNull();
+    const row = screen.getByTestId("wrapper-97");
     const observer = ResizeObserverStub.instances.find((candidate) =>
       candidate.observed.has(row),
     )!;
     act(() => observer.callback([resizeEntry(row, 32)], observer));
-    await waitFor(() => expect(measurements.get("row-95")).toBe(32));
-    expect(screen.getByTestId("wrapper-95")).toBe(row);
+    await waitFor(() => expect(measurements.get("row-97")).toBe(32));
+    expect(screen.getByTestId("wrapper-97")).toBe(row);
     expect(screen.getByTestId("content-99")).toBeTruthy();
   });
 

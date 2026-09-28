@@ -90,6 +90,10 @@ export function TimelineWindowedItems({
     itemKeys.length >= minItemCount && getScrollElement !== null;
   const [scrollRootUsable, setScrollRootUsable] = useState(true);
   const [, refreshScrollRoot] = useState(0);
+  const [, refreshPinnedWindow] = useState(0);
+  const [viewportHeight, setViewportHeight] = useState(
+    typeof window === "undefined" ? 0 : window.innerHeight,
+  );
   const [scrollMargin, setScrollMargin] = useState(0);
   const [interactionPins, setInteractionPins] = useState<readonly string[]>([]);
   const containerElementRef = useRef<HTMLDivElement>(null);
@@ -155,15 +159,14 @@ export function TimelineWindowedItems({
   const rangeExtractor = (range: Range) => {
     const instance = virtualizerRef.current;
     if (
-      instance &&
       bottomAnchor?.isAtBottom &&
       resolvedGetScrollElement() === bottomAnchor.getScrollElement()
     ) {
-      const measured = instance.measurementsCache;
-      const last = measured.at(-1);
-      if (last) {
-        const viewportStart =
-          last.end - (instance.scrollRect?.height ?? window.innerHeight);
+      range = { ...range, overscan: 0 };
+      const measured = instance?.measurementsCache;
+      const last = measured?.at(-1);
+      if (instance && measured && last) {
+        const viewportStart = last.end - viewportHeight;
         let startIndex = last.index;
         while (startIndex > 0 && measured[startIndex - 1]!.end >= viewportStart)
           startIndex -= 1;
@@ -199,7 +202,10 @@ export function TimelineWindowedItems({
   const observeScrollRect = useCallback<typeof observeElementRect>(
     (instance, callback) => {
       initialScrollWritePendingRef.current = true;
-      return observeTimelineScrollRect(instance, callback);
+      return observeTimelineScrollRect(instance, (rect) => {
+        callback(rect);
+        setViewportHeight(rect.height);
+      });
     },
     [],
   );
@@ -234,6 +240,14 @@ export function TimelineWindowedItems({
     },
     measureElement,
     observeElementRect: observeScrollRect,
+    onChange: (instance, sync) => {
+      if (
+        !sync &&
+        bottomAnchor?.isAtBottom &&
+        instance.scrollElement === bottomAnchor.getScrollElement()
+      )
+        refreshPinnedWindow((revision) => revision + 1);
+    },
     scrollToFn,
     overscan: TIMELINE_WINDOW_OVERSCAN_ITEMS,
     rangeExtractor,
