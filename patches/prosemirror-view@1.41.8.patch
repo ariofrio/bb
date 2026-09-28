@@ -1,0 +1,39 @@
+diff --git a/dist/index.cjs b/dist/index.cjs
+index ce89be47cebd61a79c6039950f6dcd10df0e3c7e..46361ab840c9ed2836850cc6a8f3495719372cd5 100644
+--- a/dist/index.cjs
++++ b/dist/index.cjs
+@@ -1730,7 +1730,7 @@ function patchOuterDeco(outerDOM, nodeDOM, prevComputed, curComputed) {
+ }
+ function patchAttributes(dom, prev, cur) {
+   for (var name in prev) if (name != "class" && name != "style" && name != "nodeName" && !(name in cur)) dom.removeAttribute(name);
+-  for (var _name in cur) if (_name != "class" && _name != "style" && _name != "nodeName" && cur[_name] != prev[_name]) dom.setAttribute(_name, cur[_name]);
++  for (var _name in cur) if (_name != "class" && _name != "style" && _name != "nodeName" && cur[_name] != prev[_name]) dom.getAttribute(_name) !== cur[_name] && dom.setAttribute(_name, cur[_name]);
+   if (prev["class"] != cur["class"]) {
+     var prevList = prev["class"] ? prev["class"].split(" ").filter(Boolean) : [];
+     var curList = cur["class"] ? cur["class"].split(" ").filter(Boolean) : [];
+diff --git a/dist/index.js b/dist/index.js
+index 2f19364145a8bb8c0f44c738d58271c76078e6f9..004216e384770857666a533265a6ab7af2d2f6d8 100644
+--- a/dist/index.js
++++ b/dist/index.js
+@@ -1717,7 +1717,7 @@ function patchAttributes(dom, prev, cur) {
+             dom.removeAttribute(name);
+     for (let name in cur)
+         if (name != "class" && name != "style" && name != "nodeName" && cur[name] != prev[name])
+-            dom.setAttribute(name, cur[name]);
++            dom.getAttribute(name) !== cur[name] && dom.setAttribute(name, cur[name]);
+     if (prev.class != cur.class) {
+         let prevList = prev.class ? prev.class.split(" ").filter(Boolean) : [];
+         let curList = cur.class ? cur.class.split(" ").filter(Boolean) : [];
+diff --git a/src/viewdesc.ts b/src/viewdesc.ts
+index 4e18e10d421852d909c43165a2b4de158c84d767..8a6c5fed4cb2c5a537cbc221f4cd3d8b79b4524d 100644
+--- a/src/viewdesc.ts
++++ b/src/viewdesc.ts
+@@ -1123,7 +1123,7 @@ function patchAttributes(dom: HTMLElement, prev: {[name: string]: string}, cur:
+       dom.removeAttribute(name)
+   for (let name in cur)
+     if (name != "class" && name != "style" && name != "nodeName" && cur[name] != prev[name])
+-      dom.setAttribute(name, cur[name])
++      dom.getAttribute(name) !== cur[name] && dom.setAttribute(name, cur[name])
+   if (prev.class != cur.class) {
+     let prevList = prev.class ? prev.class.split(" ").filter(Boolean) : []
+     let curList = cur.class ? cur.class.split(" ").filter(Boolean) : []

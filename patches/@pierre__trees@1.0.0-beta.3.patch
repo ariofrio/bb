@@ -1,0 +1,128 @@
+diff --git a/dist/components/web-components.js b/dist/components/web-components.js
+index 48645018c242f940ae39fffecb1daf8a59f29ce9..f1e69d7e2fb1039aefba0caf4c23252934921492 100644
+--- a/dist/components/web-components.js
++++ b/dist/components/web-components.js
+@@ -1,7 +1,7 @@
+ import { FILE_TREE_STYLE_ATTRIBUTE, FILE_TREE_TAG_NAME } from "../constants.js";
+ import style_default from "../style.js";
+ import { wrapCoreCSS } from "../utils/cssWrappers.js";
+-import { ensureMeasuredScrollbarGutter } from "../utils/scrollbarGutter.js";
++import { cancelScrollbarMeasurement, ensureMeasuredScrollbarGutter } from "../utils/scrollbarGutter.js";
+ 
+ //#region src/components/web-components.ts
+ let sheet;
+@@ -45,6 +45,9 @@ if (typeof HTMLElement !== "undefined" && customElements.get(FILE_TREE_TAG_NAME)
+ 		constructor() {
+ 			super();
+ 		}
++    disconnectedCallback() {
++      if (this.shadowRoot) cancelScrollbarMeasurement(this.shadowRoot);
++    }
+ 		connectedCallback() {
+ 			const shadowRoot = this.shadowRoot ?? this.attachShadow({ mode: "open" });
+ 			prepareFileTreeShadowRoot(this, shadowRoot);
+diff --git a/dist/render/FileTreeView.js b/dist/render/FileTreeView.js
+index 50a32001d7a7d3612b7f1929ccb11b3f1cbffd4f..99fea6aa3055b9261b11c10c8626429f1edddbed 100644
+--- a/dist/render/FileTreeView.js
++++ b/dist/render/FileTreeView.js
+@@ -1330,17 +1330,18 @@ function FileTreeView({ composition, controller, gitStatusByPath, ignoredGitDire
+ 		const listElement = listRef.current;
+ 		const rootElement = rootRef.current;
+ 		if (scrollElement == null) return;
+-		measuredViewportHeightRef.current = readMeasuredViewportHeight(scrollElement, initialViewportHeight);
++		let scrollTop = 0;
++		measuredViewportHeightRef.current = typeof ResizeObserver === "undefined" ? readMeasuredViewportHeight(scrollElement, initialViewportHeight) : initialViewportHeight;
+ 		const update = () => {
+ 			const nextItemCount = controller.getVisibleCount();
+ 			const nextViewportHeight = getCachedViewportHeight(measuredViewportHeightRef.current, initialViewportHeight);
+ 			const maxScrollTop = Math.max(0, nextItemCount * itemHeight - nextViewportHeight);
+-			if (scrollElement.scrollTop > maxScrollTop) scrollElement.scrollTop = maxScrollTop;
++			if (scrollTop > maxScrollTop) scrollElement.scrollTop = scrollTop = maxScrollTop;
+ 			setLayoutState(computeFileTreeViewLayoutState({
+ 				controller,
+ 				itemHeight,
+ 				overscan,
+-				scrollTop: Math.min(scrollElement.scrollTop, maxScrollTop),
++				scrollTop: Math.min(scrollTop, maxScrollTop),
+ 				stickyFolders,
+ 				viewportHeight: nextViewportHeight
+ 			}));
+@@ -1384,6 +1385,7 @@ function FileTreeView({ composition, controller, gitStatusByPath, ignoredGitDire
+ 			}, 200);
+ 		};
+ 		const onScroll = () => {
++			scrollTop = scrollElement.scrollTop;
+ 			update();
+ 			if (scrollElement.scrollTop > 0) clearOverlayReveal();
+ 			if (contextMenuStateRef.current != null && isScrollingRef.current) closeContextMenuRef.current();
+diff --git a/dist/utils/scrollbarGutter.js b/dist/utils/scrollbarGutter.js
+index 54bbcfe750f64553d6f6bd1179afad8722f06c52..651ed20d7317f4d11c16ac3a246319e8c2ededac 100644
+--- a/dist/utils/scrollbarGutter.js
++++ b/dist/utils/scrollbarGutter.js
+@@ -2,25 +2,43 @@ import { FILE_TREE_SCROLLBAR_GUTTER_MEASURED_PROPERTY, FILE_TREE_SCROLLBAR_GUTTE
+ 
+ //#region src/utils/scrollbarGutter.ts
+ const measuredGutterCache = /* @__PURE__ */ new WeakMap();
+-function measureScrollbarGutter(shadowRoot) {
+-	const cachedScrollbarGutter = measuredGutterCache.get(shadowRoot);
+-	if (cachedScrollbarGutter != null) return cachedScrollbarGutter;
+-	const wrapper = document.createElement("div");
+-	wrapper.setAttribute(FILE_TREE_SCROLLBAR_MEASURE_ATTRIBUTE, "true");
+-	const child = document.createElement("div");
+-	child.style.position = "relative";
+-	child.style.height = "200%";
+-	wrapper.appendChild(child);
+-	shadowRoot.appendChild(wrapper);
+-	const measuredGutter = Math.max(wrapper.offsetWidth - wrapper.clientWidth, 0);
+-	wrapper.remove();
+-	measuredGutterCache.set(shadowRoot, measuredGutter);
+-	return measuredGutter;
++const pendingMeasurements = new WeakMap();
++function cancelScrollbarMeasurement(shadowRoot) {
++ const pending = pendingMeasurements.get(shadowRoot);
++ if (!pending) return;
++ pending.observer.disconnect();
++ pending.wrapper.remove();
++ pendingMeasurements.delete(shadowRoot);
++}
++function measureScrollbarGutter(host, shadowRoot) {
++ if (pendingMeasurements.has(shadowRoot)) return;
++ const wrapper = document.createElement("div");
++ wrapper.setAttribute(FILE_TREE_SCROLLBAR_MEASURE_ATTRIBUTE, "true");
++ const child = document.createElement("div");
++ child.style.position = "relative";
++ child.style.height = "200%";
++ wrapper.appendChild(child);
++ shadowRoot.appendChild(wrapper);
++ const observer = new ResizeObserver(entries => {
++  const entry = entries.find(entry => entry.target === wrapper);
++  if (!entry) return;
++  const box = Array.isArray(entry.borderBoxSize) ? entry.borderBoxSize[0] : entry.borderBoxSize;
++  if (!box) return;
++  const gutter = Math.max(box.inlineSize - entry.contentRect.width, 0);
++  cancelScrollbarMeasurement(shadowRoot);
++  measuredGutterCache.set(shadowRoot, gutter);
++  ensureMeasuredScrollbarGutter(host, shadowRoot);
++ });
++ pendingMeasurements.set(shadowRoot, { observer, wrapper });
++ observer.observe(wrapper);
+ }
+ function ensureMeasuredScrollbarGutter(host, shadowRoot) {
+ 	if (!host.isConnected) return;
+-	const measuredScrollbarGutter = measureScrollbarGutter(shadowRoot);
+-	if (measuredScrollbarGutter == null) return;
++	const measuredScrollbarGutter = measuredGutterCache.get(shadowRoot);
++ if (measuredScrollbarGutter == null) {
++  measureScrollbarGutter(host, shadowRoot);
++  return;
++ }
+ 	const existing = shadowRoot.querySelector(`style[${FILE_TREE_SCROLLBAR_GUTTER_STYLE_ATTRIBUTE}]`);
+ 	const styleEl = existing instanceof HTMLStyleElement ? existing : document.createElement("style");
+ 	if (!(existing instanceof HTMLStyleElement)) {
+@@ -31,5 +49,5 @@ function ensureMeasuredScrollbarGutter(host, shadowRoot) {
+ }
+ 
+ //#endregion
+-export { ensureMeasuredScrollbarGutter };
++export { cancelScrollbarMeasurement, ensureMeasuredScrollbarGutter };
+ //# sourceMappingURL=scrollbarGutter.js.map

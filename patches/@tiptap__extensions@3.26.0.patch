@@ -1,0 +1,65 @@
+diff --git a/dist/index.cjs b/dist/index.cjs
+index 81f8a27bb3a052ece1aa9ac9d6b4022bc593c5a7..d548f88da3e8d11c6b0be901ac1db21e0d07578f 100644
+--- a/dist/index.cjs
++++ b/dist/index.cjs
+@@ -511,7 +511,7 @@ function createPlaceholderPlugin({ editor, options }) {
+   return new import_state4.Plugin({
+     key: PLUGIN_KEY,
+     state: viewportPluginState,
+-    view: createViewportPluginView,
++    view: options.showOnlyCurrent && !options.includeChildren ? undefined : createViewportPluginView,
+     props: {
+       decorations: ({ doc, selection }) => buildPlaceholderDecorations({ editor, options, dataAttribute, doc, selection })
+     }
+diff --git a/dist/index.js b/dist/index.js
+index 59953c699803e52c74638d1c6bfb2b6133b54616..bdfd9ea3799b98ecbe951c37c98a652676cdc444 100644
+--- a/dist/index.js
++++ b/dist/index.js
+@@ -474,7 +474,7 @@ function createPlaceholderPlugin({ editor, options }) {
+   return new Plugin3({
+     key: PLUGIN_KEY,
+     state: viewportPluginState,
+-    view: createViewportPluginView,
++    view: options.showOnlyCurrent && !options.includeChildren ? undefined : createViewportPluginView,
+     props: {
+       decorations: ({ doc, selection }) => buildPlaceholderDecorations({ editor, options, dataAttribute, doc, selection })
+     }
+diff --git a/dist/placeholder/index.cjs b/dist/placeholder/index.cjs
+index f9bba06f66d0d1040ef742583edf805e6020dd0e..2c2c07a503eab57adb29d60a88d9baf3d6966a14 100644
+--- a/dist/placeholder/index.cjs
++++ b/dist/placeholder/index.cjs
+@@ -299,7 +299,7 @@ function createPlaceholderPlugin({ editor, options }) {
+   return new import_state2.Plugin({
+     key: PLUGIN_KEY,
+     state: viewportPluginState,
+-    view: createViewportPluginView,
++    view: options.showOnlyCurrent && !options.includeChildren ? undefined : createViewportPluginView,
+     props: {
+       decorations: ({ doc, selection }) => buildPlaceholderDecorations({ editor, options, dataAttribute, doc, selection })
+     }
+diff --git a/dist/placeholder/index.js b/dist/placeholder/index.js
+index 800273c4283d158417067099a2519f59ead0d070..9501715585e1895c9813e31467559c273a91fc5b 100644
+--- a/dist/placeholder/index.js
++++ b/dist/placeholder/index.js
+@@ -270,7 +270,7 @@ function createPlaceholderPlugin({ editor, options }) {
+   return new Plugin({
+     key: PLUGIN_KEY,
+     state: viewportPluginState,
+-    view: createViewportPluginView,
++    view: options.showOnlyCurrent && !options.includeChildren ? undefined : createViewportPluginView,
+     props: {
+       decorations: ({ doc, selection }) => buildPlaceholderDecorations({ editor, options, dataAttribute, doc, selection })
+     }
+diff --git a/src/placeholder/plugins/PlaceholderPlugin.ts b/src/placeholder/plugins/PlaceholderPlugin.ts
+index 0cb93a04de609b7f6d1b365d7fa3aa3a34c88e4b..a3bccd01fcfdf68899214d071f506fa8b811e7cd 100644
+--- a/src/placeholder/plugins/PlaceholderPlugin.ts
++++ b/src/placeholder/plugins/PlaceholderPlugin.ts
+@@ -26,7 +26,7 @@ export function createPlaceholderPlugin({ editor, options }: CreatePluginOptions
+   return new Plugin({
+     key: PLUGIN_KEY,
+     state: viewportPluginState,
+-    view: createViewportPluginView,
++    view: options.showOnlyCurrent && !options.includeChildren ? undefined : createViewportPluginView,
+     props: {
+       decorations: ({ doc, selection }) =>
+         buildPlaceholderDecorations({ editor, options, dataAttribute, doc, selection }),

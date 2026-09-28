@@ -1,0 +1,348 @@
+diff --git a/dist/react-resizable-panels.browser.cjs.js b/dist/react-resizable-panels.browser.cjs.js
+index 321d468be4e274f3994326093a075b43760c73d2..832b5d62d13ce976bf912271abdabcc0e0259b02 100644
+--- a/dist/react-resizable-panels.browser.cjs.js
++++ b/dist/react-resizable-panels.browser.cjs.js
+@@ -1958,20 +1958,16 @@ function PanelGroupWithForwardedRef({
+     };
+   }, []);
+   const registerResizeHandle = React.useCallback(dragHandleId => {
+-    let isRTL = false;
+-    const panelGroupElement = panelGroupElementRef.current;
+-    if (panelGroupElement) {
+-      const style = window.getComputedStyle(panelGroupElement, null);
+-      if (style.getPropertyValue("direction") === "rtl") {
+-        isRTL = true;
+-      }
+-    }
++    let isRTL;
+     return function resizeHandler(event) {
+       event.preventDefault();
+       const panelGroupElement = panelGroupElementRef.current;
+       if (!panelGroupElement) {
+         return () => null;
+       }
++      if (isRTL === undefined) {
++        isRTL = window.getComputedStyle(panelGroupElement, null).getPropertyValue("direction") === "rtl";
++      }
+       const {
+         direction,
+         dragState,
+diff --git a/dist/react-resizable-panels.browser.development.cjs.js b/dist/react-resizable-panels.browser.development.cjs.js
+index dc915a751c3d6296cdc6ea7aa1ce61a114881ebb..d8c7e9f370a2fe5765de40b33ade0e6c9a31e2f3 100644
+--- a/dist/react-resizable-panels.browser.development.cjs.js
++++ b/dist/react-resizable-panels.browser.development.cjs.js
+@@ -2064,20 +2064,16 @@ function PanelGroupWithForwardedRef({
+     };
+   }, []);
+   const registerResizeHandle = React.useCallback(dragHandleId => {
+-    let isRTL = false;
+-    const panelGroupElement = panelGroupElementRef.current;
+-    if (panelGroupElement) {
+-      const style = window.getComputedStyle(panelGroupElement, null);
+-      if (style.getPropertyValue("direction") === "rtl") {
+-        isRTL = true;
+-      }
+-    }
++    let isRTL;
+     return function resizeHandler(event) {
+       event.preventDefault();
+       const panelGroupElement = panelGroupElementRef.current;
+       if (!panelGroupElement) {
+         return () => null;
+       }
++      if (isRTL === undefined) {
++        isRTL = window.getComputedStyle(panelGroupElement, null).getPropertyValue("direction") === "rtl";
++      }
+       const {
+         direction,
+         dragState,
+diff --git a/dist/react-resizable-panels.browser.development.esm.js b/dist/react-resizable-panels.browser.development.esm.js
+index 8a7d541e63311be99d4523de592305e785d9ae49..0bf6288fbf83615c1694cb44c0429faf675275de 100644
+--- a/dist/react-resizable-panels.browser.development.esm.js
++++ b/dist/react-resizable-panels.browser.development.esm.js
+@@ -2041,20 +2041,16 @@ function PanelGroupWithForwardedRef({
+     };
+   }, []);
+   const registerResizeHandle = useCallback(dragHandleId => {
+-    let isRTL = false;
+-    const panelGroupElement = panelGroupElementRef.current;
+-    if (panelGroupElement) {
+-      const style = window.getComputedStyle(panelGroupElement, null);
+-      if (style.getPropertyValue("direction") === "rtl") {
+-        isRTL = true;
+-      }
+-    }
++    let isRTL;
+     return function resizeHandler(event) {
+       event.preventDefault();
+       const panelGroupElement = panelGroupElementRef.current;
+       if (!panelGroupElement) {
+         return () => null;
+       }
++      if (isRTL === undefined) {
++        isRTL = window.getComputedStyle(panelGroupElement, null).getPropertyValue("direction") === "rtl";
++      }
+       const {
+         direction,
+         dragState,
+diff --git a/dist/react-resizable-panels.browser.esm.js b/dist/react-resizable-panels.browser.esm.js
+index 5a7297c9a54fb84fb629c014ce4f304f2d8a738e..d0e36cf9d9c1486d43f143161ec1af4474ab6ffd 100644
+--- a/dist/react-resizable-panels.browser.esm.js
++++ b/dist/react-resizable-panels.browser.esm.js
+@@ -1935,20 +1935,16 @@ function PanelGroupWithForwardedRef({
+     };
+   }, []);
+   const registerResizeHandle = useCallback(dragHandleId => {
+-    let isRTL = false;
+-    const panelGroupElement = panelGroupElementRef.current;
+-    if (panelGroupElement) {
+-      const style = window.getComputedStyle(panelGroupElement, null);
+-      if (style.getPropertyValue("direction") === "rtl") {
+-        isRTL = true;
+-      }
+-    }
++    let isRTL;
+     return function resizeHandler(event) {
+       event.preventDefault();
+       const panelGroupElement = panelGroupElementRef.current;
+       if (!panelGroupElement) {
+         return () => null;
+       }
++      if (isRTL === undefined) {
++        isRTL = window.getComputedStyle(panelGroupElement, null).getPropertyValue("direction") === "rtl";
++      }
+       const {
+         direction,
+         dragState,
+diff --git a/dist/react-resizable-panels.cjs.js b/dist/react-resizable-panels.cjs.js
+index a1808200101bb3bdd18b752be45a0846fdcaa4fe..20032a4896b58aea8031cdbcada5f16d6032aa50 100644
+--- a/dist/react-resizable-panels.cjs.js
++++ b/dist/react-resizable-panels.cjs.js
+@@ -1960,20 +1960,16 @@ function PanelGroupWithForwardedRef({
+     };
+   }, []);
+   const registerResizeHandle = React.useCallback(dragHandleId => {
+-    let isRTL = false;
+-    const panelGroupElement = panelGroupElementRef.current;
+-    if (panelGroupElement) {
+-      const style = window.getComputedStyle(panelGroupElement, null);
+-      if (style.getPropertyValue("direction") === "rtl") {
+-        isRTL = true;
+-      }
+-    }
++    let isRTL;
+     return function resizeHandler(event) {
+       event.preventDefault();
+       const panelGroupElement = panelGroupElementRef.current;
+       if (!panelGroupElement) {
+         return () => null;
+       }
++      if (isRTL === undefined) {
++        isRTL = window.getComputedStyle(panelGroupElement, null).getPropertyValue("direction") === "rtl";
++      }
+       const {
+         direction,
+         dragState,
+diff --git a/dist/react-resizable-panels.development.cjs.js b/dist/react-resizable-panels.development.cjs.js
+index 0e6d2598072792d5e243225caefb5deb59ac4058..754b1bf7f034f85f69d734066452f58db7cefade 100644
+--- a/dist/react-resizable-panels.development.cjs.js
++++ b/dist/react-resizable-panels.development.cjs.js
+@@ -2071,20 +2071,16 @@ function PanelGroupWithForwardedRef({
+     };
+   }, []);
+   const registerResizeHandle = React.useCallback(dragHandleId => {
+-    let isRTL = false;
+-    const panelGroupElement = panelGroupElementRef.current;
+-    if (panelGroupElement) {
+-      const style = window.getComputedStyle(panelGroupElement, null);
+-      if (style.getPropertyValue("direction") === "rtl") {
+-        isRTL = true;
+-      }
+-    }
++    let isRTL;
+     return function resizeHandler(event) {
+       event.preventDefault();
+       const panelGroupElement = panelGroupElementRef.current;
+       if (!panelGroupElement) {
+         return () => null;
+       }
++      if (isRTL === undefined) {
++        isRTL = window.getComputedStyle(panelGroupElement, null).getPropertyValue("direction") === "rtl";
++      }
+       const {
+         direction,
+         dragState,
+diff --git a/dist/react-resizable-panels.development.esm.js b/dist/react-resizable-panels.development.esm.js
+index f112007074169f7296fff3a571eee9b8e91606ee..a38dacfdfd924a93e1209ebca5713962a63e8a38 100644
+--- a/dist/react-resizable-panels.development.esm.js
++++ b/dist/react-resizable-panels.development.esm.js
+@@ -2048,20 +2048,16 @@ function PanelGroupWithForwardedRef({
+     };
+   }, []);
+   const registerResizeHandle = useCallback(dragHandleId => {
+-    let isRTL = false;
+-    const panelGroupElement = panelGroupElementRef.current;
+-    if (panelGroupElement) {
+-      const style = window.getComputedStyle(panelGroupElement, null);
+-      if (style.getPropertyValue("direction") === "rtl") {
+-        isRTL = true;
+-      }
+-    }
++    let isRTL;
+     return function resizeHandler(event) {
+       event.preventDefault();
+       const panelGroupElement = panelGroupElementRef.current;
+       if (!panelGroupElement) {
+         return () => null;
+       }
++      if (isRTL === undefined) {
++        isRTL = window.getComputedStyle(panelGroupElement, null).getPropertyValue("direction") === "rtl";
++      }
+       const {
+         direction,
+         dragState,
+diff --git a/dist/react-resizable-panels.development.node.cjs.js b/dist/react-resizable-panels.development.node.cjs.js
+index 71658134f48be1cb2cdede55aa28566dd6833c1d..bc0a7c838011818b01f39a911ab0bed79a506a66 100644
+--- a/dist/react-resizable-panels.development.node.cjs.js
++++ b/dist/react-resizable-panels.development.node.cjs.js
+@@ -1840,20 +1840,16 @@ function PanelGroupWithForwardedRef({
+     forceUpdate();
+   }, [forceUpdate]);
+   const registerResizeHandle = React.useCallback(dragHandleId => {
+-    let isRTL = false;
+-    const panelGroupElement = panelGroupElementRef.current;
+-    if (panelGroupElement) {
+-      const style = window.getComputedStyle(panelGroupElement, null);
+-      if (style.getPropertyValue("direction") === "rtl") {
+-        isRTL = true;
+-      }
+-    }
++    let isRTL;
+     return function resizeHandler(event) {
+       event.preventDefault();
+       const panelGroupElement = panelGroupElementRef.current;
+       if (!panelGroupElement) {
+         return () => null;
+       }
++      if (isRTL === undefined) {
++        isRTL = window.getComputedStyle(panelGroupElement, null).getPropertyValue("direction") === "rtl";
++      }
+       const {
+         direction,
+         dragState,
+diff --git a/dist/react-resizable-panels.development.node.esm.js b/dist/react-resizable-panels.development.node.esm.js
+index 9e697d30c193ed4ec8e3817061e4b934aedd4e86..4cebeea04d12b6fa50d7ff164edb048ad895c9b6 100644
+--- a/dist/react-resizable-panels.development.node.esm.js
++++ b/dist/react-resizable-panels.development.node.esm.js
+@@ -1817,20 +1817,16 @@ function PanelGroupWithForwardedRef({
+     forceUpdate();
+   }, [forceUpdate]);
+   const registerResizeHandle = useCallback(dragHandleId => {
+-    let isRTL = false;
+-    const panelGroupElement = panelGroupElementRef.current;
+-    if (panelGroupElement) {
+-      const style = window.getComputedStyle(panelGroupElement, null);
+-      if (style.getPropertyValue("direction") === "rtl") {
+-        isRTL = true;
+-      }
+-    }
++    let isRTL;
+     return function resizeHandler(event) {
+       event.preventDefault();
+       const panelGroupElement = panelGroupElementRef.current;
+       if (!panelGroupElement) {
+         return () => null;
+       }
++      if (isRTL === undefined) {
++        isRTL = window.getComputedStyle(panelGroupElement, null).getPropertyValue("direction") === "rtl";
++      }
+       const {
+         direction,
+         dragState,
+diff --git a/dist/react-resizable-panels.esm.js b/dist/react-resizable-panels.esm.js
+index e8ea3b446bdf797b6c9d727684935690ffb545f2..58f9afea8f12f6678ee2336b650d2fafa9a3136b 100644
+--- a/dist/react-resizable-panels.esm.js
++++ b/dist/react-resizable-panels.esm.js
+@@ -1937,20 +1937,16 @@ function PanelGroupWithForwardedRef({
+     };
+   }, []);
+   const registerResizeHandle = useCallback(dragHandleId => {
+-    let isRTL = false;
+-    const panelGroupElement = panelGroupElementRef.current;
+-    if (panelGroupElement) {
+-      const style = window.getComputedStyle(panelGroupElement, null);
+-      if (style.getPropertyValue("direction") === "rtl") {
+-        isRTL = true;
+-      }
+-    }
++    let isRTL;
+     return function resizeHandler(event) {
+       event.preventDefault();
+       const panelGroupElement = panelGroupElementRef.current;
+       if (!panelGroupElement) {
+         return () => null;
+       }
++      if (isRTL === undefined) {
++        isRTL = window.getComputedStyle(panelGroupElement, null).getPropertyValue("direction") === "rtl";
++      }
+       const {
+         direction,
+         dragState,
+diff --git a/dist/react-resizable-panels.node.cjs.js b/dist/react-resizable-panels.node.cjs.js
+index 265e6923b899149e7c5a7dd8b75921035cee39eb..636d92fadf705845356dc03891922d5122ef26fc 100644
+--- a/dist/react-resizable-panels.node.cjs.js
++++ b/dist/react-resizable-panels.node.cjs.js
+@@ -1739,20 +1739,16 @@ function PanelGroupWithForwardedRef({
+     forceUpdate();
+   }, [forceUpdate]);
+   const registerResizeHandle = React.useCallback(dragHandleId => {
+-    let isRTL = false;
+-    const panelGroupElement = panelGroupElementRef.current;
+-    if (panelGroupElement) {
+-      const style = window.getComputedStyle(panelGroupElement, null);
+-      if (style.getPropertyValue("direction") === "rtl") {
+-        isRTL = true;
+-      }
+-    }
++    let isRTL;
+     return function resizeHandler(event) {
+       event.preventDefault();
+       const panelGroupElement = panelGroupElementRef.current;
+       if (!panelGroupElement) {
+         return () => null;
+       }
++      if (isRTL === undefined) {
++        isRTL = window.getComputedStyle(panelGroupElement, null).getPropertyValue("direction") === "rtl";
++      }
+       const {
+         direction,
+         dragState,
+diff --git a/dist/react-resizable-panels.node.esm.js b/dist/react-resizable-panels.node.esm.js
+index eae87aacd594dbc7950e63b7634881046b0a121b..11bb49266147a3fa35839e8ff5118ebffb55642f 100644
+--- a/dist/react-resizable-panels.node.esm.js
++++ b/dist/react-resizable-panels.node.esm.js
+@@ -1716,20 +1716,16 @@ function PanelGroupWithForwardedRef({
+     forceUpdate();
+   }, [forceUpdate]);
+   const registerResizeHandle = useCallback(dragHandleId => {
+-    let isRTL = false;
+-    const panelGroupElement = panelGroupElementRef.current;
+-    if (panelGroupElement) {
+-      const style = window.getComputedStyle(panelGroupElement, null);
+-      if (style.getPropertyValue("direction") === "rtl") {
+-        isRTL = true;
+-      }
+-    }
++    let isRTL;
+     return function resizeHandler(event) {
+       event.preventDefault();
+       const panelGroupElement = panelGroupElementRef.current;
+       if (!panelGroupElement) {
+         return () => null;
+       }
++      if (isRTL === undefined) {
++        isRTL = window.getComputedStyle(panelGroupElement, null).getPropertyValue("direction") === "rtl";
++      }
+       const {
+         direction,
+         dragState,

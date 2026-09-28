@@ -12,12 +12,24 @@ patchedDependencies:
   '@pierre/diffs@1.2.9':
     hash: wdjikkl65wfpocm6wrflymrtdq
     path: patches/@pierre__diffs@1.2.9.patch
+  '@pierre/trees@1.0.0-beta.3':
+    hash: yrgvdapfonxchpm343wqvbypz4
+    path: patches/@pierre__trees@1.0.0-beta.3.patch
+  '@tiptap/extensions@3.26.0':
+    hash: 5idsaipfu4kr6xr2fgqaxku5hy
+    path: patches/@tiptap__extensions@3.26.0.patch
   expo-modules-jsi@57.0.4:
     hash: raucdrgf3mznkb7qkl7fkzjw5u
     path: patches/expo-modules-jsi@57.0.4.patch
   oniguruma-to-es@4.3.4:
     hash: f5db5z5xon23qqwgpdyyzpga5u
     path: patches/oniguruma-to-es@4.3.4.patch
+  prosemirror-view@1.41.8:
+    hash: 2jjrrczrveyd7gyfsc5aey6rxm
+    path: patches/prosemirror-view@1.41.8.patch
+  react-resizable-panels@2.1.9:
+    hash: 6eucg5b6dojdhyefxtz7s3bad4
+    path: patches/react-resizable-panels@2.1.9.patch
   sonner@1.7.4:
     hash: cmyzze74esm6ggsujpv6fshpbi
     path: patches/sonner@1.7.4.patch
@@ -136,7 +148,7 @@ importers:
         version: 1.2.9(patch_hash=wdjikkl65wfpocm6wrflymrtdq)(@shikijs/themes@3.23.0)(react-dom@19.2.4(react@19.2.4))(react@19.2.4)
       '@pierre/trees':
         specifier: ^1.0.0-beta.3
-        version: 1.0.0-beta.3(react-dom@19.2.4(react@19.2.4))(react@19.2.4)
+        version: 1.0.0-beta.3(patch_hash=yrgvdapfonxchpm343wqvbypz4)(react-dom@19.2.4(react@19.2.4))(react@19.2.4)
       '@radix-ui/react-alert-dialog':
         specifier: ^1.1.19
         version: 1.1.19(@types/react-dom@19.2.3(@types/react@19.2.13))(@types/react@19.2.13)(react-dom@19.2.4(react@19.2.4))(react@19.2.4)
@@ -190,7 +202,7 @@ importers:
         version: 3.26.0(@tiptap/core@3.26.0(@tiptap/pm@3.26.0))(@tiptap/pm@3.26.0)(@tiptap/suggestion@3.26.0(@tiptap/core@3.26.0(@tiptap/pm@3.26.0))(@tiptap/pm@3.26.0))
       '@tiptap/extension-placeholder':
         specifier: ^3.26.0
-        version: 3.26.0(@tiptap/extensions@3.26.0(@tiptap/core@3.26.0(@tiptap/pm@3.26.0))(@tiptap/pm@3.26.0))
+        version: 3.26.0(@tiptap/extensions@3.26.0(patch_hash=5idsaipfu4kr6xr2fgqaxku5hy)(@tiptap/core@3.26.0(@tiptap/pm@3.26.0))(@tiptap/pm@3.26.0))
       '@tiptap/pm':
         specifier: ^3.26.0
         version: 3.26.0
@@ -259,7 +271,7 @@ importers:
         version: 10.1.0(@types/react@19.2.13)(react@19.2.4)
       react-resizable-panels:
         specifier: ^2.1.7
-        version: 2.1.9(react-dom@19.2.4(react@19.2.4))(react@19.2.4)
+        version: 2.1.9(patch_hash=6eucg5b6dojdhyefxtz7s3bad4)(react-dom@19.2.4(react@19.2.4))(react@19.2.4)
       react-router-dom:
         specifier: ^7.1.0
         version: 7.13.0(react-dom@19.2.4(react@19.2.4))(react@19.2.4)
@@ -299,6 +311,9 @@ importers:
       tw-animate-css:
         specifier: ^1.4.0
         version: 1.4.0
+      unified:
+        specifier: ^11.0.5
+        version: 11.0.5
       unist-util-visit:
         specifier: ^5.1.0
         version: 5.1.0
@@ -2197,7 +2212,7 @@ importers:
         version: 7.80.0(react@19.2.4)
       react-resizable-panels:
         specifier: ^2.1.7
-        version: 2.1.9(react-dom@19.2.4(react@19.2.4))(react@19.2.4)
+        version: 2.1.9(patch_hash=6eucg5b6dojdhyefxtz7s3bad4)(react-dom@19.2.4(react@19.2.4))(react@19.2.4)
       recharts:
         specifier: ^2.15.4
         version: 2.15.4(react-dom@19.2.4(react@19.2.4))(react@19.2.4)
@@ -2711,7 +2726,7 @@ importers:
         version: 7.80.0(react@19.2.4)
       react-resizable-panels:
         specifier: ^2.1.7
-        version: 2.1.9(react-dom@19.2.4(react@19.2.4))(react@19.2.4)
+        version: 2.1.9(patch_hash=6eucg5b6dojdhyefxtz7s3bad4)(react-dom@19.2.4(react@19.2.4))(react@19.2.4)
       recharts:
         specifier: ^2.15.4
         version: 2.15.4(react-dom@19.2.4(react@19.2.4))(react@19.2.4)
@@ -6834,7 +6849,7 @@ packages:
 
   '@expo/bunyan@4.0.1':
     resolution: {integrity: sha512-+Lla7nYSiHZirgK+U/uYzsLv/X+HaJienbD5AKX1UQZHYfWaP+9uuQluRB4GrEVWF0GZ7vEVp/jzaOT9k/SQlg==}
-    engines: {'0': node >=0.10.0}
+    engines: {node: '>=0.10.0'}
 
   '@expo/cli@57.0.16':
     resolution: {integrity: sha512-+HyMY2nAS6QBJb0nSeMz92p11bZ1AtWSRnhWnklznN07IRoQirisnKq2vr18Ayjb/fnb5F/um+n6FRhF0fZm1Q==}
@@ -20344,7 +20359,7 @@ snapshots:
       react-dom: 19.2.4(react@19.2.4)
       shiki: 3.23.0
 
-  '@pierre/trees@1.0.0-beta.3(react-dom@19.2.4(react@19.2.4))(react@19.2.4)':
+  '@pierre/trees@1.0.0-beta.3(patch_hash=yrgvdapfonxchpm343wqvbypz4)(react-dom@19.2.4(react@19.2.4))(react@19.2.4)':
     dependencies:
       preact: 11.0.0-beta.0
       preact-render-to-string: 6.6.5(preact@11.0.0-beta.0)
@@ -21160,7 +21175,9 @@ snapshots:
       metro-runtime: 0.84.5
     transitivePeerDependencies:
       - '@babel/core'
+      - bufferutil
       - supports-color
+      - utf-8-validate
 
   '@react-native/normalize-colors@0.79.6': {}
 
@@ -22103,9 +22120,9 @@ snapshots:
       '@tiptap/core': 2.27.2(@tiptap/pm@2.27.2)
       '@tiptap/pm': 2.27.2
 
-  '@tiptap/extension-dropcursor@3.26.0(@tiptap/extensions@3.26.0(@tiptap/core@3.26.0(@tiptap/pm@3.26.0))(@tiptap/pm@3.26.0))':
+  '@tiptap/extension-dropcursor@3.26.0(@tiptap/extensions@3.26.0(patch_hash=5idsaipfu4kr6xr2fgqaxku5hy)(@tiptap/core@3.26.0(@tiptap/pm@3.26.0))(@tiptap/pm@3.26.0))':
     dependencies:
-      '@tiptap/extensions': 3.26.0(@tiptap/core@3.26.0(@tiptap/pm@3.26.0))(@tiptap/pm@3.26.0)
+      '@tiptap/extensions': 3.26.0(patch_hash=5idsaipfu4kr6xr2fgqaxku5hy)(@tiptap/core@3.26.0(@tiptap/pm@3.26.0))(@tiptap/pm@3.26.0)
 
   '@tiptap/extension-floating-menu@3.26.0(@floating-ui/dom@1.7.6)(@tiptap/core@3.26.0(@tiptap/pm@3.26.0))(@tiptap/pm@3.26.0)':
     dependencies:
@@ -22119,9 +22136,9 @@ snapshots:
       '@tiptap/core': 2.27.2(@tiptap/pm@2.27.2)
       '@tiptap/pm': 2.27.2
 
-  '@tiptap/extension-gapcursor@3.26.0(@tiptap/extensions@3.26.0(@tiptap/core@3.26.0(@tiptap/pm@3.26.0))(@tiptap/pm@3.26.0))':
+  '@tiptap/extension-gapcursor@3.26.0(@tiptap/extensions@3.26.0(patch_hash=5idsaipfu4kr6xr2fgqaxku5hy)(@tiptap/core@3.26.0(@tiptap/pm@3.26.0))(@tiptap/pm@3.26.0))':
     dependencies:
-      '@tiptap/extensions': 3.26.0(@tiptap/core@3.26.0(@tiptap/pm@3.26.0))(@tiptap/pm@3.26.0)
+      '@tiptap/extensions': 3.26.0(patch_hash=5idsaipfu4kr6xr2fgqaxku5hy)(@tiptap/core@3.26.0(@tiptap/pm@3.26.0))(@tiptap/pm@3.26.0)
 
   '@tiptap/extension-hard-break@2.27.2(@tiptap/core@2.27.2(@tiptap/pm@2.27.2))':
     dependencies:
@@ -22222,9 +22239,9 @@ snapshots:
       '@tiptap/core': 2.27.2(@tiptap/pm@2.27.2)
       '@tiptap/pm': 2.27.2
 
-  '@tiptap/extension-placeholder@3.26.0(@tiptap/extensions@3.26.0(@tiptap/core@3.26.0(@tiptap/pm@3.26.0))(@tiptap/pm@3.26.0))':
+  '@tiptap/extension-placeholder@3.26.0(@tiptap/extensions@3.26.0(patch_hash=5idsaipfu4kr6xr2fgqaxku5hy)(@tiptap/core@3.26.0(@tiptap/pm@3.26.0))(@tiptap/pm@3.26.0))':
     dependencies:
-      '@tiptap/extensions': 3.26.0(@tiptap/core@3.26.0(@tiptap/pm@3.26.0))(@tiptap/pm@3.26.0)
+      '@tiptap/extensions': 3.26.0(patch_hash=5idsaipfu4kr6xr2fgqaxku5hy)(@tiptap/core@3.26.0(@tiptap/pm@3.26.0))(@tiptap/pm@3.26.0)
 
   '@tiptap/extension-strike@2.27.2(@tiptap/core@2.27.2(@tiptap/pm@2.27.2))':
     dependencies:
@@ -22276,7 +22293,7 @@ snapshots:
     dependencies:
       '@tiptap/core': 3.26.0(@tiptap/pm@3.26.0)
 
-  '@tiptap/extensions@3.26.0(@tiptap/core@3.26.0(@tiptap/pm@3.26.0))(@tiptap/pm@3.26.0)':
+  '@tiptap/extensions@3.26.0(patch_hash=5idsaipfu4kr6xr2fgqaxku5hy)(@tiptap/core@3.26.0(@tiptap/pm@3.26.0))(@tiptap/pm@3.26.0)':
     dependencies:
       '@tiptap/core': 3.26.0(@tiptap/pm@3.26.0)
       '@tiptap/pm': 3.26.0
@@ -22298,9 +22315,9 @@ snapshots:
       prosemirror-schema-list: 1.5.1
       prosemirror-state: 1.4.4
       prosemirror-tables: 1.8.5
-      prosemirror-trailing-node: 3.0.0(prosemirror-model@1.25.7)(prosemirror-state@1.4.4)(prosemirror-view@1.41.8)
+      prosemirror-trailing-node: 3.0.0(prosemirror-model@1.25.7)(prosemirror-state@1.4.4)(prosemirror-view@1.41.8(patch_hash=2jjrrczrveyd7gyfsc5aey6rxm))
       prosemirror-transform: 1.12.0
-      prosemirror-view: 1.41.8
+      prosemirror-view: 1.41.8(patch_hash=2jjrrczrveyd7gyfsc5aey6rxm)
 
   '@tiptap/pm@3.26.0':
     dependencies:
@@ -22316,7 +22333,7 @@ snapshots:
       prosemirror-state: 1.4.4
       prosemirror-tables: 1.8.5
       prosemirror-transform: 1.12.0
-      prosemirror-view: 1.41.8
+      prosemirror-view: 1.41.8(patch_hash=2jjrrczrveyd7gyfsc5aey6rxm)
 
   '@tiptap/react@3.26.0(@floating-ui/dom@1.7.6)(@tiptap/core@3.26.0(@tiptap/pm@3.26.0))(@tiptap/pm@3.26.0)(@types/react-dom@19.2.3(@types/react@19.2.13))(@types/react@19.2.13)(react-dom@19.2.4(react@19.2.4))(react@19.2.4)':
     dependencies:
@@ -22368,8 +22385,8 @@ snapshots:
       '@tiptap/extension-code': 3.26.0(@tiptap/core@3.26.0(@tiptap/pm@3.26.0))
       '@tiptap/extension-code-block': 3.26.0(@tiptap/core@3.26.0(@tiptap/pm@3.26.0))(@tiptap/pm@3.26.0)
       '@tiptap/extension-document': 3.26.0(@tiptap/core@3.26.0(@tiptap/pm@3.26.0))
-      '@tiptap/extension-dropcursor': 3.26.0(@tiptap/extensions@3.26.0(@tiptap/core@3.26.0(@tiptap/pm@3.26.0))(@tiptap/pm@3.26.0))
-      '@tiptap/extension-gapcursor': 3.26.0(@tiptap/extensions@3.26.0(@tiptap/core@3.26.0(@tiptap/pm@3.26.0))(@tiptap/pm@3.26.0))
+      '@tiptap/extension-dropcursor': 3.26.0(@tiptap/extensions@3.26.0(patch_hash=5idsaipfu4kr6xr2fgqaxku5hy)(@tiptap/core@3.26.0(@tiptap/pm@3.26.0))(@tiptap/pm@3.26.0))
+      '@tiptap/extension-gapcursor': 3.26.0(@tiptap/extensions@3.26.0(patch_hash=5idsaipfu4kr6xr2fgqaxku5hy)(@tiptap/core@3.26.0(@tiptap/pm@3.26.0))(@tiptap/pm@3.26.0))
       '@tiptap/extension-hard-break': 3.26.0(@tiptap/core@3.26.0(@tiptap/pm@3.26.0))
       '@tiptap/extension-heading': 3.26.0(@tiptap/core@3.26.0(@tiptap/pm@3.26.0))
       '@tiptap/extension-horizontal-rule': 3.26.0(@tiptap/core@3.26.0(@tiptap/pm@3.26.0))(@tiptap/pm@3.26.0)
@@ -22383,7 +22400,7 @@ snapshots:
       '@tiptap/extension-strike': 3.26.0(@tiptap/core@3.26.0(@tiptap/pm@3.26.0))
       '@tiptap/extension-text': 3.26.0(@tiptap/core@3.26.0(@tiptap/pm@3.26.0))
       '@tiptap/extension-underline': 3.26.0(@tiptap/core@3.26.0(@tiptap/pm@3.26.0))
-      '@tiptap/extensions': 3.26.0(@tiptap/core@3.26.0(@tiptap/pm@3.26.0))(@tiptap/pm@3.26.0)
+      '@tiptap/extensions': 3.26.0(patch_hash=5idsaipfu4kr6xr2fgqaxku5hy)(@tiptap/core@3.26.0(@tiptap/pm@3.26.0))(@tiptap/pm@3.26.0)
       '@tiptap/pm': 3.26.0
 
   '@tiptap/suggestion@2.27.2(@tiptap/core@2.27.2(@tiptap/pm@2.27.2))(@tiptap/pm@2.27.2)':
@@ -28504,20 +28521,20 @@ snapshots:
     dependencies:
       prosemirror-state: 1.4.4
       prosemirror-transform: 1.12.0
-      prosemirror-view: 1.41.8
+      prosemirror-view: 1.41.8(patch_hash=2jjrrczrveyd7gyfsc5aey6rxm)
 
   prosemirror-gapcursor@1.4.1:
     dependencies:
       prosemirror-keymap: 1.2.3
       prosemirror-model: 1.25.7
       prosemirror-state: 1.4.4
-      prosemirror-view: 1.41.8
+      prosemirror-view: 1.41.8(patch_hash=2jjrrczrveyd7gyfsc5aey6rxm)
 
   prosemirror-history@1.5.0:
     dependencies:
       prosemirror-state: 1.4.4
       prosemirror-transform: 1.12.0
-      prosemirror-view: 1.41.8
+      prosemirror-view: 1.41.8(patch_hash=2jjrrczrveyd7gyfsc5aey6rxm)
       rope-sequence: 1.3.4
 
   prosemirror-inputrules@1.5.1:
@@ -28561,7 +28578,7 @@ snapshots:
     dependencies:
       prosemirror-model: 1.25.7
       prosemirror-transform: 1.12.0
-      prosemirror-view: 1.41.8
+      prosemirror-view: 1.41.8(patch_hash=2jjrrczrveyd7gyfsc5aey6rxm)
 
   prosemirror-tables@1.8.5:
     dependencies:
@@ -28569,21 +28586,21 @@ snapshots:
       prosemirror-model: 1.25.7
       prosemirror-state: 1.4.4
       prosemirror-transform: 1.12.0
-      prosemirror-view: 1.41.8
+      prosemirror-view: 1.41.8(patch_hash=2jjrrczrveyd7gyfsc5aey6rxm)
 
-  prosemirror-trailing-node@3.0.0(prosemirror-model@1.25.7)(prosemirror-state@1.4.4)(prosemirror-view@1.41.8):
+  prosemirror-trailing-node@3.0.0(prosemirror-model@1.25.7)(prosemirror-state@1.4.4)(prosemirror-view@1.41.8(patch_hash=2jjrrczrveyd7gyfsc5aey6rxm)):
     dependencies:
       '@remirror/core-constants': 3.0.0
       escape-string-regexp: 4.0.0
       prosemirror-model: 1.25.7
       prosemirror-state: 1.4.4
-      prosemirror-view: 1.41.8
+      prosemirror-view: 1.41.8(patch_hash=2jjrrczrveyd7gyfsc5aey6rxm)
 
   prosemirror-transform@1.12.0:
     dependencies:
       prosemirror-model: 1.25.7
 
-  prosemirror-view@1.41.8:
+  prosemirror-view@1.41.8(patch_hash=2jjrrczrveyd7gyfsc5aey6rxm):
     dependencies:
       prosemirror-model: 1.25.7
       prosemirror-state: 1.4.4
@@ -28928,7 +28945,7 @@ snapshots:
     optionalDependencies:
       '@types/react': 19.2.13
 
-  react-resizable-panels@2.1.9(react-dom@19.2.4(react@19.2.4))(react@19.2.4):
+  react-resizable-panels@2.1.9(patch_hash=6eucg5b6dojdhyefxtz7s3bad4)(react-dom@19.2.4(react@19.2.4))(react@19.2.4):
     dependencies:
       react: 19.2.4
       react-dom: 19.2.4(react@19.2.4)
