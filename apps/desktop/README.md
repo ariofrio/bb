@@ -270,6 +270,12 @@ is baked into the Electron main/preload bundles and selects the nightly product
 identity, yellow icon, and update URLs. Omit the variable (or set it to
 `latest`) for stable and local builds.
 
+`BB_DESKTOP_RELEASE_REPOSITORY` (a GitHub `owner/name`, default `get-bb/bb`)
+selects the repository whose `desktop-latest` or `desktop-nightly` release
+serves update feeds and binaries. It is baked in at build time like the
+channel. The release workflows set it to the repository they run in, so a
+fork's builds update from the fork's releases.
+
 ## About panel
 
 The app menu's About item opens a message box listing the facts a bug report

@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import {
+  createDesktopReleaseInfo,
   createDesktopUpdateFeedUrl,
   resolveDesktopUpdateSupport,
 } from "../src/desktop-update-provider.js";
@@ -12,6 +13,14 @@ describe("desktop update feed url", () => {
     expect(createDesktopUpdateFeedUrl("linux")).toBe(
       "https://github.com/get-bb/bb/releases/download/desktop-latest/desktop-version-linux.json",
     );
+  });
+});
+
+describe("desktop release info", () => {
+  it("downloads updates from the release repository the build names", () => {
+    expect(
+      createDesktopReleaseInfo("nightly", "ariofrio/bb").updateReleaseBaseUrl,
+    ).toBe("https://github.com/ariofrio/bb/releases/download/desktop-nightly/");
   });
 });
 

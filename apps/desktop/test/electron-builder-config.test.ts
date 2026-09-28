@@ -617,6 +617,29 @@ describe("electron-builder signing config", () => {
     });
   });
 
+  it("points the update feed at the release repository the build names", async () => {
+    const { config } = await readResolvedConfig({
+      BB_DESKTOP_RELEASE_REPOSITORY: "ariofrio/bb",
+    });
+
+    expect(config.publish[0]).toEqual({
+      channel: "latest",
+      provider: "generic",
+      url: "https://github.com/ariofrio/bb/releases/download/desktop-latest/",
+    });
+  });
+
+  it("rejects a release repository that is not owner/name", async () => {
+    const result = await runConfigScript({
+      BB_DESKTOP_RELEASE_REPOSITORY: "https://github.com/ariofrio/bb",
+    });
+
+    expect(result.exitCode).toBe(1);
+    expect(result.stderr).toContain(
+      "BB_DESKTOP_RELEASE_REPOSITORY must be a GitHub owner/name",
+    );
+  });
+
   it("rejects unknown desktop release channels", async () => {
     const result = await runConfigScript({
       BB_DESKTOP_RELEASE_CHANNEL: "canary",
