@@ -11,11 +11,11 @@ import {
 const slowScope =
   ':where([data-bb-plugin="example"], [data-bb-plugin-root]:not([data-bb-plugin]))';
 
-function loadSheet(css?: string) {
-  applyPluginCss("example", "/example.css");
-  retainPluginCss("example");
+function loadSheet(css?: string, pluginId = "example") {
+  applyPluginCss(pluginId, `/${pluginId}.css`);
+  retainPluginCss(pluginId);
   const link = document.querySelector<HTMLLinkElement>(
-    'link[data-bb-plugin-css="example"]',
+    `link[data-bb-plugin-css="${pluginId}"]`,
   )!;
   const style = document.createElement("style");
   style.textContent =
@@ -87,4 +87,33 @@ it("styles descendants added to existing plugin roots and stops styling moved co
   await waitFor(() =>
     expect(getComputedStyle(item).color).not.toBe("rgb(255, 0, 0)"),
   );
+});
+
+
+it("preserves inherited styles in nested plugins and removes them when moved", async () => {
+  document.body.innerHTML = '<div data-bb-plugin="example"><div data-bb-plugin="other"><span class="item">nested</span></div></div>';
+  loadSheet();
+  const otherScope = slowScope.replaceAll("example", "other");
+  loadSheet(`${otherScope} .item { background-color: rgb(0, 128, 0); }`, "other");
+  const item = document.querySelector("span")!;
+  const nested = document.querySelector('[data-bb-plugin="other"]')!;
+  expect(getComputedStyle(item).color).toBe("rgb(255, 0, 0)");
+  expect(getComputedStyle(item).backgroundColor).toBe("rgb(0, 128, 0)");
+
+  document.body.append(nested);
+
+  await waitFor(() => {
+    expect(getComputedStyle(item).color).not.toBe("rgb(255, 0, 0)");
+    expect(getComputedStyle(item).backgroundColor).toBe("rgb(0, 128, 0)");
+  });
+});
+
+it("includes newly loaded plugin styles in existing anonymous portals", () => {
+  document.body.innerHTML = '<div data-bb-plugin-root><span class="item">portal</span></div>';
+  loadSheet();
+  const otherScope = slowScope.replaceAll("example", "other");
+  loadSheet(`${otherScope} .item { background-color: rgb(0, 128, 0); }`, "other");
+  const item = document.querySelector("span")!;
+  expect(getComputedStyle(item).color).toBe("rgb(255, 0, 0)");
+  expect(getComputedStyle(item).backgroundColor).toBe("rgb(0, 128, 0)");
 });

@@ -1,5 +1,7 @@
 const SCOPE_ATTRIBUTE_PREFIX = "data-bb-plugin-scope-";
-const STYLED_ATTRIBUTE = "data-bb-plugin-styled";
+const STYLED_ATTRIBUTE_PREFIX = "data-bb-plugin-styled-";
+const EMPTY_PLUGIN_IDS: ReadonlySet<string> = new Set();
+let styledPluginIdsByElement = new WeakMap<Element, ReadonlySet<string>>();
 const ROOT_SELECTOR = "[data-bb-plugin], [data-bb-plugin-root]";
 const pluginIds = new Set<string>();
 let observer: MutationObserver | null = null;
@@ -8,13 +10,36 @@ export function pluginScopeProps(pluginId: string): Record<string, string> {
   return { [`${SCOPE_ATTRIBUTE_PREFIX}${pluginId}`]: "" };
 }
 
-function markStyledSubtree(root: Element, inherited: boolean): void {
-  const styled = inherited || root.matches(ROOT_SELECTOR);
-  root.toggleAttribute(STYLED_ATTRIBUTE, styled);
+function rootPluginIds(root: Element): ReadonlySet<string> {
+  const pluginId = root.getAttribute("data-bb-plugin");
+  if (pluginId !== null) return new Set([pluginId]);
+  return root.hasAttribute("data-bb-plugin-root") ? pluginIds : EMPTY_PLUGIN_IDS;
+}
+
+function inheritedPluginIds(root: Element): ReadonlySet<string> {
+  const ids = new Set<string>();
+  for (let parent = root.parentElement; parent; parent = parent.parentElement) {
+    for (const id of rootPluginIds(parent)) ids.add(id);
+  }
+  return ids;
+}
+
+function markStyledSubtree(root: Element, inherited: ReadonlySet<string>): void {
+  const own = rootPluginIds(root);
+  const styled = own.size > 0 ? new Set([...inherited, ...own]) : inherited;
+  const previous = styledPluginIdsByElement.get(root) ?? EMPTY_PLUGIN_IDS;
+  for (const id of previous) {
+    if (!styled.has(id)) root.removeAttribute(`${STYLED_ATTRIBUTE_PREFIX}${id}`);
+  }
+  for (const id of styled) {
+    if (!previous.has(id))
+      root.setAttribute(`${STYLED_ATTRIBUTE_PREFIX}${id}`, "");
+  }
+  styledPluginIdsByElement.set(root, styled);
   for (const child of root.children) markStyledSubtree(child, styled);
 }
 
-function gateSelector(selector: string): string {
+function gateSelector(selector: string, pluginId: string): string {
   if (selector.includes("::")) return selector;
   const selectors: string[] = [];
   let start = 0;
@@ -43,12 +68,11 @@ function gateSelector(selector: string): string {
   }
   selectors.push(selector.slice(start));
   return selectors
-    .map((part) => `:where([${STYLED_ATTRIBUTE}]):is(${part.trim()})`)
+    .map((part) => `${part.trim()}:where([${STYLED_ATTRIBUTE_PREFIX}${pluginId}])`)
     .join(", ");
 }
 
 function markRoot(root: Element): void {
-  if (!root.hasAttribute(STYLED_ATTRIBUTE)) markStyledSubtree(root, false);
   const pluginId = root.getAttribute("data-bb-plugin");
   const ids =
     pluginId !== null
@@ -76,22 +100,17 @@ function markRoots(root: ParentNode): void {
 function trackRoots(pluginId: string): void {
   pluginIds.add(pluginId);
   markRoots(document);
+  markStyledSubtree(document.documentElement, EMPTY_PLUGIN_IDS);
   if (observer !== null) return;
   observer = new MutationObserver((records) => {
     for (const record of records) {
       if (record.type === "attributes" && record.target instanceof Element) {
         markRoot(record.target);
-        markStyledSubtree(
-          record.target,
-          record.target.parentElement?.closest(ROOT_SELECTOR) != null,
-        );
+        markStyledSubtree(record.target, inheritedPluginIds(record.target));
       } else {
         for (const node of record.addedNodes) {
-          if (node instanceof Element) {
-            markStyledSubtree(
-              node,
-              node.parentElement?.closest(ROOT_SELECTOR) != null,
-            );
+          if (node instanceof Element && node.isConnected) {
+            markStyledSubtree(node, inheritedPluginIds(node));
             markRoots(node);
           }
         }
@@ -116,7 +135,10 @@ export function optimizePluginCssScope(
     rule: CSSRule & { selectorText?: string; cssRules?: CSSRuleList },
   ): void => {
     if (rule.selectorText?.includes(from))
-      rule.selectorText = gateSelector(rule.selectorText.replaceAll(from, to));
+      rule.selectorText = gateSelector(
+        rule.selectorText.replaceAll(from, to),
+        pluginId,
+      );
     if (rule.cssRules !== undefined) {
       for (const child of rule.cssRules) rewrite(child);
     }
@@ -135,4 +157,5 @@ export function resetPluginCssScopesForTest(): void {
   observer?.disconnect();
   observer = null;
   pluginIds.clear();
+  styledPluginIdsByElement = new WeakMap();
 }
