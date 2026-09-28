@@ -105,6 +105,8 @@ function buildSenderThreadMetadataById(
 function shouldSyncSenderThreadMetadata(event: QueryCacheNotifyEvent): boolean {
   return (
     event.type === "updated" &&
+    (event.action.type === "success" ||
+      (event.action.type === "setState" && "data" in event.action.state)) &&
     (event.query.queryKey[0] === SIDEBAR_NAVIGATION_QUERY_KEY ||
       event.query.queryKey[0] === THREADS_QUERY_KEY ||
       event.query.queryKey[0] === THREAD_QUERY_KEY)
@@ -161,7 +163,9 @@ export function useSenderThreadMetadataById(): ReadonlyMap<
     }
 
     let subscribed = true;
+    let scheduled = false;
     const syncMetadataById = () => {
+      scheduled = false;
       if (subscribed) {
         setMetadataById((current) => {
           const next = buildSenderThreadMetadataById(queryClient);
@@ -172,7 +176,8 @@ export function useSenderThreadMetadataById(): ReadonlyMap<
       }
     };
     const unsubscribe = queryClient.getQueryCache().subscribe((event) => {
-      if (shouldSyncSenderThreadMetadata(event)) {
+      if (!scheduled && shouldSyncSenderThreadMetadata(event)) {
+        scheduled = true;
         notifyManager.schedule(syncMetadataById);
       }
     });

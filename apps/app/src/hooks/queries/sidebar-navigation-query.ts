@@ -27,14 +27,16 @@ function fetchSidebarNavigation(
   );
 }
 
-export function useSidebarNavigation(options?: QueryOptions) {
+export function useSidebarNavigation<T = SidebarBootstrapResponse>(
+  options?: QueryOptions & { select?: (data: SidebarBootstrapResponse) => T },
+) {
   const enabled = options?.enabled ?? true;
   useEnvironmentListRealtimeSubscription({ enabled });
   useHostListRealtimeSubscription({ enabled });
   useProjectListRealtimeSubscription({ enabled });
   useThreadListRealtimeSubscription({ enabled });
 
-  return useQuery<SidebarBootstrapResponse>({
+  return useQuery<SidebarBootstrapResponse, Error, T>({
     queryKey: sidebarNavigationQueryKey(),
     queryFn: async ({ signal }) => {
       const response = await fetchSidebarNavigation(signal);
@@ -42,6 +44,7 @@ export function useSidebarNavigation(options?: QueryOptions) {
       return response;
     },
     enabled,
+    select: options?.select,
     ...REALTIME_OWNED_STATIC_CACHE_QUERY_POLICY,
     placeholderData: () => readCachedSidebarBootstrap() ?? undefined,
   });

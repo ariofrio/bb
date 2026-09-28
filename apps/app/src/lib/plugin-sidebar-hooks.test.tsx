@@ -1,6 +1,8 @@
+import { createQueryClientTestHarness } from "@/test/queryClientTestHarness";
+import { sidebarNavigationQueryKey } from "@/hooks/queries/query-keys";
 // @vitest-environment jsdom
 
-import { act, cleanup, renderHook } from "@testing-library/react";
+import { act, cleanup, renderHook, waitFor } from "@testing-library/react";
 import { getDefaultStore } from "jotai";
 import { PERSONAL_PROJECT_ID, type ThreadListEntry } from "@bb/domain";
 import { getThreadConversationCollapsedAtom } from "@/components/secondary-panel/threadSecondaryPanelAtoms";
@@ -42,6 +44,7 @@ type SidebarSection = {
 };
 
 const state = vi.hoisted(() => ({
+  queryMode: false,
   data: undefined as
     | {
         sections: SidebarSection[];
@@ -71,9 +74,32 @@ vi.mock("@/hooks/queries/thread-queries", () => ({
   },
 }));
 
-vi.mock("@/hooks/queries/sidebar-navigation-query", () => ({
-  useSidebarNavigation: () => ({ data: state.data, isError: false }),
-}));
+vi.mock("@/hooks/queries/sidebar-navigation-query", async () => {
+  const { useQuery } = await import("@tanstack/react-query");
+  return {
+    useSidebarNavigation: <T = NonNullable<typeof state.data>,>(options?: {
+      select?: (data: NonNullable<typeof state.data>) => T;
+    }) => {
+      if (state.queryMode) {
+        // oxlint-disable-next-line react-hooks/rules-of-hooks
+        return useQuery({
+          queryKey: sidebarNavigationQueryKey(),
+          enabled: false,
+          select: options?.select,
+        });
+      }
+      return {
+        data:
+          state.data === undefined
+            ? undefined
+            : options?.select
+              ? options.select(state.data)
+              : state.data,
+        isError: false,
+      };
+    },
+  };
+});
 
 vi.mock("@/hooks/queries/host-queries", () => {
   const hosts: never[] = [];
@@ -161,12 +187,44 @@ afterEach(() => {
   cleanup();
   vi.clearAllMocks();
   state.data = undefined;
+  state.queryMode = false;
   archiveQuery.data = undefined;
   archiveQuery.isLoadingError = false;
   archiveQuery.hasNextPage = false;
   drafts.threadIds.clear();
   clearPluginThreadRowStatuses("plugin-a");
   environmentProviders.providers = undefined;
+});
+
+it("does not rerender a row when another thread changes", async () => {
+  state.queryMode = true;
+  const { queryClient, wrapper } = createQueryClientTestHarness();
+  const stable = makeThreadListEntry({ id: "thr_stable" });
+  const changing = makeThreadListEntry({ id: "thr_changing", title: "One" });
+  queryClient.setQueryData(
+    sidebarNavigationQueryKey(),
+    payload([stable, changing]),
+  );
+  const renders = vi.fn();
+  renderHook(
+    () => {
+      renders();
+      return useSidebarThreadEntry(stable.id);
+    },
+    { wrapper },
+  );
+  const changed = renderHook(() => useSidebarThreadEntry(changing.id), {
+    wrapper,
+  });
+  const count = renders.mock.calls.length;
+  act(() => {
+    queryClient.setQueryData(
+      sidebarNavigationQueryKey(),
+      payload([stable, { ...changing, title: "Two" }]),
+    );
+  });
+  await waitFor(() => expect(changed.result.current?.title).toBe("Two"));
+  expect(renders).toHaveBeenCalledTimes(count);
 });
 
 describe("useSidebarThreads", () => {

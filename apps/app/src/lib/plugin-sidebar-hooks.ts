@@ -1,3 +1,4 @@
+import type { SidebarBootstrapResponse } from "@bb/server-contract";
 import { useCallback, useMemo } from "react";
 import { useStore } from "jotai";
 import {
@@ -215,7 +216,7 @@ const threadEntryMapByPayload = new WeakMap<
 >();
 
 function threadEntryMapFor(
-  data: ReturnType<typeof useSidebarNavigation>["data"],
+  data: SidebarBootstrapResponse | undefined,
 ): ReadonlyMap<string, ThreadListEntry> {
   if (data === undefined) return EMPTY_ENTRIES;
   const cached = threadEntryMapByPayload.get(data);
@@ -263,7 +264,18 @@ function useThreadEntryMap(): ReadonlyMap<string, ThreadListEntry> {
 export function useSidebarThreadEntry(
   threadId: string,
 ): ThreadListEntry | null {
-  return useThreadEntryMap().get(threadId) ?? null;
+  const select = useCallback(
+    (data: SidebarBootstrapResponse) =>
+      threadEntryMapFor(data).get(threadId) ?? null,
+    [threadId],
+  );
+  const { data: active } = useSidebarNavigation({ select });
+  const archived = useArchivedThreads({}, { enabled: false });
+  return (
+    active ??
+    archived.data?.pages.flat().find((entry) => entry.id === threadId) ??
+    null
+  );
 }
 
 export function useSidebarThreadActions(): PluginSidebarThreadActions {

@@ -111,6 +111,27 @@ describe("useThreadReadTracking", () => {
     expect(markThreadRead.mutateAsync).toHaveBeenCalledTimes(2);
   });
 
+  it("does not retry a rejected read on unrelated rerenders", async () => {
+    const mutateAsync = vi
+      .fn<MarkThreadReadMutation["mutateAsync"]>()
+      .mockRejectedValue(new Error("Forbidden"));
+    const { rerender } = renderHook(() =>
+      useThreadReadTracking({
+        markThreadRead: { mutateAsync },
+        thread: { id: "thr_readonly", lastReadAt: 10, latestAttentionAt: 20 },
+      }),
+    );
+    await act(async () => {});
+    for (let i = 0; i < 5; i += 1) {
+      rerender();
+      await act(async () => {});
+    }
+    expect(mutateAsync).toHaveBeenCalledTimes(1);
+    act(() => window.dispatchEvent(new Event("pageshow")));
+    await act(async () => {});
+    expect(mutateAsync).toHaveBeenCalledTimes(2);
+  });
+
   it("retries a failed read after pageshow while already visible", async () => {
     const markThreadRead = makeMarkThreadRead();
     markThreadRead.mutateAsync.mockRejectedValueOnce(new Error("Failed"));

@@ -31,7 +31,10 @@ export function useThreadReadTracking({
   markThreadRead,
   thread,
 }: UseThreadReadTrackingParams) {
-  const failedReadKeysRef = useRef<Set<string>>(new Set());
+  const failedReadKeysRef = useRef(
+    new Map<string, { activation: number; visibilityRevision: number }>(),
+  );
+  const activationRef = useRef(0);
   const pendingReadControllersRef = useRef<Map<string, AbortController>>(
     new Map(),
   );
@@ -59,6 +62,7 @@ export function useThreadReadTracking({
     previousSnapshotRef.current = currentSnapshot;
 
     if (previousSnapshot?.threadId !== currentSnapshot.threadId) {
+      activationRef.current += 1;
       for (const controller of pendingReadControllersRef.current.values()) {
         controller.abort();
       }
@@ -90,7 +94,12 @@ export function useThreadReadTracking({
     const becameVisible =
       previousSnapshot?.threadId === thread.id &&
       previousSnapshot.isVisible === false;
-    const isRetry = failedReadKeysRef.current.has(marker);
+    const failure = failedReadKeysRef.current.get(marker);
+    const isRetry = failure !== undefined;
+    const canRetry =
+      failure !== undefined &&
+      (failure.activation !== activationRef.current ||
+        failure.visibilityRevision !== visibilityRevision);
     const becameManuallyUnread =
       previousSnapshot?.threadId === thread.id &&
       previousSnapshot.latestAttentionAt === thread.latestAttentionAt &&
@@ -109,7 +118,7 @@ export function useThreadReadTracking({
       return;
     }
 
-    if (!isOpenedThread && !hasNewAttention && !becameVisible && !isRetry) {
+    if (!isOpenedThread && !hasNewAttention && !becameVisible && !canRetry) {
       return;
     }
     if (pendingReadControllersRef.current.has(marker)) {
@@ -117,12 +126,16 @@ export function useThreadReadTracking({
     }
 
     failedReadKeysRef.current.delete(marker);
+    const activation = activationRef.current;
     const controller = new AbortController();
     pendingReadControllersRef.current.set(marker, controller);
     void markThreadRead
       .mutateAsync({ signal: controller.signal, threadId: thread.id })
       .catch(() => {
-        failedReadKeysRef.current.add(marker);
+        failedReadKeysRef.current.set(marker, {
+          activation,
+          visibilityRevision,
+        });
       })
       .finally(() => {
         if (pendingReadControllersRef.current.get(marker) === controller) {

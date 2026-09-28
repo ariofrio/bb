@@ -36,9 +36,9 @@ function twoPanes(focused: string): SplitLayout {
   };
 }
 
-function renderIndicator(threadId: string) {
+function renderIndicator(threadId: string, initialLayout = twoPanes("pane-1")) {
   const store = createStore();
-  store.set(splitLayoutAtom, twoPanes("pane-1"));
+  store.set(splitLayoutAtom, initialLayout);
   const wrapper = ({ children }: { children: ReactNode }) => (
     <Provider store={store}>{children}</Provider>
   );
@@ -70,6 +70,44 @@ describe("usePaneContentSplitIndicator", () => {
     });
     expect(renderCount()).toBe(settled);
     expect(result.current.isOpenInSplit).toBe(false);
+  });
+
+  it("does not rerender rows when a single pane switches threads", () => {
+    const { store, result, renderCount } = renderIndicator("t1", {
+      root: pane("pane-1", "t1"),
+      focusedPaneId: "pane-1",
+    });
+    const settled = renderCount();
+    act(() =>
+      store.set(splitLayoutAtom, {
+        root: pane("pane-1", "t2"),
+        focusedPaneId: "pane-1",
+      }),
+    );
+    expect(renderCount()).toBe(settled);
+    expect(result.current.isOpenInSplit).toBe(false);
+    act(() => store.set(splitLayoutAtom, twoPanes("pane-1")));
+    expect(result.current.isOpenInSplit).toBe(true);
+  });
+
+  it("does not rerender rows outside the split when its focus changes", () => {
+    const { store, result, renderCount } = renderIndicator("t3");
+    const settled = renderCount();
+    act(() => store.set(splitLayoutAtom, twoPanes("pane-2")));
+    expect(renderCount()).toBe(settled);
+    expect(result.current.isOpenInSplit).toBe(false);
+    act(() =>
+      store.set(splitLayoutAtom, {
+        root: {
+          type: "split",
+          dir: "row",
+          sizes: [0.5, 0.5],
+          children: [pane("pane-1", "t3"), pane("pane-2", "t2")],
+        },
+        focusedPaneId: "pane-1",
+      }),
+    );
+    expect(result.current.isOpenInSplit).toBe(true);
   });
 
   it("follows the split layout on wide viewports", () => {

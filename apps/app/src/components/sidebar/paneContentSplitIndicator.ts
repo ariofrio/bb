@@ -30,6 +30,10 @@ const NO_INDICATOR: PaneContentSplitIndicator = {
 };
 
 const NULL_LAYOUT_ATOM = atom<SplitLayout | null>(null);
+const MULTI_PANE_LAYOUT_ATOM = atom((get) => {
+  const layout = get(splitLayoutAtom);
+  return layout !== null && countPanes(layout.root) > 1 ? layout : null;
+});
 
 function useSplitLayoutForIndicator(enabled: boolean): {
   layout: SplitLayout | null;
@@ -37,7 +41,7 @@ function useSplitLayoutForIndicator(enabled: boolean): {
 } {
   const isCompact = useIsCompactViewport();
   const layout = useAtomValue(
-    enabled && !isCompact ? splitLayoutAtom : NULL_LAYOUT_ATOM,
+    enabled && !isCompact ? MULTI_PANE_LAYOUT_ATOM : NULL_LAYOUT_ATOM,
   );
   return { layout, isCompact };
 }
@@ -74,27 +78,28 @@ function buildSplitIndicator(
   };
 }
 
+const NO_INDICATOR_ATOM = atom(NO_INDICATOR);
+
 export function usePaneContentSplitIndicator(
   content: PaneContent,
   enabled: boolean,
 ): PaneContentSplitIndicator {
-  const { layout, isCompact } = useSplitLayoutForIndicator(enabled);
-
-  return useMemo<PaneContentSplitIndicator>(() => {
-    if (
-      !enabled ||
-      layout === null ||
-      isCompact ||
-      countPanes(layout.root) < 2
-    ) {
-      return NO_INDICATOR;
-    }
-    const pane = findPaneByContent(layout.root, content);
-    if (pane === null) {
-      return NO_INDICATOR;
-    }
-    return buildSplitIndicator(layout, new Set([pane.paneId]));
-  }, [content, enabled, isCompact, layout]);
+  const isCompact = useIsCompactViewport();
+  const indicatorAtom = useMemo(
+    () =>
+      atom((get) => {
+        const layout = get(MULTI_PANE_LAYOUT_ATOM);
+        if (layout === null) return NO_INDICATOR;
+        const pane = findPaneByContent(layout.root, content);
+        return pane === null
+          ? NO_INDICATOR
+          : buildSplitIndicator(layout, new Set([pane.paneId]));
+      }),
+    [content],
+  );
+  return useAtomValue(
+    enabled && !isCompact ? indicatorAtom : NO_INDICATOR_ATOM,
+  );
 }
 
 export function useThreadGroupSplitIndicator(
