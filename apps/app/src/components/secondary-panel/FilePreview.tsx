@@ -41,6 +41,7 @@ import {
 import { cn } from "@bb/shared-ui/lib/utils";
 import { SecondaryPanelSelectionActions } from "./SecondaryPanelSelectionActions.js";
 import { useImageTabLightbox } from "./ImageTabLightboxContext.js";
+import { useSealedMediaSrc } from "@/lib/sealed";
 
 export interface FilePreviewFile {
   cacheKey?: string;
@@ -1038,6 +1039,7 @@ function CsvFilePreview({ file, onSelectionAddToChat }: CsvFilePreviewProps) {
 }
 
 function FilePreviewImage({ url, alt }: FilePreviewImageProps) {
+  const sealedImageSrc = useSealedMediaSrc(url);
   const [isLightboxOpen, setIsLightboxOpen] = useState(false);
   const imageTabLightbox = useImageTabLightbox();
 
@@ -1061,7 +1063,11 @@ function FilePreviewImage({ url, alt }: FilePreviewImageProps) {
           setIsLightboxOpen(true);
         }}
       >
-        <img src={url} alt={alt} className="mx-auto block h-auto max-w-full" />
+        <img
+          src={sealedImageSrc ?? undefined}
+          alt={alt}
+          className="mx-auto block h-auto max-w-full"
+        />
       </button>
       {imageTabLightbox === null ? (
         <ImageLightbox
@@ -1076,10 +1082,11 @@ function FilePreviewImage({ url, alt }: FilePreviewImageProps) {
 }
 
 function FilePreviewVideo({ url, title }: FilePreviewVideoProps) {
+  const sealedVideoSrc = useSealedMediaSrc(url);
   return (
     <div className="pt-4">
       <video
-        src={url}
+        src={sealedVideoSrc ?? undefined}
         title={title}
         className="block max-h-[34rem] w-full bg-black"
         controls
@@ -1091,6 +1098,7 @@ function FilePreviewVideo({ url, title }: FilePreviewVideoProps) {
 
 function IframeFilePreview({ sandbox, title, url }: IframeFilePreviewTarget) {
   const [loadState, setLoadState] = useState<IframeLoadState>("loading");
+  const sealedFrameSrc = useSealedMediaSrc(url);
   const [showLoadingIndicator, setShowLoadingIndicator] = useState(false);
 
   useEffect(() => {
@@ -1133,7 +1141,7 @@ function IframeFilePreview({ sandbox, title, url }: IframeFilePreviewTarget) {
       ) : null}
       <iframe
         title={title}
-        src={url}
+        src={sealedFrameSrc ?? undefined}
         sandbox={sandbox}
         style={HTML_FILE_PREVIEW_IFRAME_STYLE}
         onLoad={() => setLoadState("loaded")}

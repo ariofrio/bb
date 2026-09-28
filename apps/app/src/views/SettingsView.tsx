@@ -63,6 +63,7 @@ import { PluginDetailPaneView } from "@/views/ToolsView";
 import { SETTINGS_PLUGIN_ROUTE_PATH } from "@/lib/route-paths";
 import { PluginSettingsPage } from "@/components/plugin/PluginSettings";
 import { FileOpenersSettingsSection } from "@/components/settings/FileOpenersSettingsSection";
+import { SealedConnectionSettingsSection } from "@/components/settings/SealedConnectionSettingsSection";
 import { VoiceInputSettingsSection } from "@/components/settings/VoiceInputSettingsSection";
 import { AiServicesSettingsSection } from "@/components/settings/AiServicesSettingsSection";
 import { CommunitySettingsSection } from "@/components/settings/CommunitySettingsSection";
@@ -1276,6 +1277,7 @@ export function SettingsView() {
   } else {
     content = (
       <>
+        <SealedConnectionSettingsSection />
         <GeneralSettingsSection
           desktopBrowserAvailable={desktopBrowserAvailable}
           generalSettingsDisabled={

@@ -7,6 +7,7 @@ import {
 } from "../../ui/image-lightbox.js";
 import { cn } from "@bb/shared-ui/lib/utils";
 import { buildProjectAttachmentContentUrl } from "@/lib/file-content-urls";
+import { SealedImage, openSealedLink } from "@/lib/sealed";
 import type {
   ThreadTimelineLocalFileLinkHandler,
   UserAttachmentImageSrcResolver,
@@ -146,7 +147,7 @@ export function ConversationAttachments({
               onClick={() => setExpandedImageIndex(index)}
               title={imageItem.alt}
             >
-              <img
+              <SealedImage
                 src={imageItem.src}
                 alt={imageItem.alt}
                 className={cn(
@@ -181,6 +182,7 @@ export function ConversationAttachments({
                   href={attachmentHref}
                   target="_blank"
                   rel="noreferrer"
+                  onClick={(event) => openSealedLink(event, attachmentHref)}
                   className={cn(
                     className,
                     "cursor-pointer hover:bg-state-hover",

@@ -75,7 +75,8 @@
     "The composer (tiptap/prosemirror) is visible on every thread page and is",
     "allowed until it moves behind a first-focus handoff. Run",
     "`node scripts/why-eager.mjs --from=views/SplitWorkspaceRoute.tsx <package>`",
-    "to print the static chain that pulled a package into the closure."
+    "to print the static chain that pulled a package into the closure.",
+    "On 2026-09-27 the sealed-channel crypto (@noble/*) joined onDemandPackages, gated behind the sealed-transport bootstrap that only remote origins import."
   ],
   "maxBootBytes": 1715362,
   "maxBootBrotliBytes": 423083,
@@ -105,7 +106,10 @@
   "onDemandPackages": {
     "@pierre/trees": "src/components/secondary-panel/ThreadStorageFileTree.tsx",
     "katex": "src/components/ui/markdown-katex.ts",
-    "rehype-katex": "src/components/ui/markdown-katex.ts"
+    "rehype-katex": "src/components/ui/markdown-katex.ts",
+    "@noble/ciphers": "src/lib/sealed/bootstrap.ts",
+    "@noble/curves": "src/lib/sealed/bootstrap.ts",
+    "@noble/hashes": "src/lib/sealed/bootstrap.ts"
   },
   "routeClosures": {
     "SplitWorkspaceRoute": {
