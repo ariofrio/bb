@@ -46,3 +46,23 @@ it("an app Dialog dims the browser through the shared-ui env seam", async () => 
     expect(screen.getByTestId("dim").textContent).toBe("clear"),
   );
 });
+
+it("a plugin Dialog dims the browser while its portal is open", async () => {
+  render(<DimProbe />);
+  const pluginDialog = document.createElement("div");
+  pluginDialog.setAttribute("data-bb-plugin-root", "");
+  pluginDialog.setAttribute("data-bb-portaled-overlay", "");
+  pluginDialog.setAttribute("role", "dialog");
+  pluginDialog.setAttribute("data-state", "open");
+  document.body.append(pluginDialog);
+
+  await waitFor(() =>
+    expect(screen.getByTestId("dim").textContent).toBe("dimmed"),
+  );
+
+  pluginDialog.setAttribute("data-state", "closed");
+  await waitFor(() =>
+    expect(screen.getByTestId("dim").textContent).toBe("clear"),
+  );
+  pluginDialog.remove();
+});
