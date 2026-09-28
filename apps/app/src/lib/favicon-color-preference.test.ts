@@ -160,6 +160,48 @@ describe("favicon rendering", () => {
     unmount();
   });
 
+  it("encodes badge variants asynchronously and reuses them across switches", async () => {
+    stubDisplayMode(false);
+    vi.stubGlobal("Image", FakeImage);
+    const context = {
+      drawImage: vi.fn(),
+      save: vi.fn(),
+      beginPath: vi.fn(),
+      arc: vi.fn(),
+      fill: vi.fn(),
+      restore: vi.fn(),
+    };
+    const getContext = vi
+      .spyOn(HTMLCanvasElement.prototype, "getContext")
+      .mockReturnValue(context as unknown as CanvasRenderingContext2D);
+    const toDataURL = vi
+      .spyOn(HTMLCanvasElement.prototype, "toDataURL")
+      .mockReturnValue("data:image/png;base64,old");
+    const toBlob = vi
+      .spyOn(HTMLCanvasElement.prototype, "toBlob")
+      .mockImplementation((callback) =>
+        queueMicrotask(() =>
+          callback(new Blob(["png"], { type: "image/png" })),
+        ),
+      );
+    const module = await loadFreshModule();
+    module.initializeFavicon();
+    const { rerender } = renderHook(
+      ({ badge }: { badge: "none" | "unread" }) =>
+        module.useFaviconBadge(badge),
+      { initialProps: { badge: "unread" as "none" | "unread" } },
+    );
+    await waitFor(() => expect(toBlob).toHaveBeenCalledTimes(2));
+    expect(getContext).toHaveBeenCalledWith("2d", { willReadFrequently: true });
+    expect(toDataURL).not.toHaveBeenCalled();
+    rerender({ badge: "none" });
+    rerender({ badge: "unread" });
+    await waitFor(() => expect(toBlob).toHaveBeenCalledTimes(2));
+    toBlob.mockRestore();
+    toDataURL.mockRestore();
+    getContext.mockRestore();
+  });
+
   it("skips favicon image work in standalone display mode", async () => {
     stubDisplayMode(true);
     FakeImage.created = 0;

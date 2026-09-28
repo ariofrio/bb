@@ -223,7 +223,19 @@ function loadBaseImage(src: string): Promise<HTMLImageElement> {
 
 const STANDALONE_DISPLAY_MODE_QUERY = "(display-mode: standalone)";
 
-async function createFaviconHref({
+const faviconHrefCache = new Map<string, Promise<string>>();
+
+function createFaviconHref(request: FaviconRenderRequest): Promise<string> {
+  const key = JSON.stringify(request);
+  const cached = faviconHrefCache.get(key);
+  if (cached) return cached;
+  const pending = renderFaviconHref(request);
+  faviconHrefCache.set(key, pending);
+  pending.catch(() => faviconHrefCache.delete(key));
+  return pending;
+}
+
+async function renderFaviconHref({
   badge,
   baseHref,
   colorPreference,
@@ -236,7 +248,7 @@ async function createFaviconHref({
   const canvas = document.createElement("canvas");
   canvas.width = image.naturalWidth;
   canvas.height = image.naturalHeight;
-  const context = canvas.getContext("2d");
+  const context = canvas.getContext("2d", { willReadFrequently: true });
   if (!context) throw new Error("Canvas 2D context unavailable");
   context.drawImage(image, 0, 0);
 
@@ -251,7 +263,18 @@ async function createFaviconHref({
     drawUnreadBadge(context, canvas.width, canvas.height);
   }
 
-  return canvas.toDataURL("image/png");
+  return new Promise((resolve, reject) => {
+    canvas.toBlob((blob) => {
+      if (!blob) {
+        reject(new Error("Favicon encoding failed"));
+        return;
+      }
+      const reader = new FileReader();
+      reader.onload = () => resolve(String(reader.result));
+      reader.onerror = () => reject(reader.error);
+      reader.readAsDataURL(blob);
+    }, "image/png");
+  });
 }
 
 function getUnreadBadgeDot(width: number, height: number): UnreadBadgeDot {
