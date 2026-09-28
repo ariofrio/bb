@@ -9,6 +9,7 @@ afterEach(() => {
   cleanup();
   vi.unstubAllGlobals();
   vi.restoreAllMocks();
+  vi.useRealTimers();
 });
 
 function OverflowProbe({ name }: { name: string }) {
@@ -22,7 +23,8 @@ function OverflowProbe({ name }: { name: string }) {
 }
 
 describe("useOverflowMeasurement", () => {
-  it("shares one observer and batches measurements for all rows", () => {
+  it("measures overflow after ResizeObserver delivery and batches all rows", () => {
+    vi.useFakeTimers();
     let observerCallback: ResizeObserverCallback | null = null;
     const observe = vi.fn();
     const unobserve = vi.fn();
@@ -81,6 +83,10 @@ describe("useOverflowMeasurement", () => {
       );
     });
 
+    expect(scrollHeight).not.toHaveBeenCalled();
+    expect(clientHeight).not.toHaveBeenCalled();
+    act(() => vi.runOnlyPendingTimers());
+
     expect(constructorSpy).toHaveBeenCalledOnce();
     expect(observe).toHaveBeenCalledTimes(2);
     expect(scrollHeight).toHaveBeenCalledTimes(2);
@@ -89,5 +95,16 @@ describe("useOverflowMeasurement", () => {
     expect(clientWidth).toHaveBeenCalledOnce();
     expect(first.dataset.measurement).toBe("overflowing");
     expect(second.dataset.measurement).toBe("fits");
+
+    act(() => {
+      observerCallback?.(
+        [{ target: first } as unknown as ResizeObserverEntry],
+        {} as ResizeObserver,
+      );
+    });
+    cleanup();
+    act(() => vi.runOnlyPendingTimers());
+    expect(scrollHeight).toHaveBeenCalledTimes(2);
+    expect(disconnect).toHaveBeenCalledOnce();
   });
 });

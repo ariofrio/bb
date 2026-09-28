@@ -6,6 +6,7 @@ import {
   fireEvent,
   render,
   screen,
+  waitFor,
 } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { MemoryRouter } from "react-router-dom";
@@ -552,14 +553,16 @@ describe("GeneratedConversationMessage markdown body", () => {
     expect(screen.queryByRole("img", { name: "Mermaid diagram" })).toBeNull();
   });
 
-  it("expands a one-line agent message when its preview text overflows", () => {
+  it("expands a one-line agent message when its preview text overflows", async () => {
     const notifyResize = mockInnerPreviewTextOverflow(
       OVERFLOWING_ONE_LINE_AGENT_BODY,
     );
     renderAgentMessage(OVERFLOWING_ONE_LINE_AGENT_BODY);
     notifyResize();
 
-    const toggle = screen.getByRole("button", { name: /Message from Worker/u });
+    const toggle = await screen.findByRole("button", {
+      name: /Message from Worker/u,
+    });
     expect(toggle.getAttribute("aria-expanded")).toBe("false");
     expect(screen.getByText("...").className).toContain("invisible");
 
@@ -624,13 +627,13 @@ describe("GeneratedConversationMessage markdown body", () => {
 });
 
 describe("GeneratedConversationMessage markdown body (system)", () => {
-  it("keeps the continuation width stable when it makes the preview overflow", () => {
+  it("keeps the continuation width stable when it makes the preview overflow", async () => {
     const notifyResize = mockContinuationSensitiveOverflow();
     renderChildCompleted();
     notifyResize();
 
     const continuation = screen.getByText("...");
-    expect(continuation.className).toContain("invisible");
+    await waitFor(() => expect(continuation.className).toContain("invisible"));
 
     notifyResize();
     notifyResize();

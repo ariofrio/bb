@@ -18,6 +18,8 @@ const overflowListenersByElement = new Map<
   Set<OverflowMeasurementListener>
 >();
 let sharedOverflowResizeObserver: ResizeObserver | null = null;
+const pendingOverflowElements = new Set<HTMLElement>();
+let overflowTimer: ReturnType<typeof setTimeout> | null = null;
 
 function readOverflowMeasurement(
   element: HTMLElement,
@@ -42,13 +44,21 @@ function measureOverflowElements(elements: readonly HTMLElement[]): void {
 
 function getSharedOverflowResizeObserver(): ResizeObserver {
   sharedOverflowResizeObserver ??= new ResizeObserver((entries) => {
-    const connectedElements: HTMLElement[] = [];
     for (const entry of entries) {
       if (entry.target instanceof HTMLElement && entry.target.isConnected) {
-        connectedElements.push(entry.target);
+        pendingOverflowElements.add(entry.target);
       }
     }
-    measureOverflowElements(connectedElements);
+    if (overflowTimer !== null || pendingOverflowElements.size === 0) return;
+    overflowTimer = setTimeout(() => {
+      overflowTimer = null;
+      const elements = [...pendingOverflowElements].filter(
+        (element) =>
+          element.isConnected && overflowListenersByElement.has(element),
+      );
+      pendingOverflowElements.clear();
+      measureOverflowElements(elements);
+    }, 0);
   });
   return sharedOverflowResizeObserver;
 }
@@ -70,8 +80,11 @@ function observeOverflow(
     currentListeners?.delete(listener);
     if (currentListeners?.size === 0) {
       overflowListenersByElement.delete(element);
+      pendingOverflowElements.delete(element);
       sharedOverflowResizeObserver?.unobserve?.(element);
       if (overflowListenersByElement.size === 0) {
+        if (overflowTimer !== null) clearTimeout(overflowTimer);
+        overflowTimer = null;
         sharedOverflowResizeObserver?.disconnect?.();
         sharedOverflowResizeObserver = null;
       }
