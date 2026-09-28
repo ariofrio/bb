@@ -1,5 +1,6 @@
 import {
   useCallback,
+  useEffect,
   useLayoutEffect,
   useMemo,
   useRef,
@@ -23,6 +24,7 @@ const TIMELINE_WINDOW_MAX_INTERACTION_PINS = 24;
 
 const EMPTY_KEY_SET: ReadonlySet<string> = new Set();
 const GET_NO_SCROLL_ELEMENT = () => null;
+const NOOP_ITEM_REF = () => {};
 
 function measureBorderBox(
   element: HTMLElement,
@@ -226,6 +228,40 @@ export function TimelineWindowedItems({
   const indexes = renderWindow
     ? virtualItems.map((item) => item.index)
     : itemKeys.map((_, index) => index);
+  useEffect(() => {
+    if (renderWindow) return;
+    const container = containerElementRef.current;
+    if (container === null) return;
+    const items = [...container.children].filter(
+      (element): element is HTMLDivElement =>
+        element instanceof HTMLDivElement &&
+        element.dataset.index !== undefined,
+    );
+    const recordHeight = (element: HTMLDivElement, height: number) => {
+      const index = Number(element.dataset.index);
+      const key = Number.isInteger(index) ? itemKeys[index] : undefined;
+      if (key !== undefined && height > 0) {
+        recordTimelineMeasurement(measurements, key, height);
+      }
+    };
+    if (typeof ResizeObserver === "undefined") {
+      const frame = requestAnimationFrame(() => {
+        for (const item of items) {
+          recordHeight(item, item.getBoundingClientRect().height);
+        }
+      });
+      return () => cancelAnimationFrame(frame);
+    }
+    const observer = new ResizeObserver((entries) => {
+      for (const entry of entries) {
+        if (entry.target instanceof HTMLDivElement) {
+          recordHeight(entry.target, measureBorderBox(entry.target, entry));
+        }
+      }
+    });
+    for (const item of items) observer.observe(item);
+    return () => observer.disconnect();
+  }, [itemKeys, measurements, renderWindow]);
   return (
     <div
       ref={containerRef}
@@ -240,16 +276,7 @@ export function TimelineWindowedItems({
         renderItem(index, {
           isRealized: true,
           itemIndex: index,
-          itemRef: renderWindow
-            ? virtualizer.measureElement
-            : (element) => {
-                if (element === null) return;
-                const key = itemKeys[index];
-                const height = element.getBoundingClientRect().height;
-                if (key !== undefined && height > 0) {
-                  recordTimelineMeasurement(measurements, key, height);
-                }
-              },
+          itemRef: renderWindow ? virtualizer.measureElement : NOOP_ITEM_REF,
           itemStyle: renderWindow
             ? { position: "absolute", left: 0, width: "100%" }
             : undefined,

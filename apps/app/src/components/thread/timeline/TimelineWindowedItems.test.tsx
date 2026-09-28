@@ -34,9 +34,27 @@ function rect(top: number, height: number): DOMRect {
   };
 }
 
+function resizeEntry(target: Element, height: number): ResizeObserverEntry {
+  const size = { blockSize: height, inlineSize: 320 };
+  return {
+    target,
+    borderBoxSize: [size],
+    contentBoxSize: [size],
+    contentRect: rect(0, height),
+    devicePixelContentBoxSize: [size],
+  };
+}
+
 class ResizeObserverStub implements ResizeObserver {
+  static instances: ResizeObserverStub[] = [];
+  readonly observed = new Set<Element>();
+  constructor(readonly callback: ResizeObserverCallback) {
+    ResizeObserverStub.instances.push(this);
+  }
   disconnect(): void {}
-  observe(): void {}
+  observe(element: Element): void {
+    this.observed.add(element);
+  }
   unobserve(): void {}
 }
 
@@ -88,6 +106,7 @@ function renderWindowedItems(options?: {
 }
 
 beforeEach(() => {
+  ResizeObserverStub.instances = [];
   itemHeights = new Map();
   scrollElement = document.createElement("div");
   document.body.append(scrollElement);
@@ -133,6 +152,18 @@ afterEach(() => {
 });
 
 describe("TimelineWindowedItems", () => {
+  it("does not synchronously measure every row while mounting an unwindowed timeline", () => {
+    renderWindowedItems({ clientHeight: 0 });
+
+    const rectSpy = vi.mocked(HTMLElement.prototype.getBoundingClientRect);
+    const measuredRows = rectSpy.mock.instances.filter(
+      (element) =>
+        element instanceof HTMLElement &&
+        element.hasAttribute("data-timeline-window-key"),
+    );
+    expect(measuredRows).toHaveLength(0);
+  });
+
   it("captures exact heights before the scrollport becomes usable", () => {
     const measurements = new Map<string, number>();
 
@@ -154,6 +185,17 @@ describe("TimelineWindowedItems", () => {
       { container: scrollElement },
     );
 
+    expect(measurements.size).toBe(0);
+    const rowObserver = ResizeObserverStub.instances.find((observer) =>
+      [...observer.observed].some((element) =>
+        element.hasAttribute("data-index"),
+      ),
+    );
+    expect(rowObserver).toBeDefined();
+    const entries = [...rowObserver!.observed].map((target) =>
+      resizeEntry(target, 32),
+    );
+    act(() => rowObserver!.callback(entries, rowObserver!));
     expect(measurements.get("row-0")).toBe(32);
     expect(measurements.get("row-99")).toBe(32);
   });
@@ -192,6 +234,18 @@ describe("TimelineWindowedItems", () => {
     const view = render(list(19), { container: scrollElement });
     const inputs = screen.getAllByTestId(/^input-/);
     fireEvent.change(inputs[0]!, { target: { value: "unsaved edit" } });
+    const rowObserver = ResizeObserverStub.instances.find((observer) =>
+      [...observer.observed].some((element) =>
+        element.hasAttribute("data-index"),
+      ),
+    );
+    expect(rowObserver).toBeDefined();
+    act(() =>
+      rowObserver!.callback(
+        [...rowObserver!.observed].map((target) => resizeEntry(target, 32)),
+        rowObserver!,
+      ),
+    );
 
     view.rerender(list(20));
     await waitFor(() =>
