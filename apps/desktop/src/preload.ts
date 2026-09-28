@@ -20,8 +20,11 @@ import {
   type BbDesktopBrowserControlState,
   type BbDesktopBrowserRevealRequest,
   bbDesktopInfoSchema,
+  bbDesktopSealedContextSchema,
+  bbDesktopSealedTrustSchema,
   bbDesktopWindowStateSchema,
   type BbDesktopApi,
+  type BbDesktopSealedApi,
   type BbDesktopAppCommandHandler,
   type BbDesktopBrowserApi,
   type BbDesktopBrowserFindResultHandler,
@@ -44,6 +47,12 @@ import {
   type BbDesktopWindowStateChangeHandler,
   type BbDesktopZoomChangeHandler,
 } from "@bb/desktop-contract";
+import {
+  BB_DESKTOP_SEALED_GET_CONTEXT_CHANNEL,
+  BB_DESKTOP_SEALED_GET_TRUST_CHANNEL,
+  BB_DESKTOP_SEALED_SET_TRUST_CHANNEL,
+  BB_DESKTOP_SEALED_SIGN_CHANNEL,
+} from "./sealed-ipc.js";
 import {
   BB_DESKTOP_CHECK_FOR_UPDATES_CHANNEL,
   BB_DESKTOP_GET_INFO_CHANNEL,
@@ -380,8 +389,39 @@ const bbBrowserApi: BbDesktopBrowserApi = {
   },
 };
 
+const bbSealedApi: BbDesktopSealedApi = {
+  async getContext() {
+    const payload: unknown = await ipcRenderer.invoke(
+      BB_DESKTOP_SEALED_GET_CONTEXT_CHANNEL,
+    );
+    return bbDesktopSealedContextSchema.parse(payload);
+  },
+  async signClientAuth(transcript) {
+    const payload: unknown = await ipcRenderer.invoke(
+      BB_DESKTOP_SEALED_SIGN_CHANNEL,
+      transcript,
+    );
+    return z.string().min(1).parse(payload);
+  },
+  async getTrust(origin) {
+    const payload: unknown = await ipcRenderer.invoke(
+      BB_DESKTOP_SEALED_GET_TRUST_CHANNEL,
+      origin,
+    );
+    return bbDesktopSealedTrustSchema.nullable().parse(payload);
+  },
+  async setTrust(origin, trust) {
+    await ipcRenderer.invoke(
+      BB_DESKTOP_SEALED_SET_TRUST_CHANNEL,
+      origin,
+      trust,
+    );
+  },
+};
+
 const bbDesktopApi: BbDesktopApi = {
   browser: bbBrowserApi,
+  sealed: bbSealedApi,
   get lastCheckedAt() {
     return currentInfo.lastCheckedAt;
   },
