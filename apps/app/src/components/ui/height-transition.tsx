@@ -243,7 +243,6 @@ export function AutoHeightContainer({
     const wrapper = wrapperRef.current;
     const inner = innerRef.current;
     if (!wrapper || !inner || typeof ResizeObserver === "undefined") return;
-    wrapper.style.height = `${inner.offsetHeight}px`;
     let lastWidth: number | null = null;
     let pendingVisibilitySnap = false;
     let initialSettleComplete = false;

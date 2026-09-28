@@ -91,6 +91,33 @@ function makeResizeEntry(
 }
 
 describe("AutoHeightContainer", () => {
+  it("uses the first resize entry instead of measuring during mount", () => {
+    vi.stubGlobal("ResizeObserver", ResizeObserverStub);
+    vi.spyOn(HTMLElement.prototype, "offsetHeight", "get").mockImplementation(
+      () => {
+        throw new Error("forced layout");
+      },
+    );
+
+    const view = render(
+      <AutoHeightContainer>
+        <span>Streaming response</span>
+      </AutoHeightContainer>,
+    );
+    const inner = view.getByText("Streaming response").parentElement;
+    const wrapper = inner?.parentElement;
+    const observer = ResizeObserverStub.instances[0];
+    if (!inner || !wrapper || !observer) {
+      throw new Error("AutoHeightContainer did not render");
+    }
+
+    act(() => {
+      observer.callback([makeResizeEntry(inner, 120, 112)], observer);
+    });
+
+    expect(wrapper.style.height).toBe("120px");
+  });
+
   it("sizes the wrapper from the observed border box", () => {
     vi.stubGlobal("ResizeObserver", ResizeObserverStub);
 
@@ -125,7 +152,7 @@ describe("AutoHeightContainer", () => {
     const wrapper = inner?.parentElement;
     const observer = ResizeObserverStub.instances[0];
     expect(inner).not.toBeNull();
-    expect(wrapper?.style.height).toBe("0px");
+    expect(wrapper?.style.height).toBe("");
     expect(observer).toBeDefined();
 
     Object.defineProperty(inner, "offsetHeight", {
