@@ -3,7 +3,7 @@
 # router takes it from there. The screens the shell keeps stay native.
 #
 # Runs after shell-launch, which leaves the E2E backend paired.
-appId: app.getbb.mobile
+appId: app.getbb.mobile.ariofrio
 env:
   METRO_URL: "http://127.0.0.1:8082"
   SERVER_URL: "http://127.0.0.1:41999"

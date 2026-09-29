@@ -232,7 +232,7 @@ jobs:
             echo "No .app product in apps/mobile/build-output"; ls -la build-output; exit 1
           fi
           xcrun simctl install "$SIMULATOR_UDID" "$app"
-          xcrun simctl listapps "$SIMULATOR_UDID" | grep -A3 app.getbb.mobile || true
+          xcrun simctl listapps "$SIMULATOR_UDID" | grep -A3 app.getbb.mobile.ariofrio || true
 
       - name: Save CocoaPods
         if: always() && steps.build.outcome == 'success' && steps.pods-cache.outputs.cache-hit != 'true'

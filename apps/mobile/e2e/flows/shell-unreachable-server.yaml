@@ -9,7 +9,7 @@
 # demand, which the mobile e2e backend cannot do yet.
 #
 # Deliberately does not use the harness backend.
-appId: app.getbb.mobile
+appId: app.getbb.mobile.ariofrio
 env:
   METRO_URL: "http://127.0.0.1:8082"
   # Reachable host, closed port: the load fails fast instead of hanging.

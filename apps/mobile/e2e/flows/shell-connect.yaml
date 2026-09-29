@@ -14,7 +14,7 @@
 # (APEX_URL), the pairing code STUB-PAIR (CODE).
 #
 # Run: JAVA_HOME=/opt/homebrew/opt/openjdk@17 maestro test e2e/flows/phase5-connect.yaml
-appId: app.getbb.mobile
+appId: app.getbb.mobile.ariofrio
 env:
   METRO_URL: "http://127.0.0.1:8082"
   APEX_URL: "https://localhost:42998"

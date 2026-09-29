@@ -7,7 +7,7 @@
 # Needs the harness backend started with BB_MOBILE_E2E_SERVE_APP=1 and a built
 # apps/app (`pnpm exec turbo run build --filter=@bb/app`); without them the
 # server answers API routes only and the WebView shows the native error state.
-appId: app.getbb.mobile
+appId: app.getbb.mobile.ariofrio
 env:
   METRO_URL: "http://127.0.0.1:8082"
   SERVER_URL: "http://127.0.0.1:41999"
