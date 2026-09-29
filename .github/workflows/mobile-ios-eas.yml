@@ -30,7 +30,7 @@ on:
         description: TestFlight external group that receives the submitted build. Empty skips this step.
         required: false
         type: string
-        default: External testers
+        default: ""
   workflow_call:
     inputs:
       profile:
