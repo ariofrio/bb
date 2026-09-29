@@ -12,7 +12,7 @@
 # Called with `runFlow: ../subflows/launch-app.yaml` (flows) or
 # `runFlow: ./launch-app.yaml` (sibling subflows). Flow-file `env:` values
 # beat `-e`, so the switch is a variable no flow defines in its header.
-appId: app.getbb.mobile
+appId: app.getbb.mobile.ariofrio
 ---
 - stopApp
 - runFlow:
