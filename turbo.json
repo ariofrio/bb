@@ -1,7 +1,11 @@
 {
   "$schema": "https://turbo.build/schema.json",
   "globalEnv": ["BB_BUILD_TOOLCHAIN"],
-  "globalPassThroughEnv": ["npm_config_store_dir", "pnpm_config_store_dir"],
+  "globalPassThroughEnv": [
+    "BB_TEST_TIMEOUT_SCALE",
+    "npm_config_store_dir",
+    "pnpm_config_store_dir"
+  ],
   "tasks": {
     "@bb/db#db:generate": { "cache": false },
     "@bb/desktop#smoke:browser-broker": {
@@ -225,7 +229,7 @@
     },
     "@bb/desktop#build": {
       "dependsOn": ["bb-app#build"],
-      "env": ["BB_DESKTOP_RELEASE_CHANNEL"],
+      "env": ["BB_DESKTOP_RELEASE_CHANNEL", "BB_DESKTOP_RELEASE_REPOSITORY"],
       "inputs": [
         "$TURBO_DEFAULT$",
         "$TURBO_ROOT$/apps/desktop/**",
@@ -260,7 +264,10 @@
     "@bb/desktop#smoke:packaged-npm": {
       "cache": false,
       "outputs": [],
-      "passThroughEnv": ["BB_DESKTOP_RELEASE_CHANNEL"]
+      "passThroughEnv": [
+        "BB_DESKTOP_RELEASE_CHANNEL",
+        "BB_DESKTOP_RELEASE_REPOSITORY"
+      ]
     },
     "@bb/desktop#package": {
       "dependsOn": ["bb-app#build", "@bb/desktop#build"],

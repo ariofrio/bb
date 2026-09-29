@@ -331,10 +331,15 @@ function hugeiconsBundleAlias(): { find: RegExp; replacement: string }[] {
   }
 }
 
+function readTestTimeoutScale(): number {
+  const parsed = Number(process.env.BB_TEST_TIMEOUT_SCALE ?? 1);
+  return Number.isFinite(parsed) && parsed > 0 ? parsed : 1;
+}
+
 export function defineWorkspaceTestConfig(
   config: ViteUserConfig,
 ): ViteUserConfig {
-  return mergeConfig(
+  const merged = mergeConfig(
     {
       resolve: {
         alias: hugeiconsBundleAlias(),
@@ -380,4 +385,18 @@ export function defineWorkspaceTestConfig(
     },
     config,
   );
+  const timeoutScale = readTestTimeoutScale();
+  if (timeoutScale === 1) return merged;
+  return {
+    ...merged,
+    test: {
+      ...merged.test,
+      testTimeout: Math.ceil(
+        (merged.test?.testTimeout ?? 5_000) * timeoutScale,
+      ),
+      hookTimeout: Math.ceil(
+        (merged.test?.hookTimeout ?? 10_000) * timeoutScale,
+      ),
+    },
+  };
 }

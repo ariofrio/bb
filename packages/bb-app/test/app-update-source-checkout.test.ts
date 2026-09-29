@@ -20,8 +20,8 @@ afterEach(() => {
   for (const fixture of fixtures.splice(0)) fixture.cleanup();
 });
 
-async function createCheckout(): Promise<GitCheckoutFixture> {
-  const fixture = await createGitCheckout();
+async function createCheckout(branch?: string): Promise<GitCheckoutFixture> {
+  const fixture = await createGitCheckout(branch);
   fixtures.push(fixture);
   return fixture;
 }
@@ -95,6 +95,58 @@ describe("source checkout inspection", () => {
     });
 
     expect(check.blocked?.reason).toBe("not-on-main");
+  });
+
+  it("follows the default branch origin/HEAD names", async () => {
+    const { checkout, upstream } = await createCheckout("current");
+    const tip = await publish(upstream, "1.1.0", "Add feature");
+
+    const check = await inspectSourceCheckout({
+      fetch: true,
+      repoRoot: checkout,
+      runner: runCommand,
+    });
+
+    expect(check.blocked).toBeNull();
+    expect(check.incoming?.commit).toBe(tip);
+
+    await fastForwardSource({
+      from: check.current.commit,
+      repoRoot: checkout,
+      runner: runCommand,
+      to: tip,
+    });
+    expect(await git(checkout, "rev-parse", "HEAD")).toBe(tip);
+  });
+
+  it("blocks updates on main when origin/HEAD names another branch", async () => {
+    const { checkout, upstream } = await createCheckout("current");
+    await publish(upstream, "1.1.0", "Add feature");
+    await git(checkout, "checkout", "-q", "-b", "main");
+
+    const check = await inspectSourceCheckout({
+      fetch: true,
+      repoRoot: checkout,
+      runner: runCommand,
+    });
+
+    expect(check.blocked?.reason).toBe("not-on-main");
+    expect(check.blocked?.message).toContain("Only current can be updated");
+  });
+
+  it("falls back to main when origin/HEAD is unset", async () => {
+    const { checkout, upstream } = await createCheckout();
+    const tip = await publish(upstream, "1.1.0", "Add feature");
+    await git(checkout, "remote", "set-head", "origin", "--delete");
+
+    const check = await inspectSourceCheckout({
+      fetch: true,
+      repoRoot: checkout,
+      runner: runCommand,
+    });
+
+    expect(check.blocked).toBeNull();
+    expect(check.incoming?.commit).toBe(tip);
   });
 
   it("blocks updates when local main has commits origin/main lacks", async () => {

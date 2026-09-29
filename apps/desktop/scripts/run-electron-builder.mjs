@@ -6,6 +6,7 @@ import {
   createDesktopReleaseConfig,
   createDesktopUpdateReleaseBaseUrl,
   resolveDesktopReleaseChannel,
+  resolveDesktopReleaseRepository,
 } from "./desktop-release-channel.mjs";
 
 const scriptDirectory = dirname(fileURLToPath(import.meta.url));
@@ -162,6 +163,7 @@ function resolveElectronBuilderConfig(baseConfig, env) {
   const signingPlan = createSigningPlan(env);
   const releaseChannel = resolveDesktopReleaseChannel(env);
   const releaseConfig = createDesktopReleaseConfig(releaseChannel);
+  const releaseRepository = resolveDesktopReleaseRepository(env);
   const config = cloneJson(baseConfig);
   const mac = {
     ...config.mac,
@@ -191,7 +193,10 @@ function resolveElectronBuilderConfig(baseConfig, env) {
     {
       channel: releaseChannel,
       provider: "generic",
-      url: createDesktopUpdateReleaseBaseUrl(releaseConfig.releaseTag),
+      url: createDesktopUpdateReleaseBaseUrl(
+        releaseConfig.releaseTag,
+        releaseRepository,
+      ),
     },
   ];
 

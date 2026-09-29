@@ -61,7 +61,7 @@ jobs:
       github.repository == 'get-bb/bb'
       && (github.event_name != 'pull_request'
       || contains(github.event.pull_request.labels.*.name, 'mobile-e2e'))
-    runs-on: blacksmith-6vcpu-macos-15
+    runs-on: macos-15
     timeout-minutes: 90
 
     steps:

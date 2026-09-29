@@ -21,6 +21,8 @@ export function resolveDesktopReleaseChannel(
   env: NodeJS.ProcessEnv,
 ): DesktopReleaseChannel;
 
+export function resolveDesktopReleaseRepository(env: NodeJS.ProcessEnv): string;
+
 export function resolveDesktopBuildPlatform(
   nodePlatform: string,
 ): DesktopBuildPlatform;
@@ -31,4 +33,5 @@ export function createDesktopReleaseConfig(
 
 export function createDesktopUpdateReleaseBaseUrl(
   releaseTag: DesktopReleaseConfig["releaseTag"],
+  repository: string,
 ): string;

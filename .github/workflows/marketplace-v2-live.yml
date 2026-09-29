@@ -16,7 +16,7 @@ jobs:
     # against the upstream marketplace for no benefit. Manual dispatch keeps
     # working in forks.
     if: ${{ github.event_name != 'schedule' || github.repository == 'get-bb/bb' }}
-    runs-on: blacksmith-4vcpu-ubuntu-2404
+    runs-on: ubuntu-24.04
     timeout-minutes: 10
 
     steps:

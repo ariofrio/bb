@@ -22,7 +22,7 @@ concurrency:
 jobs:
   checks:
     name: Checks (ubuntu-latest, Node 22.x)
-    runs-on: blacksmith-4vcpu-ubuntu-2404
+    runs-on: ubuntu-24.04
     timeout-minutes: 30
 
     # `actions: read` is what lets the cache-usage check call the Actions API;
@@ -100,7 +100,7 @@ jobs:
   # the same 4 vCPUs, which made tests the critical path of every run.
   tests:
     name: Tests (${{ matrix.shard }}, ubuntu-latest, Node 22.x)
-    runs-on: blacksmith-4vcpu-ubuntu-2404
+    runs-on: ubuntu-24.04
     timeout-minutes: 30
 
     strategy:
@@ -156,6 +156,8 @@ jobs:
 
       - name: Test
         run: ${{ matrix.shard == 'packages' && 'xvfb-run -a' || '' }} pnpm exec turbo run test ${{ matrix.filter }} --cache-dir=.turbo/cache --output-logs=new-only --concurrency=4 ${{ matrix.args }}
+        env:
+          BB_TEST_TIMEOUT_SCALE: "4"
 
   # Every other suite mocks the Agent SDK, so an upstream CLI release that
   # breaks the model probe passes CI silently. This runs it against a real,
@@ -163,7 +165,7 @@ jobs:
   # TODO: cover the npm build, macOS, and the full `test:integration` suite.
   plugin-forks:
     name: Plugin Fork Check (ubuntu-latest, Node 22.x)
-    runs-on: blacksmith-4vcpu-ubuntu-2404
+    runs-on: ubuntu-24.04
     timeout-minutes: 20
 
     steps:
@@ -187,12 +189,16 @@ jobs:
 
   provider-model-listing:
     name: Provider Model Listing
-    runs-on: blacksmith-4vcpu-ubuntu-2404
+    runs-on: ubuntu-24.04
     timeout-minutes: 20
 
     # Fork pull requests cannot read secrets, so the probe would fail
     # unauthenticated for reasons unrelated to bb.
-    if: ${{ github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository }}
+    # Forks opt in with the RUN_PROVIDER_MODEL_LISTING variable once they add
+    # the CLAUDE_CODE_OAUTH_TOKEN secret.
+    if: >-
+      ${{ (github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository)
+      && (github.repository == 'get-bb/bb' || vars.RUN_PROVIDER_MODEL_LISTING == 'true') }}
 
     steps:
       - name: Checkout repository
@@ -248,10 +254,10 @@ jobs:
       fail-fast: false
       matrix:
         include:
-          - os: blacksmith-4vcpu-ubuntu-2404
+          - os: ubuntu-24.04
             node-version: "22.x"
             turbo-cache: "true"
-          - os: blacksmith-6vcpu-macos-15
+          - os: macos-15
             node-version: "22.x"
             turbo-cache: "false"
 
@@ -294,16 +300,16 @@ jobs:
       fail-fast: false
       matrix:
         include:
-          - os: blacksmith-4vcpu-ubuntu-2404
+          - os: ubuntu-24.04
             node-version: "24.x"
             turbo-cache: "true"
-          - os: blacksmith-4vcpu-ubuntu-2404
+          - os: ubuntu-24.04
             node-version: "26.x"
             turbo-cache: "true"
-          - os: blacksmith-6vcpu-macos-15
+          - os: macos-15
             node-version: "24.x"
             turbo-cache: "false"
-          - os: blacksmith-6vcpu-macos-15
+          - os: macos-15
             node-version: "26.x"
             turbo-cache: "false"
 
