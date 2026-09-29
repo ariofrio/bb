@@ -1,4 +1,4 @@
-name: Build Desktop
+name: Release
 
 on:
   workflow_dispatch:
@@ -241,6 +241,8 @@ jobs:
     timeout-minutes: 20
     permissions:
       contents: write
+    outputs:
+      should_publish: ${{ steps.release_plan.outputs.should_publish }}
 
     steps:
       - name: Checkout repository
@@ -419,3 +421,20 @@ jobs:
             echo "- macOS feed URL: ${GITHUB_SERVER_URL}/${GITHUB_REPOSITORY}/releases/download/desktop-latest/desktop-version.json"
             echo "- Linux feed URL: ${GITHUB_SERVER_URL}/${GITHUB_REPOSITORY}/releases/download/desktop-latest/desktop-version-linux.json"
           } >> "$GITHUB_STEP_SUMMARY"
+
+  # Ships iOS on the same release train when the repository opts in with the
+  # IOS_WITH_DESKTOP_RELEASE variable. Builds go to the internal TestFlight
+  # group only, which needs no Beta App Review.
+  mobile-ios:
+    name: Build and submit iOS (EAS)
+    needs: publish
+    if: ${{ vars.IOS_WITH_DESKTOP_RELEASE == 'true' && needs.publish.outputs.should_publish == 'true' }}
+    uses: ./.github/workflows/mobile-ios-eas.yml
+    with:
+      profile: production
+      submit: true
+      version: ""
+      external_group: ""
+    secrets:
+      EXPO_TOKEN: ${{ secrets.EXPO_TOKEN }}
+      ASC_API_KEY_P8: ${{ secrets.ASC_API_KEY_P8 }}
