@@ -147,6 +147,7 @@ jobs:
           EXPO_TOKEN: ${{ secrets.EXPO_TOKEN }}
           EAS_PROFILE: ${{ inputs.profile }}
           EAS_SUBMIT: ${{ inputs.submit }}
+          EXPO_APPLE_TEAM_TYPE: ${{ vars.EXPO_APPLE_TEAM_TYPE }}
         working-directory: apps/mobile
         # EAS builds on its own workers for ~20 minutes and, with --auto-submit,
         # then uploads to App Store Connect with the submit profile of the same
@@ -155,6 +156,14 @@ jobs:
         # holds the build and submission logs; the run summary links to them.
         run: |
           set -euo pipefail
+
+          # The submit key also lets EAS create missing iOS signing
+          # credentials without an interactive Apple sign-in.
+          EXPO_ASC_API_KEY_PATH="$PWD/asc-api-key.p8"
+          EXPO_ASC_KEY_ID="$(node -p 'require("./eas.json").submit.production.ios.ascApiKeyId')"
+          EXPO_ASC_ISSUER_ID="$(node -p 'require("./eas.json").submit.production.ios.ascApiKeyIssuerId')"
+          EXPO_APPLE_TEAM_ID="$(node -p 'require("./eas.json").submit.production.ios.appleTeamId')"
+          export EXPO_ASC_API_KEY_PATH EXPO_ASC_KEY_ID EXPO_ASC_ISSUER_ID EXPO_APPLE_TEAM_ID
 
           args=(build --platform ios --profile "$EAS_PROFILE" --non-interactive --json)
           if [[ "$EAS_SUBMIT" == "true" ]]; then
