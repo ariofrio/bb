@@ -61,6 +61,12 @@ jobs:
       - name: Install dependencies
         run: pnpm install --frozen-lockfile --prefer-offline
 
+      - name: Apply the fork version
+        if: ${{ vars.DESKTOP_VERSION_SUFFIX != '' }}
+        env:
+          DESKTOP_VERSION_SUFFIX: ${{ vars.DESKTOP_VERSION_SUFFIX }}
+        run: node scripts/prepare-fork-version.mjs
+
       - name: Typecheck desktop and launcher
         run: pnpm exec turbo run typecheck --filter=@bb/desktop --filter=bb-app --output-logs=new-only
 
@@ -173,6 +179,12 @@ jobs:
       - name: Install dependencies
         run: pnpm install --frozen-lockfile --prefer-offline
 
+      - name: Apply the fork version
+        if: ${{ vars.DESKTOP_VERSION_SUFFIX != '' }}
+        env:
+          DESKTOP_VERSION_SUFFIX: ${{ vars.DESKTOP_VERSION_SUFFIX }}
+        run: node scripts/prepare-fork-version.mjs
+
       - name: Install AppImage FUSE runtime
         uses: ./.github/actions/install-appimage-fuse
         timeout-minutes: 5
@@ -234,6 +246,12 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
 
+      - name: Apply the fork version
+        if: ${{ vars.DESKTOP_VERSION_SUFFIX != '' }}
+        env:
+          DESKTOP_VERSION_SUFFIX: ${{ vars.DESKTOP_VERSION_SUFFIX }}
+        run: node scripts/prepare-fork-version.mjs
+
       # The plan runs before the downloads: a qa or publish=false run has no use
       # for several hundred MB of binaries it will never upload.
       - name: Plan release publication
@@ -242,12 +260,14 @@ jobs:
           HAS_SIGNING_SECRETS: ${{ needs.macos.outputs.has_signing_secrets }}
           INPUT_PUBLISH: ${{ inputs.publish }}
           RELEASE_CHANNEL: ${{ inputs.release_channel }}
+          VERSION_SUFFIX: ${{ vars.DESKTOP_VERSION_SUFFIX }}
         run: |
           set -euo pipefail
 
           VERSION="$(node -p "require('./apps/desktop/package.json').version")"
           IS_PRERELEASE="false"
-          if [[ "$VERSION" == *-* ]]; then
+          # A fork's -<suffix>.<run> versions are its stable releases.
+          if [[ "$VERSION" == *-* && ( -z "$VERSION_SUFFIX" || "$VERSION" != *"-${VERSION_SUFFIX}."* ) ]]; then
             IS_PRERELEASE="true"
           fi
 

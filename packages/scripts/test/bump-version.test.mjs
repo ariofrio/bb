@@ -17,6 +17,10 @@ import {
   deriveNightlyVersion,
   prepareNightlyVersion,
 } from "../../../scripts/prepare-nightly-version.mjs";
+import {
+  deriveForkVersion,
+  prepareForkVersion,
+} from "../../../scripts/prepare-fork-version.mjs";
 
 const scriptPath = fileURLToPath(
   new URL("../../../scripts/bump-version.mjs", import.meta.url),
@@ -200,6 +204,46 @@ describe("prepare-nightly-version", () => {
     );
     expect(readVersion(repoRoot, "apps/desktop/package.json")).toBe(
       "1.2.4-nightly.987654.1",
+    );
+  });
+});
+
+describe("prepare-fork-version", () => {
+  it("derives a next-patch prerelease that sorts above the base and between runs", () => {
+    expect(deriveForkVersion("0.44.0", "daneel", "12")).toBe(
+      "0.44.1-daneel.12",
+    );
+    expect(deriveForkVersion("0.44.1-daneel.12", "daneel", "13")).toBe(
+      "0.44.2-daneel.13",
+    );
+  });
+
+  it("rejects suffixes that are not identifiers or that upstream channels use", () => {
+    expect(() => deriveForkVersion("0.44.0", "Daneel!", "1")).toThrow(
+      "DESKTOP_VERSION_SUFFIX must be a lowercase identifier",
+    );
+    expect(() => deriveForkVersion("0.44.0", "nightly", "1")).toThrow(
+      "DESKTOP_VERSION_SUFFIX must not be an upstream channel",
+    );
+    expect(() => deriveForkVersion("0.44.0", "daneel", "0")).toThrow(
+      "GITHUB_RUN_NUMBER must be a positive integer",
+    );
+  });
+
+  it("updates bb-app and desktop to the same fork version", async () => {
+    const repoRoot = createTestRepo({
+      bbAppVersion: "0.44.0",
+      desktopVersion: "0.44.0",
+    });
+
+    await expect(
+      prepareForkVersion({ repoRoot, runNumber: "7", suffix: "daneel" }),
+    ).resolves.toBe("0.44.1-daneel.7");
+    expect(readVersion(repoRoot, "packages/bb-app/package.json")).toBe(
+      "0.44.1-daneel.7",
+    );
+    expect(readVersion(repoRoot, "apps/desktop/package.json")).toBe(
+      "0.44.1-daneel.7",
     );
   });
 });

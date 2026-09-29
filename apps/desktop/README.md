@@ -276,6 +276,12 @@ serves update feeds and binaries. It is baked in at build time like the
 channel. The release workflows set it to the repository they run in, so a
 fork's builds update from the fork's releases.
 
+A fork that publishes its own desktop releases sets the `DESKTOP_VERSION_SUFFIX`
+repository variable (for example `daneel`). `Build Desktop` then versions each
+run as the next patch of the committed version plus `-<suffix>.<run number>`
+(`0.44.1-daneel.12` on top of 0.44.0) and publishes it as a stable release, so
+every run sorts above the previous one and below upstream's next patch.
+
 ## About panel
 
 The app menu's About item opens a message box listing the facts a bug report
