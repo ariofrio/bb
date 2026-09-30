@@ -276,6 +276,15 @@ serves update feeds and binaries. It is baked in at build time like the
 channel. The release workflows set it to the repository they run in, so a
 fork's builds update from the fork's releases.
 
+A fork that publishes its own desktop releases sets the `DESKTOP_VERSION_SUFFIX`
+repository variable (for example `daneel`). The `Release` workflow
+(`build-desktop.yml`) then versions each run as the next patch of the committed
+version plus `-<suffix>.<run number>` (`0.44.1-daneel.12` on top of 0.44.0) and
+publishes it as a stable release, so every run sorts above the previous one and
+below upstream's next patch. With the `IOS_WITH_DESKTOP_RELEASE` variable set to
+`true`, each published release also builds iOS on EAS and submits it to
+TestFlight's internal group.
+
 ## About panel
 
 The app menu's About item opens a message box listing the facts a bug report
@@ -313,7 +322,7 @@ GitHub Actions secrets:
 | `APPLE_APP_PASSWORD`         | App-specific password from `appleid.apple.com` under Sign-In and Security.                                                                                                             |
 | `APPLE_TEAM_ID`              | Developer Team ID from `developer.apple.com/account` membership details.                                                                                                               |
 
-Once those secrets are present, the next `Build Desktop` workflow run with
+Once those secrets are present, the next `Release` workflow (`build-desktop.yml`) run with
 `publish=true` and `release_channel=stable` signs the `.app`, notarizes it, and
 publishes the signed `.dmg` / `.zip` assets to `desktop-latest`. If no required
 signing secrets are configured, the workflow still builds unsigned artifacts, but

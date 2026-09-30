@@ -1,4 +1,4 @@
-name: Build Desktop
+name: Release
 
 on:
   workflow_dispatch:
@@ -60,6 +60,12 @@ jobs:
 
       - name: Install dependencies
         run: pnpm install --frozen-lockfile --prefer-offline
+
+      - name: Apply the fork version
+        if: ${{ vars.DESKTOP_VERSION_SUFFIX != '' }}
+        env:
+          DESKTOP_VERSION_SUFFIX: ${{ vars.DESKTOP_VERSION_SUFFIX }}
+        run: node scripts/prepare-fork-version.mjs
 
       - name: Typecheck desktop and launcher
         run: pnpm exec turbo run typecheck --filter=@bb/desktop --filter=bb-app --output-logs=new-only
@@ -173,6 +179,12 @@ jobs:
       - name: Install dependencies
         run: pnpm install --frozen-lockfile --prefer-offline
 
+      - name: Apply the fork version
+        if: ${{ vars.DESKTOP_VERSION_SUFFIX != '' }}
+        env:
+          DESKTOP_VERSION_SUFFIX: ${{ vars.DESKTOP_VERSION_SUFFIX }}
+        run: node scripts/prepare-fork-version.mjs
+
       - name: Install AppImage FUSE runtime
         uses: ./.github/actions/install-appimage-fuse
         timeout-minutes: 5
@@ -229,10 +241,18 @@ jobs:
     timeout-minutes: 20
     permissions:
       contents: write
+    outputs:
+      should_publish: ${{ steps.release_plan.outputs.should_publish }}
 
     steps:
       - name: Checkout repository
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - name: Apply the fork version
+        if: ${{ vars.DESKTOP_VERSION_SUFFIX != '' }}
+        env:
+          DESKTOP_VERSION_SUFFIX: ${{ vars.DESKTOP_VERSION_SUFFIX }}
+        run: node scripts/prepare-fork-version.mjs
 
       # The plan runs before the downloads: a qa or publish=false run has no use
       # for several hundred MB of binaries it will never upload.
@@ -242,12 +262,14 @@ jobs:
           HAS_SIGNING_SECRETS: ${{ needs.macos.outputs.has_signing_secrets }}
           INPUT_PUBLISH: ${{ inputs.publish }}
           RELEASE_CHANNEL: ${{ inputs.release_channel }}
+          VERSION_SUFFIX: ${{ vars.DESKTOP_VERSION_SUFFIX }}
         run: |
           set -euo pipefail
 
           VERSION="$(node -p "require('./apps/desktop/package.json').version")"
           IS_PRERELEASE="false"
-          if [[ "$VERSION" == *-* ]]; then
+          # A fork's -<suffix>.<run> versions are its stable releases.
+          if [[ "$VERSION" == *-* && ( -z "$VERSION_SUFFIX" || "$VERSION" != *"-${VERSION_SUFFIX}."* ) ]]; then
             IS_PRERELEASE="true"
           fi
 
@@ -399,3 +421,20 @@ jobs:
             echo "- macOS feed URL: ${GITHUB_SERVER_URL}/${GITHUB_REPOSITORY}/releases/download/desktop-latest/desktop-version.json"
             echo "- Linux feed URL: ${GITHUB_SERVER_URL}/${GITHUB_REPOSITORY}/releases/download/desktop-latest/desktop-version-linux.json"
           } >> "$GITHUB_STEP_SUMMARY"
+
+  # Ships iOS on the same release train when the repository opts in with the
+  # IOS_WITH_DESKTOP_RELEASE variable. Builds go to the internal TestFlight
+  # group only, which needs no Beta App Review.
+  mobile-ios:
+    name: Build and submit iOS (EAS)
+    needs: publish
+    if: ${{ vars.IOS_WITH_DESKTOP_RELEASE == 'true' && needs.publish.outputs.should_publish == 'true' }}
+    uses: ./.github/workflows/mobile-ios-eas.yml
+    with:
+      profile: production
+      submit: true
+      version: ""
+      external_group: ""
+    secrets:
+      EXPO_TOKEN: ${{ secrets.EXPO_TOKEN }}
+      ASC_API_KEY_P8: ${{ secrets.ASC_API_KEY_P8 }}
