@@ -3,7 +3,10 @@ import { atom, useAtomValue, useSetAtom } from "jotai";
 
 const browserDimmingModalCountAtom = atom(0);
 const pluginPortalSelector = "[data-bb-plugin-root][data-bb-portaled-overlay]";
-const pluginDialogSelector = `${pluginPortalSelector}[role="dialog"][data-state="open"]`;
+const pluginDialogSelector = [
+  `${pluginPortalSelector}[role="dialog"][data-state="open"]:not([data-side])`,
+  `${pluginPortalSelector}[role="alertdialog"][data-state="open"]`,
+].join(", ");
 const pluginDialogListeners = new Set<() => void>();
 let pluginDialogObserver: MutationObserver | null = null;
 
