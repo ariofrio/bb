@@ -19,4 +19,13 @@ describe("createPackagedAppLaunchArguments", () => {
       }),
     ).toEqual(["--use-mock-keychain", "--user-data-dir=/tmp/smoke/user-data"]);
   });
+
+  it("keeps the Chromium sandbox on Windows", () => {
+    expect(
+      createPackagedAppLaunchArguments({
+        platform: "win32",
+        userDataDir: "C:\\smoke\\user-data",
+      }),
+    ).toEqual(["--user-data-dir=C:\\smoke\\user-data"]);
+  });
 });
