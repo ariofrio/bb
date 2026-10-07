@@ -18,6 +18,10 @@ concurrency:
 jobs:
   windows-foundation:
     name: Windows host packages (Node 22.x)
+    # PowerShell process lookups in @bb/config's tests time out on GitHub's
+    # windows-2025 runners, though not on Blacksmith's. Forks opt in with the
+    # RUN_WINDOWS_CI variable.
+    if: ${{ github.repository == 'get-bb/bb' || vars.RUN_WINDOWS_CI == 'true' }}
     runs-on: windows-2025
     timeout-minutes: 15
     permissions:
@@ -59,6 +63,7 @@ jobs:
 
   windows-app-smoke:
     name: Windows app smoke (Node 22.x)
+    if: ${{ github.repository == 'get-bb/bb' || vars.RUN_WINDOWS_CI == 'true' }}
     runs-on: windows-2025
     timeout-minutes: 40
     permissions:
