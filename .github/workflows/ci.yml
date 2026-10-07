@@ -24,14 +24,6 @@ jobs:
       contents: read
 
     steps:
-      # GitHub's Windows image scans every new process and file in real
-      # time. Under the job's own build load that pushed PowerShell process
-      # lookups past their 30s timeout, while the same lookup on an idle
-      # runner takes about a second.
-      - name: Turn off Defender real-time scanning
-        shell: pwsh
-        run: Set-MpPreference -DisableRealtimeMonitoring $true
-
       - name: Checkout repository
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
 
@@ -73,14 +65,6 @@ jobs:
       contents: read
 
     steps:
-      # GitHub's Windows image scans every new process and file in real
-      # time. Under the job's own build load that pushed PowerShell process
-      # lookups past their 30s timeout, while the same lookup on an idle
-      # runner takes about a second.
-      - name: Turn off Defender real-time scanning
-        shell: pwsh
-        run: Set-MpPreference -DisableRealtimeMonitoring $true
-
       - name: Checkout repository
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
 
