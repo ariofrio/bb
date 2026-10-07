@@ -67,10 +67,9 @@ describe("orderMentionCandidates", () => {
     }));
 
     for (const query of ["opus claude", "claude opus"]) {
-      expect(suggestionNames(orderMentionCandidates(candidates, query))).toEqual([
-        "Opus",
-        "Claude Opus",
-      ]);
+      expect(
+        suggestionNames(orderMentionCandidates(candidates, query)),
+      ).toEqual(["Opus", "Claude Opus"]);
     }
   });
 
