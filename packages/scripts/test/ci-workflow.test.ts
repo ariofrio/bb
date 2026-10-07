@@ -63,3 +63,28 @@ it("rejects a pnpm version that disagrees with the root manifest", ({
     "pnpm version mismatch: package.json declares 9.15.1, but the action requested 9.15.0",
   );
 });
+
+it("gates merges on a CI result job that needs every other job", () => {
+  const workflow = readFileSync(
+    resolve(repoRoot, ".github", "workflows", "ci.yml"),
+    "utf8",
+  );
+  const jobsSection = workflow.slice(workflow.indexOf("\njobs:\n"));
+  const jobIds = [...jobsSection.matchAll(/^ {2}([\w-]+):$/gmu)].map(
+    (match) => match[1],
+  );
+  const resultJob = /^ {2}ci-result:\n((?: {4}.*\n|\n)*)/mu.exec(
+    jobsSection,
+  )?.[1];
+  const needs = [
+    ...(
+      /^ {4}needs:\n((?: {6}- [\w-]+\n)+)/mu.exec(resultJob ?? "")?.[1] ?? ""
+    ).matchAll(/- ([\w-]+)/gu),
+  ].map((match) => match[1]);
+
+  expect(resultJob).toContain("name: CI result");
+  expect(resultJob).toContain("if: ${{ always() }}");
+  expect([...needs].sort()).toEqual(
+    jobIds.filter((id) => id !== "ci-result").sort(),
+  );
+});

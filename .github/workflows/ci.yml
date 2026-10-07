@@ -591,3 +591,31 @@ jobs:
       - name: Bound saved Turbo cache
         if: matrix.turbo-cache == 'true'
         run: node scripts/prune-turbo-cache.mjs --dir .turbo/cache --max-size-mb 1024
+
+  # The single check the default branch's ruleset requires. Job names change
+  # as upstream reshards CI, so requiring them one by one would leave pull
+  # requests waiting on checks that never report.
+  ci-result:
+    name: CI result
+    if: ${{ always() }}
+    needs:
+      - windows-foundation
+      - windows-app-smoke
+      - checks
+      - tests
+      - plugin-forks
+      - provider-model-listing
+      - package-smoke
+      - node-compat-smoke
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    steps:
+      - name: Require every CI job to succeed or skip
+        env:
+          RESULTS: ${{ toJSON(needs.*.result) }}
+        run: |
+          echo "$RESULTS"
+          if jq -e 'any(.[]; . != "success" and . != "skipped")' <<<"$RESULTS" >/dev/null; then
+            echo "::error::A CI job failed or was cancelled."
+            exit 1
+          fi
