@@ -89,7 +89,7 @@ interface ResolveDesktopUpdateSupportArgs {
 export function resolveDesktopUpdateSupport(
   args: ResolveDesktopUpdateSupportArgs,
 ): DesktopUpdateSupport {
-  if (args.platform === "macos") {
+  if (args.platform === "macos" || args.platform === "windows") {
     return { autoUpdate: true, versionCheck: true };
   }
 

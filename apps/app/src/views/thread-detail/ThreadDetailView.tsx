@@ -1,3 +1,7 @@
+import { appendQuoteAndAttachmentsToDraft } from "@bb/client-core";
+import { useSplitPreload } from "@/lib/define-split";
+import { idleSplitDownload } from "@/lib/split-prefetch";
+import { createCoreComposerActions } from "@/lib/plugin-composer-handle";
 import {
   useCallback,
   useEffect,
@@ -78,6 +82,7 @@ import {
   useThread,
   useThreadDetailBootstrap,
   useThreadPendingInteractions,
+  useThreadStorageLocation,
   type ProjectThreadSubsetFilters,
 } from "../../hooks/queries/thread-queries";
 import { isTransientReadError } from "@/hooks/queries/query-helpers";
@@ -180,7 +185,7 @@ import {
   useThreadStorageViewer,
 } from "@/components/secondary-panel/useThreadStorageViewer";
 import { getThreadConversationCollapsedAtom } from "@/components/secondary-panel/threadSecondaryPanelAtoms";
-import { BrowserTabLifecycleObserver } from "@/components/secondary-panel/BrowserTabDeck";
+import { BrowserTabLifecycleObserver } from "@/components/secondary-panel/BrowserTabLifecycleObserver";
 import {
   LazyBrowserTabDeck,
   LazyHostFilePreviewTabContent,
@@ -196,7 +201,7 @@ import {
 } from "@/lib/side-chat-plugin";
 import { RightPanelFileTabIcon } from "@/components/secondary-panel/RightPanelFileTabIcon";
 import { COARSE_POINTER_COMPACT_ICON_SIZE_CLASS } from "@bb/shared-ui/coarse-pointer-sizing";
-import { PluginIcon } from "@/components/plugin/PluginIcon";
+import { PluginItemIcon } from "@/components/plugin/PluginIcon";
 import {
   PluginPanelTabContent,
   usePluginPanelActions,
@@ -258,7 +263,6 @@ import { useThreadReadTracking } from "@/hooks/useThreadReadTracking";
 import { useThreadUnreadDividerState } from "./useThreadUnreadDividerState";
 import {
   buildTerminalSyncedSecondaryFileTabs,
-  getRetainedTerminalTabId,
   syncTerminalTabsInFixedPanelState,
 } from "@/components/secondary-panel/terminalPanelTabs";
 import {
@@ -273,6 +277,7 @@ import {
 } from "@/lib/thread-local-file-links";
 import {
   MarkdownLocalFileContextMenuContext,
+  MarkdownLocalFileOpenTargetsContext,
   type MarkdownLinkRouting,
   type MarkdownLocalFileContextMenuItem,
   type MarkdownLocalFileLinkRouting,
@@ -305,7 +310,7 @@ import {
 } from "./threadSecondaryPanelSelection";
 import { useRouteState } from "@/hooks/useRouteState";
 import { useAppCommandHandler } from "@/components/commands/AppCommandProvider";
-import { DefaultPaneContextProvider, usePaneContext } from "./PaneContext";
+import { usePaneContext } from "./PaneContext";
 import { ThreadArchiveCommandHandler } from "./ThreadArchiveCommandHandler";
 import { ThreadRenameCommandHandler } from "./ThreadRenameCommandHandler";
 
@@ -381,6 +386,7 @@ interface ThreadDetailViewPageProps {
 
 interface ThreadDetailViewPaneProps extends ThreadRoutePathArgs {
   surface: "pane";
+  timelineEnabled: boolean;
 }
 
 type ThreadDetailViewProps =
@@ -404,22 +410,10 @@ function buildHostConnectionNotice(
   thread: ThreadWithRuntime,
   hostName: string | null,
 ): HostConnectionNotice | null {
-  const displayStatus = thread.runtime.displayStatus;
-  if (
-    displayStatus !== "host-reconnecting" &&
-    displayStatus !== "waiting-for-host"
-  ) {
+  if (thread.runtime.displayStatus !== "waiting-for-host") {
     return null;
   }
-
-  const subject = hostName ?? "Host";
-  return {
-    label:
-      displayStatus === "host-reconnecting"
-        ? `${subject} disconnected. Waiting for reconnection...`
-        : `${subject} disconnected`,
-    tone: displayStatus === "host-reconnecting" ? "pending" : "error",
-  };
+  return { label: `${hostName ?? "Host"} disconnected` };
 }
 
 function buildMarkdownPreviewLinkRouting({
@@ -506,21 +500,28 @@ function RoutedThreadDetailView() {
   }
 
   return (
-    <DefaultPaneContextProvider>
-      <ThreadDetailViewInternal projectId={projectId} threadId={threadId} />
-    </DefaultPaneContextProvider>
+    <ThreadDetailViewInternal
+      projectId={projectId}
+      threadId={threadId}
+      timelineEnabled
+    />
   );
 }
 
+const queuedMessagesDownload = idleSplitDownload("queued-messages-list");
+
 export function ThreadDetailView(props: ThreadDetailViewProps) {
+  useSplitPreload(queuedMessagesDownload);
   if (props.surface === "pane") {
     return <ThreadDetailViewInternal {...props} />;
   }
   return <RoutedThreadDetailView />;
 }
 
-function ThreadDetailViewInternal(props: ThreadRoutePathArgs) {
-  const { projectId, threadId } = props;
+function ThreadDetailViewInternal(
+  props: ThreadRoutePathArgs & { timelineEnabled: boolean },
+) {
+  const { projectId, threadId, timelineEnabled } = props;
   const { isFocused, navigateInPane, onRequestClose, isBoundedPane } =
     usePaneContext();
   const navigate = useImmediateRouteNavigate();
@@ -584,10 +585,6 @@ function ThreadDetailViewInternal(props: ThreadRoutePathArgs) {
   const openFixedSecondaryTab = isPersistedSecondaryPanelOpen
     ? activeFixedSecondaryTab
     : null;
-  const retainedTerminalId = getRetainedTerminalTabId({
-    activeTab: activeFixedSecondaryTab,
-    isPanelOpen: isPersistedSecondaryPanelOpen,
-  });
   const activeFixedSecondaryTabId = activeFixedSecondaryTab?.id ?? null;
   const renderSecondaryPanelAsDrawer = useIsCompactViewport();
   const secondaryPanelDrawerVisibility =
@@ -676,16 +673,18 @@ function ThreadDetailViewInternal(props: ThreadRoutePathArgs) {
     secondaryTabs: fixedPanelTabsState.secondary.tabs,
   });
   const {
-    checkThreadStorageFileExists,
     isThreadStorageFilesLoading,
-    refetchThreadStorageFiles,
     threadStorageFiles,
     threadStorageFilesError,
-    threadStorageRootPath,
   } = useThreadStorageViewer({
     fileListEnabled: shouldLoadThreadStorageFiles,
     threadId,
   });
+  const threadStorageLocationQuery = useThreadStorageLocation(threadId, {
+    enabled: Boolean(thread?.environmentId),
+  });
+  const threadStorageRootPath =
+    threadStorageLocationQuery.data?.storageRootPath ?? null;
   const terminalsListQuery = useThreadTerminals(threadId, {
     enabled: isSecondaryPanelOpen,
   });
@@ -711,8 +710,6 @@ function ThreadDetailViewInternal(props: ThreadRoutePathArgs) {
     syncThreadId: threadId,
     environmentId: thread?.environmentId,
     onCloseLastTab: secondaryPanelDrawerVisibility.closeDrawer,
-    retainedTerminalId,
-    storageFileExists: checkThreadStorageFileExists,
     storageFiles: threadStorageFiles,
     terminalSessions: terminalsListQuery.data?.sessions,
   });
@@ -877,6 +874,7 @@ function ThreadDetailViewInternal(props: ThreadRoutePathArgs) {
     timelineRows,
   } = useThreadTimelineController({
     threadId,
+    enabled: timelineEnabled,
   });
   const sendMessage = useSendThreadMessage();
   const editMessage = useEditThreadMessage();
@@ -904,10 +902,9 @@ function ThreadDetailViewInternal(props: ThreadRoutePathArgs) {
         ? orderedSecondaryFileTabs
         : buildTerminalSyncedSecondaryFileTabs({
             orderedTabs: orderedSecondaryFileTabs,
-            retainedTerminalId,
             terminalSessions: loadedTerminalSessions,
           }),
-    [loadedTerminalSessions, orderedSecondaryFileTabs, retainedTerminalId],
+    [loadedTerminalSessions, orderedSecondaryFileTabs],
   );
   useEffect(() => {
     if (terminalsListQuery.data === undefined) {
@@ -915,17 +912,11 @@ function ThreadDetailViewInternal(props: ThreadRoutePathArgs) {
     }
     updateFixedPanelTabsState((state) =>
       syncTerminalTabsInFixedPanelState({
-        retainedTerminalId,
         state,
         terminalSessions,
       }),
     );
-  }, [
-    retainedTerminalId,
-    terminalSessions,
-    terminalsListQuery.data,
-    updateFixedPanelTabsState,
-  ]);
+  }, [terminalSessions, terminalsListQuery.data, updateFixedPanelTabsState]);
   const hostsQuery = useHosts({
     enabled:
       hasThreadDetailBootstrapSettled &&
@@ -963,6 +954,7 @@ function ThreadDetailViewInternal(props: ThreadRoutePathArgs) {
     [thread, threadEnvironmentHost],
   );
   const forkThreadFromMessage = useForkThreadFromMessage({
+    navigateInPane,
     sourceThread: thread ?? null,
   });
   const handleForkMessage = useCallback<ThreadTimelineForkMessageHandler>(
@@ -1015,7 +1007,6 @@ function ThreadDetailViewInternal(props: ThreadRoutePathArgs) {
       }),
     [selectionPromptDraftProjectId, selectionPromptDraftThreadId],
   );
-  const addQuoteToComposer = selectionPromptDraft.addQuote;
   const [composerFocusRequestNonce, setComposerFocusRequestNonce] = useState(0);
   const [sentMessageEditSession, setSentMessageEditSession] =
     useState<SentMessageEditSession | null>(null);
@@ -1186,13 +1177,23 @@ function ThreadDetailViewInternal(props: ThreadRoutePathArgs) {
       ),
     [selectionPromptDraft.storageKey],
   );
+  const composerActions = useMemo(
+    () =>
+      createCoreComposerActions({
+        ...selectionPromptDraft,
+        focus: () => setComposerFocusRequestNonce((nonce) => nonce + 1),
+      }),
+    [selectionPromptDraft],
+  );
   const handleSelectionAddToChat = useCallback(
     (text: string, attachments?: readonly PromptDraftAttachment[]) => {
       dismissCompactKeyboard();
-      addQuoteToComposer(text, attachments);
-      setComposerFocusRequestNonce((nonce) => nonce + 1);
+      composerActions.replace((current) =>
+        appendQuoteAndAttachmentsToDraft(current, text, attachments ?? []),
+      );
+      composerActions.focus();
     },
-    [addQuoteToComposer, dismissCompactKeyboard],
+    [composerActions, dismissCompactKeyboard],
   );
   const sendSideChatMessageToMain = useSendSideChatMessageToMain({
     createQueuedMessage,
@@ -1215,6 +1216,7 @@ function ThreadDetailViewInternal(props: ThreadRoutePathArgs) {
     projectId,
     environmentId: thread?.environmentId ?? "",
     sectionId: thread?.sectionId ?? null,
+    pinned: thread?.pinnedAt != null,
   });
   const { providers: registeredEnvironmentProviders } =
     useSystemEnvironmentProviders();
@@ -1282,6 +1284,10 @@ function ThreadDetailViewInternal(props: ThreadRoutePathArgs) {
     if (pluginDetails.activePluginId !== null) closeSecondaryPanel();
     else toggleWorkspacePanel();
   }, [pluginDetails.activePluginId, closeSecondaryPanel, toggleWorkspacePanel]);
+  const openThreadInfo = useCallback(
+    () => openFixedViewDestination("thread-info"),
+    [openFixedViewDestination],
+  );
   const fixedTabDestinations = useMemo(
     () => [
       createThreadInfoFixedTabDestination(() =>
@@ -2062,6 +2068,18 @@ function ThreadDetailViewInternal(props: ThreadRoutePathArgs) {
         return true;
       }
 
+      if (resolution.kind === "open-in-target") {
+        void openPathInFileTarget({
+          lineNumber: getFilePreviewLineRangeStart({
+            lineRange: resolution.request.lineRange,
+          }),
+          path: resolution.request.path,
+          rememberTarget: false,
+          targetId: resolution.request.targetId,
+        });
+        return true;
+      }
+
       if (resolution.kind === "open-workspace-path") {
         openWorkspaceFile(
           {
@@ -2095,58 +2113,29 @@ function ThreadDetailViewInternal(props: ThreadRoutePathArgs) {
       );
       return true;
     },
-    [openHostFile, openStorageFile, openWorkspaceFile],
+    [openHostFile, openPathInFileTarget, openStorageFile, openWorkspaceFile],
   );
   const handleOpenTimelineLocalFileLink = useCallback(
     (
       link: ThreadTimelineLocalFileLink,
       options?: ThreadSecondaryPanelFileOpenOptions,
     ) => {
-      const resolution = resolveThreadLocalFileLink({
-        hostFileLinksAvailable:
-          thread?.environmentId !== null && thread?.environmentId !== undefined,
-        link,
-        threadStorageRootPath,
-        workspaceRootPath: workspacePreviewRootPath,
-      });
-
-      if (
-        resolution.kind !== "open-host-path" ||
-        threadStorageRootPath !== null
-      ) {
-        return handleTimelineLocalFileLinkResolution(resolution, options);
-      }
-
-      void refetchThreadStorageFiles()
-        .then((result) => {
-          const resolvedThreadStorageRootPath =
-            result.data?.storageRootPath ?? null;
-          if (resolvedThreadStorageRootPath === null) {
-            appToast.error("Failed to open file locally", {
-              description: "Thread storage path is not available yet.",
-            });
-            return;
-          }
-
-          const resolvedResolution = resolveThreadLocalFileLink({
-            hostFileLinksAvailable: true,
-            link,
-            threadStorageRootPath: resolvedThreadStorageRootPath,
-            workspaceRootPath: workspacePreviewRootPath,
-          });
-          handleTimelineLocalFileLinkResolution(resolvedResolution, options);
-        })
-        .catch((error: Error) => {
-          appToast.error("Failed to open file locally", {
-            description: error.message,
-          });
-        });
-
-      return true;
+      return handleTimelineLocalFileLinkResolution(
+        resolveThreadLocalFileLink({
+          fileOpenTargetIds: fileOpenTargets.map((target) => target.id),
+          hostFileLinksAvailable:
+            thread?.environmentId !== null &&
+            thread?.environmentId !== undefined,
+          link,
+          threadStorageRootPath,
+          workspaceRootPath: workspacePreviewRootPath,
+        }),
+        options,
+      );
     },
     [
+      fileOpenTargets,
       handleTimelineLocalFileLinkResolution,
-      refetchThreadStorageFiles,
       thread?.environmentId,
       threadStorageRootPath,
       workspacePreviewRootPath,
@@ -2559,6 +2548,7 @@ function ThreadDetailViewInternal(props: ThreadRoutePathArgs) {
       environmentHostId={environment?.hostId}
       isEnvironmentActionPending={requestEnvironmentAction.isPending}
       onCreateNewThreadInEnvironment={onCreateNewThreadInEnvironment}
+      onOpenThreadInfo={openThreadInfo}
       onPullRequestMerge={handlePullRequestMerge}
       onPullRequestDraft={handlePullRequestDraft}
       onPullRequestReady={handlePullRequestReady}
@@ -2862,7 +2852,7 @@ function ThreadDetailViewInternal(props: ThreadRoutePathArgs) {
             ...shared,
             label: tab.title,
             leadingVisual: (
-              <PluginIcon
+              <PluginItemIcon
                 pluginId={tab.pluginId}
                 icon={pluginAction?.icon ?? null}
                 className={COARSE_POINTER_COMPACT_ICON_SIZE_CLASS}
@@ -2900,13 +2890,17 @@ function ThreadDetailViewInternal(props: ThreadRoutePathArgs) {
               <MarkdownLocalFileContextMenuContext.Provider
                 value={getLocalFileContextMenuItems}
               >
-                <UrlOpenRoutingProvider
-                  openInAppBrowser={
-                    canOpenUrlsInAppBrowser ? openBrowserTabAndReveal : null
-                  }
+                <MarkdownLocalFileOpenTargetsContext.Provider
+                  value={fileOpenTargets}
                 >
-                  {panel}
-                </UrlOpenRoutingProvider>
+                  <UrlOpenRoutingProvider
+                    openInAppBrowser={
+                      canOpenUrlsInAppBrowser ? openBrowserTabAndReveal : null
+                    }
+                  >
+                    {panel}
+                  </UrlOpenRoutingProvider>
+                </MarkdownLocalFileOpenTargetsContext.Provider>
               </MarkdownLocalFileContextMenuContext.Provider>
             )}
             metadata={{
@@ -3007,10 +3001,6 @@ function ThreadDetailViewInternal(props: ThreadRoutePathArgs) {
                   thread.runtime.displayStatus,
                 ) &&
                 !isThreadTimelinePending,
-              ongoingIndicatorLabel:
-                thread.runtime.displayStatus === "host-reconnecting"
-                  ? "Waiting for reconnection"
-                  : undefined,
               timelineRows,
               isStopping: thread.status === "stopping",
               stoppingAnchorAt: thread.updatedAt,
@@ -3048,7 +3038,11 @@ function ThreadDetailViewInternal(props: ThreadRoutePathArgs) {
           openThreadPanel={handleOpenTimelinePluginPanel}
         >
           <PluginDetailPanelContext.Provider value={pluginDetails}>
-            {threadDetailContent}
+            <MarkdownLocalFileOpenTargetsContext.Provider
+              value={fileOpenTargets}
+            >
+              {threadDetailContent}
+            </MarkdownLocalFileOpenTargetsContext.Provider>
           </PluginDetailPanelContext.Provider>
         </PluginThreadPanelNavigationProvider>
       </ThreadProviderContext.Provider>

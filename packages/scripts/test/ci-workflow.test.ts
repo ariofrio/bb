@@ -21,19 +21,17 @@ it("limits concurrent Turbo test tasks to the CI runner CPU count", () => {
     "utf8",
   );
   const testStep = /- name: Test\n\s+run: ([^\n]+)/u.exec(workflow)?.[1];
-  const shardConcurrency = [
-    ...workflow.matchAll(/^\s+concurrency: (\d+)$/gmu),
-  ].map((match) => Number(match[1]));
 
-  expect(testStep).toContain("--concurrency=${{ matrix.concurrency }}");
-  expect(shardConcurrency).toHaveLength(6);
-  for (const concurrency of shardConcurrency) {
-    expect(concurrency).toBeGreaterThan(0);
-    expect(concurrency).toBeLessThanOrEqual(4);
-  }
+  expect(testStep).toContain("--concurrency=4");
 });
 
-it("rejects a pnpm version that disagrees with the root manifest", () => {
+it("rejects a pnpm version that disagrees with the root manifest", ({
+  skip,
+}) => {
+  skip(
+    process.platform === "win32",
+    "install-pnpm.sh runs only on Linux and macOS CI runners",
+  );
   const fixture = mkdtempSync(join(tmpdir(), "bb-pnpm-version-"));
   onTestFinished(() => rmSync(fixture, { force: true, recursive: true }));
   const fakeBin = resolve(fixture, "bin");
