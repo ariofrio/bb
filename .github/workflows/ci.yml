@@ -242,9 +242,12 @@ jobs:
           - shard: integration
             filter: --filter=@bb/integration-tests
             args: ""
+          # Plugin suites use their own Vitest config, which
+          # BB_TEST_TIMEOUT_SCALE cannot reach. 60s matches the longest timeout
+          # a plugin sets, so this raises the rest without lowering any.
           - shard: plugins
             filter: --filter='bb-plugin-*'
-            args: ""
+            args: -- --testTimeout=60000
           - shard: packages-host
             filter: --filter=@bb/host-daemon --filter=@bb/cli --filter=@bb/agent-runtime --filter=@bb/provider-parity --filter=@bb/db
             args: ""
