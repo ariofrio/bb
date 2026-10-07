@@ -43,6 +43,37 @@ function suggestionNames(results: OrderedMentionSuggestions): string[] {
 }
 
 describe("orderMentionCandidates", () => {
+  it("preserves a plugin's search order for provider-qualified queries", () => {
+    const candidates = [
+      { title: "Opus", subtitle: "Model · Claude Code" },
+      { title: "Claude Opus", subtitle: "Model · Pi" },
+    ].map(({ title, subtitle }, index): MentionCandidate => ({
+      suggestion: {
+        kind: "plugin",
+        pluginId: "model-mentions",
+        providerId: "model",
+        itemId: String(index),
+        providerLabel: "Models",
+        title,
+        subtitle,
+        icon: null,
+        replacement: title,
+      },
+      visibleTitle: title,
+      identityTerms: [],
+      supportingTerms: [subtitle],
+      groupKey: "plugin:model-mentions:model",
+      groupLabel: "Models",
+    }));
+
+    for (const query of ["opus claude", "claude opus"]) {
+      expect(suggestionNames(orderMentionCandidates(candidates, query))).toEqual([
+        "Opus",
+        "Claude Opus",
+      ]);
+    }
+  });
+
   it("orders exact, prefix, substring, and supporting-text matches", () => {
     const candidates = [
       candidate({

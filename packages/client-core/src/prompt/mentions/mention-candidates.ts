@@ -114,6 +114,12 @@ function compareRankedMentionCandidates(
   left: RankedMentionCandidate,
   right: RankedMentionCandidate,
 ): number {
+  if (
+    left.candidate.suggestion.kind === "plugin" &&
+    right.candidate.suggestion.kind === "plugin"
+  ) {
+    return left.inputIndex - right.inputIndex;
+  }
   const byMatch = left.matchRank - right.matchRank;
   return byMatch !== 0 ? byMatch : left.inputIndex - right.inputIndex;
 }
@@ -127,9 +133,9 @@ function compareRankedMentionCandidateGroups(
 }
 
 /**
- * Rank intact source groups by their strongest row, and rank rows within each
- * group by exact identity, identity prefix, identity substring, then
- * supporting-text match. Original source order is the final tie-breaker.
+ * Rank intact source groups by their strongest row. Plugin rows preserve their
+ * source's order; other rows rank by exact identity, identity prefix, identity
+ * substring, then supporting-text match, with source order as the tie-breaker.
  */
 export function orderMentionCandidates(
   candidates: readonly MentionCandidate[],
