@@ -5,6 +5,7 @@ import { afterEach, expect, it } from "vitest";
 import type { ReactNode } from "react";
 import * as AlertDialog from "@radix-ui/react-alert-dialog";
 import { Dialog, DialogContent, DialogTitle } from "@bb/shared-ui/dialog";
+import { CompactViewportOverrideProvider } from "@bb/shared-ui/hooks/use-compact-viewport";
 import { Popover, PopoverAnchor, PopoverContent } from "@bb/shared-ui/popover";
 import { PluginContext } from "@/components/plugin/plugin-context";
 import { usePortalScopeProps } from "@/lib/portal-scope";
@@ -162,6 +163,48 @@ it("a plugin Popover leaves the browser visible like host popovers", async () =>
 
   const content = await screen.findByText("Plugin popover");
   expect(content.closest("[data-bb-plugin-root]")).not.toBeNull();
+  await new Promise((resolve) => setTimeout(resolve, 0));
+  expect(screen.getByTestId("dim").textContent).toBe("clear");
+});
+
+it("a compact plugin Dialog drawer dims the browser like a host Dialog", async () => {
+  render(
+    <>
+      <CompactViewportOverrideProvider isCompactViewport>
+        {inPluginScope(
+          <Dialog open>
+            <DialogContent>
+              <DialogTitle>Plugin drawer dialog</DialogTitle>
+            </DialogContent>
+          </Dialog>,
+        )}
+      </CompactViewportOverrideProvider>
+      <DimProbe />
+    </>,
+  );
+
+  await waitFor(() =>
+    expect(screen.getByTestId("dim").textContent).toBe("dimmed"),
+  );
+});
+
+it("a compact plugin Popover drawer leaves the browser visible like host popovers", async () => {
+  render(
+    <>
+      <CompactViewportOverrideProvider isCompactViewport>
+        {inPluginScope(
+          <Popover open>
+            <PopoverAnchor />
+            <PopoverContent>Plugin drawer popover</PopoverContent>
+          </Popover>,
+        )}
+      </CompactViewportOverrideProvider>
+      <DimProbe />
+    </>,
+  );
+
+  const content = await screen.findByText("Plugin drawer popover");
+  expect(content.closest("[data-persistent-drawer-content]")).not.toBeNull();
   await new Promise((resolve) => setTimeout(resolve, 0));
   expect(screen.getByTestId("dim").textContent).toBe("clear");
 });

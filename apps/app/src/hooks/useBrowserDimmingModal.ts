@@ -4,7 +4,8 @@ import { atom, useAtomValue, useSetAtom } from "jotai";
 const browserDimmingModalCountAtom = atom(0);
 const pluginPortalSelector = "[data-bb-plugin-root][data-bb-portaled-overlay]";
 const pluginDialogSelector = [
-  `${pluginPortalSelector}[role="dialog"][data-state="open"]:not([data-side])`,
+  `${pluginPortalSelector}[role="dialog"][data-state="open"]:not([data-side]):not([data-persistent-drawer-content])`,
+  `${pluginPortalSelector}[data-persistent-drawer-content][aria-describedby][data-state="open"]`,
   `${pluginPortalSelector}[role="alertdialog"][data-state="open"]`,
 ].join(", ");
 const pluginDialogListeners = new Set<() => void>();
