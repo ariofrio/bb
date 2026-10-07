@@ -37,6 +37,7 @@ import {
 import type { CallerExecutionInputSource } from "@bb/domain";
 import { THREAD_EVENT_LIST_PAGE_SIZE } from "../common.js";
 import {
+  timelineConversationRowSchema,
   timelineDeltaSchema,
   timelineRowSchema,
   timelineWorkflowWorkRowSchema,
@@ -106,6 +107,7 @@ export const createThreadRequestSchema = z
     environment: createThreadEnvironmentArgsSchema,
     parentThreadId: z.string().min(1).optional(),
     sectionId: z.string().min(1).nullable().optional(),
+    pinned: z.boolean().optional(),
     sourceThreadId: z.string().min(1).optional(),
     sourceSeqEnd: z.number().int().nonnegative().optional(),
     startedOnBehalfOf: startedOnBehalfOfSchema.nullable().default(null),
@@ -121,38 +123,8 @@ export const createThreadRequestSchema = z
     pluginSubmission: z
       .object({ pluginId: pluginIdSchema, data: jsonValueSchema })
       .optional(),
-    /**
-     * `true` ⇒ the thread is created as a draft: it stays `pending`, nothing
-     * is dispatched or provisioned, and `input` becomes the thread's draft
-     * instead of its first message. Sending a message to the thread later
-     * starts it and clears the draft.
-     */
-    draft: z.boolean().optional(),
   })
   .superRefine((value, ctx) => {
-    if (value.draft === true) {
-      for (const field of [
-        "sendAt",
-        "pluginSubmission",
-        "sourceThreadId",
-        "sourceSeqEnd",
-      ] as const) {
-        if (value[field] !== undefined) {
-          ctx.addIssue({
-            code: "custom",
-            message: `${field} cannot be combined with draft`,
-            path: [field],
-          });
-        }
-      }
-      if (value.originKind !== null) {
-        ctx.addIssue({
-          code: "custom",
-          message: "originKind cannot be combined with draft",
-          path: ["originKind"],
-        });
-      }
-    }
     if (value.origin === "plugin" && value.originPluginId === undefined) {
       ctx.addIssue({
         code: "custom",
@@ -403,15 +375,6 @@ export type CreateQueuedMessageRequest = z.infer<
   typeof createQueuedMessageRequestSchema
 >;
 
-export const updateThreadDraftRequestSchema = z
-  .object({
-    input: z.array(promptInputSchema),
-  })
-  .strict();
-export type UpdateThreadDraftRequest = z.infer<
-  typeof updateThreadDraftRequestSchema
->;
-
 export const updateQueuedMessageRequestSchema = z.object({
   expectedUpdatedAt: z.number().int().nonnegative(),
   input: z.array(promptInputSchema).min(1),
@@ -538,10 +501,6 @@ export const threadResponseSchema = threadWithRuntimeSchema.extend({
   // `GET /threads/:id/queued-messages` supplies the reasons once a surface
   // actually renders them.
   queuedMessageCount: z.number().int().nonnegative(),
-  // The thread's saved, unsent composer message, or null when it has none. A
-  // draft thread is a `pending` thread whose first message lives here until it
-  // is sent; sending any message to the thread clears it.
-  draft: z.array(promptInputSchema).nullable(),
 });
 export type ThreadResponse = z.infer<typeof threadResponseSchema>;
 
@@ -932,6 +891,7 @@ export const timelinePageMetadataSchema = z
     olderCursor: timelinePaginationCursorSchema.nullable(),
     historySnapshot: z.string().optional(),
     olderRowsSourceSeqEnd: z.number().int().nonnegative().nullable().optional(),
+    olderRowUpdates: z.array(timelineRowSchema).optional(),
     contentPage: z
       .object({
         anchorSeq: z.number().int().nonnegative(),
@@ -1010,6 +970,31 @@ export const threadEventWaitQuerySchema = z.object({
 });
 export type ThreadEventWaitQuery = z.infer<typeof threadEventWaitQuerySchema>;
 
+export const THREAD_MESSAGE_CONTEXT_LIMIT = 20;
+
+const threadMessageContextCountSchema = z
+  .string()
+  .regex(/^\d+$/)
+  .refine(
+    (value) => Number(value) <= THREAD_MESSAGE_CONTEXT_LIMIT,
+    `Message context cannot exceed ${THREAD_MESSAGE_CONTEXT_LIMIT}`,
+  );
+
+export const threadMessageQuerySchema = z
+  .object({
+    before: threadMessageContextCountSchema,
+    after: threadMessageContextCountSchema,
+  })
+  .partial();
+export type ThreadMessageQuery = z.infer<typeof threadMessageQuerySchema>;
+
+export const threadMessageResponseSchema = z.object({
+  message: timelineConversationRowSchema,
+  before: z.array(timelineConversationRowSchema),
+  after: z.array(timelineConversationRowSchema),
+});
+export type ThreadMessageResponse = z.infer<typeof threadMessageResponseSchema>;
+
 export const threadStorageFilesQuerySchema = z
   .object({
     query: z.string().min(1).max(FILE_LIST_QUERY_MAX_LENGTH),
@@ -1029,13 +1014,6 @@ export type ThreadStoragePathsQuery = z.infer<
   typeof threadStoragePathsQuerySchema
 >;
 
-export const threadStorageContentQuerySchema = z.object({
-  path: z.string().min(1),
-});
-export type ThreadStorageContentQuery = z.infer<
-  typeof threadStorageContentQuerySchema
->;
-
 export const threadStorageLocationResponseSchema = z
   .object({
     hostId: z.string().min(1),
@@ -1045,18 +1023,6 @@ export const threadStorageLocationResponseSchema = z
 export type ThreadStorageLocationResponse = z.infer<
   typeof threadStorageLocationResponseSchema
 >;
-
-export const threadHostFileContentQuerySchema = z.object({
-  path: z.string().min(1),
-});
-export type ThreadHostFileContentQuery = z.infer<
-  typeof threadHostFileContentQuerySchema
->;
-
-export const threadFilesRawQuerySchema = z.object({
-  path: z.string().min(1),
-});
-export type ThreadFilesRawQuery = z.infer<typeof threadFilesRawQuerySchema>;
 
 export const timelineTurnSummaryDetailsResponseSchema = z.object({
   olderCursor: z.string().nullable().optional(),

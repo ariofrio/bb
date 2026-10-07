@@ -1,3 +1,5 @@
+import { appendQuoteAndAttachmentsToDraft } from "@bb/client-core";
+import { createCoreComposerActions } from "@/lib/plugin-composer-handle";
 import {
   useCallback,
   useEffect,
@@ -9,6 +11,12 @@ import {
 } from "react";
 import { defaultAppSettings, type PromptInput } from "@bb/domain";
 import type { SendMessageDelivery } from "@bb/server-contract";
+import type {
+  ComposerSelection,
+  ComposerSubmitOptions,
+  JsonValue,
+} from "@get-bb/plugin-sdk";
+import { readExecutionSelection } from "@/components/promptbox/composer-selection-settle";
 import type {
   AttachmentsConfig,
   HistoryConfig,
@@ -23,13 +31,14 @@ import {
 } from "@/components/promptbox/FollowUpPromptBox";
 import {
   useComposerHostDraftNotifier,
+  useComposerHostSelection,
   type PluginComposerHost,
 } from "@/components/plugin/plugin-composer-host";
 import { ThreadPendingInteractionBanner } from "@/components/thread/pending-interactions/ThreadPendingInteractionBanner";
 import {
-  QueuedMessagesList,
+  LazyQueuedMessagesList,
   type QueuedMessageInlineEditor,
-} from "@/components/promptbox/banner/QueuedMessagesList";
+} from "@/components/promptbox/banner/LazyQueuedMessagesList";
 import type {
   ExecutionControlsProps,
   ExecutionPermissionConfig,
@@ -62,7 +71,11 @@ import {
 import { useMarkThreadRead } from "@/hooks/mutations/thread-state-mutations";
 import { useThreadReadTracking } from "@/hooks/useThreadReadTracking";
 import { useComposerTextEffects } from "@/lib/composer-text-effects";
-import { showMutationErrorToast } from "@/lib/mutation-errors";
+import {
+  getMutationErrorMessage,
+  showMutationErrorToast,
+} from "@/lib/mutation-errors";
+import { type PromptDraftState, promptDraftToInput } from "@bb/client-core";
 import type { PromptDraftScope } from "@/hooks/usePromptDraftStorage";
 import { appToast } from "@/components/ui/app-toast";
 import {
@@ -76,6 +89,8 @@ import { useLatestRef } from "@/hooks/useLatestRef";
 import { useComposerTypeahead } from "./useComposerTypeahead";
 import { useInlineQueuedMessageEditing } from "./useInlineQueuedMessageEditing";
 import { useQueuedMessageActions } from "./useQueuedMessageActions";
+
+const NO_QUEUED_EDITOR_SELECTION: ComposerSelection = {};
 
 function reportQueuedSendDelivery(delivery: SendMessageDelivery): void {
   if (delivery !== "queued") {
@@ -163,6 +178,7 @@ function EmbeddedThreadChatHostedFooter({
         scrollBehavior="bottom-anchor"
         scrollAnchorThreadId={surface.threadId}
         shellClassName="!mx-0 !mt-0 md:!mx-0 md:!mt-0"
+        scrollAreaClassName="scroll-pt-4"
         contentClassName="gap-2 pt-4"
         footerClassName="chat-prompt-box"
         footer={footer}
@@ -259,7 +275,7 @@ function EmbeddedThreadChatWithComposer({
     supportsPermissionModeSelection,
     supportsServiceTier,
     serviceTierSupportByProvider,
-    serviceTierFastLabel,
+    serviceTierOptions,
     isLoadingModels,
   } = threadCreationOptions;
   const selectedExecutionModel = activeModel?.model ?? selectedModel;
@@ -329,7 +345,6 @@ function EmbeddedThreadChatWithComposer({
     currentPromptDraftInput,
     activeComposerDraft,
     activeComposerDraftInput,
-    setActiveComposerDraft,
     handleChangeMessage,
     removeActiveComposerAttachment,
   } = useActiveComposerDraft({
@@ -443,6 +458,56 @@ function EmbeddedThreadChatWithComposer({
       threadId,
     ],
   );
+  const submitProgrammatically = useCallback(
+    async (
+      options: ComposerSubmitOptions,
+      pluginSubmission: { pluginId: string; data: JsonValue } | undefined,
+    ) => {
+      const submittedDraft = promptDraft.getCurrent();
+      const input = promptDraftToInput(submittedDraft);
+      if (input.length === 0) {
+        throw new Error("Type a message before submitting it.");
+      }
+      const clearedSubmittedDraft =
+        promptDraft.clearIfCurrentMatches(submittedDraft);
+      setBottomAttachmentError(null);
+      setIsTurnSubmitting(true);
+      try {
+        const result = await sendThreadMessage.mutateAsync({
+          id: threadId,
+          input,
+          mode: "queue-if-active",
+          ...executionRequestFields,
+          ...(options.sendAt === undefined ? {} : { sendAt: options.sendAt }),
+          ...(pluginSubmission === undefined ? {} : { pluginSubmission }),
+        });
+        reportQueuedSendDelivery(result.delivery);
+      } catch (error) {
+        if (clearedSubmittedDraft) {
+          promptDraft.restoreIfEmpty(submittedDraft);
+        }
+        throw new Error(
+          getMutationErrorMessage({
+            error,
+            fallbackMessage: "Failed to submit message",
+            lifecycleOperation: "send_message",
+          }),
+        );
+      } finally {
+        if (isMountedRef.current) {
+          setIsTurnSubmitting(false);
+        }
+      }
+    },
+    [
+      executionRequestFields,
+      promptDraft,
+      sendThreadMessage,
+      setBottomAttachmentError,
+      threadId,
+    ],
+  );
+  const submitProgrammaticallyRef = useLatestRef(submitProgrammatically);
   const handleSubmit = useCallback(() => {
     const submittedDraft = currentPromptDraft;
     const submittedInput = currentPromptDraftInput;
@@ -567,14 +632,25 @@ function EmbeddedThreadChatWithComposer({
     void handleSaveInlineQueuedMessage();
   }, [handleSaveInlineQueuedMessage]);
 
-  const addQuoteToPromptDraft = promptDraft.addQuote;
+  const composerActions = useMemo(
+    () =>
+      createCoreComposerActions({
+        getCurrent: promptDraft.getCurrent,
+        setDraft: promptDraft.setDraft,
+        focus: () => setComposerFocusNonce((nonce) => nonce + 1),
+      }),
+    [promptDraft.getCurrent, promptDraft.setDraft],
+  );
   const handleAddToChat = useCallback<ThreadTimelineAddToChatHandler>(
     (text, attachments) => {
-      addQuoteToPromptDraft(text, attachments);
-      setComposerFocusNonce((nonce) => nonce + 1);
+      composerActions.replace((current) =>
+        appendQuoteAndAttachmentsToDraft(current, text, attachments ?? []),
+      );
+      composerActions.focus();
     },
-    [addQuoteToPromptDraft],
+    [composerActions],
   );
+  const restoreHistoryDraft = composerActions.restoreDraft;
 
   const queuedEditSessionId = inlineEditingQueuedMessage?.editSessionId ?? null;
   const queuedEditOwnerThreadId =
@@ -644,24 +720,67 @@ function EmbeddedThreadChatWithComposer({
   const subscribeQueuedDraft = useComposerHostDraftNotifier(
     inlineEditingQueuedMessage?.draft ?? null,
   );
+  const bottomSelection = useMemo(
+    () => ({
+      ...(selectedProviderId ? { providerId: selectedProviderId } : {}),
+      ...(selectedExecutionModel ? { model: selectedExecutionModel } : {}),
+      reasoningLevel,
+      ...(selectedExecutionServiceTier !== undefined
+        ? { serviceTier: selectedExecutionServiceTier }
+        : {}),
+      ...(effectivePermissionMode !== undefined
+        ? { permissionMode: effectivePermissionMode }
+        : {}),
+    }),
+    [
+      effectivePermissionMode,
+      reasoningLevel,
+      selectedExecutionModel,
+      selectedExecutionServiceTier,
+      selectedProviderId,
+    ],
+  );
+  const { getSelection, subscribeSelection } = useComposerHostSelection(
+    bottomComposerHostIdentity,
+    bottomSelection,
+  );
+  const queuedSelection = useMemo(
+    () =>
+      inlineEditingQueuedMessage
+        ? readExecutionSelection({
+            selectedProviderId,
+            selectedThreadModel: inlineEditingQueuedMessage.model,
+            reasoningLevel: inlineEditingQueuedMessage.reasoningLevel,
+            serviceTier: inlineEditingQueuedMessage.serviceTier,
+            supportsServiceTier,
+            permissionMode: inlineEditingQueuedMessage.permissionMode,
+          })
+        : NO_QUEUED_EDITOR_SELECTION,
+    [inlineEditingQueuedMessage, selectedProviderId, supportsServiceTier],
+  );
+  const queuedComposerSelection = useComposerHostSelection(
+    queuedComposerHostIdentity ?? "",
+    queuedSelection,
+  );
   const setStoredPromptDraft = promptDraft.setDraft;
+  const getStoredPromptDraft = promptDraft.getCurrent;
+  const storedPromptDraftKey = promptDraft.storageKey;
   const bottomPluginComposerHost = useMemo<PluginComposerHost | null>(() => {
     if (bottomScope === null) return null;
     const identity = bottomComposerHostIdentity;
-    const initialDraft = currentPromptDraftRef.current;
     return {
       scope: bottomScope,
-      textEffectKey: identity,
+      textEffectKey: storedPromptDraftKey,
       getCurrent: () =>
         activeBottomComposerIdentityRef.current === identity
           ? currentPromptDraftRef.current
-          : initialDraft,
+          : getStoredPromptDraft(),
       subscribeDraft: subscribeBottomDraft,
-      setDraft: (draft) => {
-        if (activeBottomComposerIdentityRef.current === identity) {
-          setStoredPromptDraft(draft);
-        }
-      },
+      getSelection,
+      subscribeSelection,
+      setDraft: setStoredPromptDraft,
+      submit: (options, pluginSubmission) =>
+        submitProgrammaticallyRef.current(options, pluginSubmission),
       focus: () => {
         if (activeBottomComposerIdentityRef.current === identity) {
           setComposerFocusNonce((nonce) => nonce + 1);
@@ -671,8 +790,13 @@ function EmbeddedThreadChatWithComposer({
   }, [
     bottomComposerHostIdentity,
     bottomScope,
+    getStoredPromptDraft,
+    getSelection,
     setStoredPromptDraft,
+    storedPromptDraftKey,
+    submitProgrammaticallyRef,
     subscribeBottomDraft,
+    subscribeSelection,
   ]);
   const queuedPluginComposerHost = useMemo<PluginComposerHost | null>(() => {
     if (
@@ -712,6 +836,8 @@ function EmbeddedThreadChatWithComposer({
           : initialDraft;
       },
       subscribeDraft: subscribeQueuedDraft,
+      getSelection: queuedComposerSelection.getSelection,
+      subscribeSelection: queuedComposerSelection.subscribeSelection,
       setDraft: (draft) => {
         if (activeQueuedComposerIdentityRef.current !== identity) {
           return;
@@ -720,6 +846,9 @@ function EmbeddedThreadChatWithComposer({
           isCurrentQueuedEdit(current) ? { ...current, draft } : current,
         );
       },
+      isAvailable: () =>
+        activeQueuedComposerIdentityRef.current === identity &&
+        isCurrentQueuedEdit(committedInlineEditRef.current),
       focus: () => {
         if (activeQueuedComposerIdentityRef.current === identity) {
           setInlineComposerFocusNonce((nonce) => nonce + 1);
@@ -730,6 +859,7 @@ function EmbeddedThreadChatWithComposer({
     inlineEditingQueuedMessageRef,
     queuedComposerIdentity,
     queuedComposerHostIdentity,
+    queuedComposerSelection,
     subscribeQueuedDraft,
     updateInlineQueuedMessage,
   ]);
@@ -751,7 +881,7 @@ function EmbeddedThreadChatWithComposer({
       history: {
         currentDraft: currentPromptDraft,
         entries: [],
-        onSelectEntry: promptDraft.setDraft,
+        onSelectEntry: restoreHistoryDraft,
       } satisfies HistoryConfig,
       isFollowUpSubmitting: isTurnSubmitting,
       message: currentPromptDraft.text,
@@ -774,11 +904,19 @@ function EmbeddedThreadChatWithComposer({
       handleModifierSubmit,
       handleSubmit,
       isTurnSubmitting,
-      promptDraft.setDraft,
+      restoreHistoryDraft,
       promptDraft.setTextAndMentions,
       steerActiveThreadOnEnter,
       submitMode,
     ],
+  );
+  const restoreQueuedHistoryDraft = useCallback(
+    (draft: PromptDraftState) => {
+      if (queuedPluginComposerHost === null)
+        throw new Error("This composer is no longer available.");
+      createCoreComposerActions(queuedPluginComposerHost).restoreDraft(draft);
+    },
+    [queuedPluginComposerHost],
   );
   const inlineComposerConfig = useMemo<FollowUpComposerProps | null>(
     () =>
@@ -787,7 +925,7 @@ function EmbeddedThreadChatWithComposer({
             history: {
               currentDraft: activeComposerDraft,
               entries: [],
-              onSelectEntry: setActiveComposerDraft,
+              onSelectEntry: restoreQueuedHistoryDraft,
             } satisfies HistoryConfig,
             isFollowUpSubmitting: isUpdateQueuedMessagePending,
             message: activeComposerDraft.text,
@@ -813,8 +951,8 @@ function EmbeddedThreadChatWithComposer({
       handleChangeMessage,
       handleInlineComposerSubmit,
       inlineEditingQueuedMessage,
+      restoreQueuedHistoryDraft,
       isUpdateQueuedMessagePending,
-      setActiveComposerDraft,
     ],
   );
 
@@ -882,7 +1020,7 @@ function EmbeddedThreadChatWithComposer({
         onChange: setServiceTier,
         supported: supportsServiceTier,
         supportByProvider: serviceTierSupportByProvider,
-        fastLabel: serviceTierFastLabel,
+        options: serviceTierOptions,
       },
       reasoning: {
         value: reasoningLevel,
@@ -910,7 +1048,7 @@ function EmbeddedThreadChatWithComposer({
       setSelectedModel,
       setServiceTier,
       supportsServiceTier,
-      serviceTierFastLabel,
+      serviceTierOptions,
     ],
   );
   const inlineExecutionConfig = useMemo<ExecutionControlsProps | null>(
@@ -928,7 +1066,7 @@ function EmbeddedThreadChatWithComposer({
               onChange: setServiceTier,
               supported: supportsServiceTier,
               supportByProvider: serviceTierSupportByProvider,
-              fastLabel: serviceTierFastLabel,
+              options: serviceTierOptions,
             },
             reasoning: {
               ...bottomExecutionConfig.reasoning,
@@ -942,7 +1080,7 @@ function EmbeddedThreadChatWithComposer({
       serviceTierSupportByProvider,
       setServiceTier,
       supportsServiceTier,
-      serviceTierFastLabel,
+      serviceTierOptions,
     ],
   );
 
@@ -1036,7 +1174,7 @@ function EmbeddedThreadChatWithComposer({
   const queuedMessagesStack = useMemo(
     () =>
       queuedMessages.length > 0 && !hasComposerBlockingPendingInteraction ? (
-        <QueuedMessagesList
+        <LazyQueuedMessagesList
           attachedToComposer
           queuedMessages={queuedMessages}
           resolveMentionLink={resolveMentionLink}
@@ -1161,9 +1299,9 @@ function EmbeddedThreadChatWithComposer({
     >
       <BottomAnchoredScrollBody
         key={surfaceKey}
-        scrollAreaClassName={surfaceClassName}
+        scrollAreaClassName={cn(surfaceClassName, "scroll-pt-4")}
         contentClassName={
-          measure === "page" ? "!pb-3 !pt-3" : "!px-2 !pb-3 !pt-3"
+          measure === "page" ? "!pb-3 !pt-4" : "!px-2 !pb-3 !pt-4"
         }
         maxWidthClassName={maxWidthClassName}
         footer={footer}

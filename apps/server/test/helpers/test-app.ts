@@ -10,6 +10,7 @@ import type { AddressInfo } from "node:net";
 import {
   createConnection,
   getAppSettings,
+  getDisabledProviderIds,
   listRunningThreads,
   type DbConnection,
 } from "@bb/db";
@@ -174,6 +175,7 @@ export async function createTestAppHarness(
       const settings = getAppSettings(db);
       return {
         providerOrder: settings.providerOrder,
+        disabledProviderIds: getDisabledProviderIds(db),
         defaultProviderId: settings.defaultProviderId,
       };
     },
@@ -226,6 +228,7 @@ export async function createTestAppHarness(
     customModels: [],
     dataDir,
     featureFlags: defaultFeatureFlags,
+    performanceDiagnosticsAvailable: false,
     hostDaemonPort: 3001,
     marketplaceUrl: "https://marketplace.invalid/marketplace.json",
     inheritedSkillsRootPaths: [],
@@ -273,12 +276,15 @@ export async function createTestAppHarness(
   const appVersion =
     appVersionService ??
     createAppVersionService({
+      sourceCommit: null,
+      installKind: null,
       config,
       logger,
     });
   const appUpdate =
     appUpdateService ??
     createAppUpdateService({
+      currentCommit: null,
       appSurface: "web",
       appVersion,
       config,

@@ -14,6 +14,7 @@ import {
   THREAD_DELTA_NOTIFICATION_METHOD,
 } from "@bb/provider-bridge-protocol";
 import type {
+  BridgeExecutionOptions,
   InitializeResult,
   ThreadDelta,
 } from "@bb/provider-bridge-protocol";
@@ -35,7 +36,7 @@ import type {
   BridgeToolCallContent,
   BridgeToolCallImage,
 } from "@bb/provider-bridge-protocol/bridge-kit";
-import { execFile } from "node:child_process";
+import { execPortableFile } from "@bb/process-utils";
 import { randomBytes } from "node:crypto";
 import { promises as fs, readFileSync } from "node:fs";
 import { createServer, type Server, type Socket } from "node:net";
@@ -44,7 +45,6 @@ import { fileURLToPath } from "node:url";
 import { isDeepStrictEqual } from "node:util";
 import { z } from "zod";
 import {
-  ACP_BRIDGE_NO_ACTIVE_TURN_ERROR_CODE,
   ACP_COMPACTION_COMPLETED_METHOD,
   ACP_COMPACTION_STARTED_METHOD,
   ACP_DEFAULT_MODEL_ID,
@@ -159,6 +159,7 @@ interface AcpPendingTurnInput {
   clientRequestId: string;
   input: PromptInput[];
   requestId: AcpBridgeRequestId | null;
+  options: BridgeExecutionOptions;
 }
 
 interface AcpThreadSession {
@@ -178,6 +179,7 @@ interface AcpThreadSession {
   queuedInputs: AcpPendingTurnInput[];
   promptRequestPending: boolean;
   cancelRequested: boolean;
+  restartAfterCancelError: boolean;
   loading: boolean;
   loadingSessionId: string | undefined;
   pendingLoadUsageUpdate: AcpUsageUpdate | undefined;
@@ -300,10 +302,7 @@ function rememberGrokContextWindow(
   }
 }
 
-function emitGrokContextWindow(
-  session: AcpThreadSession,
-  used: number,
-): void {
+function emitGrokContextWindow(session: AcpThreadSession, used: number): void {
   if (
     session.dialect.id !== "grok" ||
     session.grokContextWindowSize === undefined
@@ -766,35 +765,33 @@ async function authenticateAcpAgent(args: {
 async function loadAgentModelCatalog(
   listCommand: AcpAgentCommandParam,
 ): Promise<AgentModelCatalog | null> {
-  const stdout = await new Promise<string | null>((resolveExec, rejectExec) => {
-    execFile(
-      listCommand.command,
-      listCommand.args,
-      {
-        ...(listCommand.cwd !== undefined ? { cwd: listCommand.cwd } : {}),
-        env: {
-          ...withoutBridgeRuntimeEnv(process.env),
-          ...(listCommand.envVars ?? {}),
-        },
-        timeout: MODEL_LIST_TIMEOUT_MS,
-      },
-      (error, out, stderr) => {
-        if (!error) {
-          resolveExec(out);
-          return;
-        }
-        if (isMissingExecutableError(error)) {
-          rejectExec(error);
-          return;
-        }
-        if (isAuthRequiredModelListError(error, out, stderr)) {
-          rejectExec(new AcpModelListAuthRequiredError());
-          return;
-        }
-        resolveExec(null);
-      },
-    );
-  });
+  const stdout = await execPortableFile(listCommand.command, listCommand.args, {
+    cwd: listCommand.cwd ?? process.cwd(),
+    env: {
+      ...withoutBridgeRuntimeEnv(process.env),
+      ...(listCommand.envVars ?? {}),
+    },
+    maxBuffer: 1024 * 1024,
+    timeout: MODEL_LIST_TIMEOUT_MS,
+  }).then(
+    ({ stdout }) => stdout,
+    (error: unknown) => {
+      if (isMissingExecutableError(error)) throw error;
+      const output = z
+        .object({ stdout: z.string(), stderr: z.string() })
+        .safeParse(error);
+      if (
+        isAuthRequiredModelListError(
+          error,
+          output.success ? output.data.stdout : "",
+          output.success ? output.data.stderr : "",
+        )
+      ) {
+        throw new AcpModelListAuthRequiredError();
+      }
+      return null;
+    },
+  );
   const key = JSON.stringify(listCommand);
   if (stdout === null) {
     process.stderr.write(
@@ -928,7 +925,7 @@ async function loadSessionDiscoveredModels(
     if (timeout !== undefined) {
       clearTimeout(timeout);
     }
-    connection.kill();
+    await connection.kill();
   }
 }
 
@@ -1717,6 +1714,9 @@ async function startAgentSession(
   const childEnv = {
     ...withoutBridgeRuntimeEnv(process.env),
     ...params.envVars,
+    ...(dialect.id === "opencode"
+      ? { OPENCODE_CLIENT: "acp", OPENCODE_ENABLE_QUESTION_TOOL: "false" }
+      : {}),
   };
   const connection = createAcpAgentConnection({
     command: params.agent.command,
@@ -1764,6 +1764,7 @@ async function startAgentSession(
     queuedInputs: [],
     promptRequestPending: false,
     cancelRequested: false,
+    restartAfterCancelError: false,
     loading: false,
     loadingSessionId: undefined,
     pendingLoadUsageUpdate: undefined,
@@ -1945,7 +1946,7 @@ async function startAgentSession(
   } catch (error) {
     session.stopping = true;
     session.deferStartEmit = undefined;
-    connection.kill();
+    await connection.kill();
     removeSession(session);
     await releaseCursorMcpApproval(session);
     throw error;
@@ -1978,7 +1979,7 @@ async function stopSession(session: AcpThreadSession): Promise<void> {
   }
   settleInterruptedPrompt(session);
 
-  session.connection.kill();
+  await session.connection.kill();
   removeSession(session);
   await releaseCursorMcpApproval(session);
 }
@@ -2006,7 +2007,7 @@ async function releaseSession(session: AcpThreadSession): Promise<void> {
     "ACP session released before the steer was sent",
   );
   cancelPendingPermissions(session);
-  session.connection.kill();
+  await session.connection.kill();
   removeSession(session);
   await releaseCursorMcpApproval(session);
 }
@@ -2100,6 +2101,21 @@ function runTurn(
       let stopReason: z.infer<typeof acpStopReasonSchema>;
       session.cancelRequested = false;
       try {
+        const previousSession = session;
+        const reconciled = reconcileExecutionSettings(session, pending.options);
+        session = reconciled instanceof Promise ? await reconciled : reconciled;
+        if (session.stopping) {
+          dropTurnInput(pending, "ACP session is stopping");
+          finishTurn(session, "cancelled");
+          return;
+        }
+        session.activePromptKind = "turn";
+        session.turnSettled = previousSession.turnSettled;
+        if (session !== previousSession) {
+          emitForSession(session, ACP_TURN_STARTED_METHOD, {
+            threadId: session.bbThreadId,
+          });
+        }
         session.promptRequestPending = true;
         const promptResult = session.connection.request({
           method: "session/prompt",
@@ -2120,6 +2136,7 @@ function runTurn(
           emitGrokContextWindow(session, grokUsage.used);
         }
       } catch (error) {
+        session.restartAfterCancelError = session.cancelRequested;
         session.promptRequestPending = false;
         dropTurnInput(pending, "ACP turn failed before the prompt was sent");
         dropQueuedTurnInputs(
@@ -2150,6 +2167,96 @@ function runTurn(
       return;
     }
   })();
+}
+
+function reconcileExecutionSettings(
+  session: AcpThreadSession,
+  options: BridgeExecutionOptions,
+): AcpThreadSession | Promise<AcpThreadSession> {
+  if (options.permissionMode === "auto") {
+    throw new Error('ACP does not support permission mode "auto".');
+  }
+  const envVars =
+    Object.keys(options.envVars ?? {}).length > 0
+      ? {
+          ...(decodeLaunchSpec(options.providerOptions)?.env ?? {}),
+          ...options.envVars,
+        }
+      : session.construction.envVars;
+  const workspaceWriteRoots =
+    options.providerOptions?.additionalWorkspaceWriteRoots !== undefined
+      ? [
+          session.cwd,
+          ...decodeAdditionalWorkspaceWriteRoots(options.providerOptions),
+        ]
+      : session.policy.workspaceWriteRoots;
+  const construction = {
+    ...session.construction,
+    envVars,
+    permissionMode: options.permissionMode,
+    workspaceWriteRoots,
+  };
+  const launchArgsChanged = !isDeepStrictEqual(
+    permissionCliArgsForMode(
+      session.construction.permissionCli,
+      session.construction.permissionMode,
+    ),
+    permissionCliArgsForMode(
+      construction.permissionCli,
+      construction.permissionMode,
+    ),
+  );
+  const restart =
+    session.restartAfterCancelError ||
+    launchArgsChanged ||
+    !isDeepStrictEqual(envVars ?? {}, session.construction.envVars ?? {});
+  cancelPendingPermissions(session);
+  session.policy = {
+    permissionMode: options.permissionMode,
+    workspaceWriteRoots,
+  };
+  if (!restart) {
+    session.construction = construction;
+    return session;
+  }
+  return rebuildAgentSession(session, construction);
+}
+
+async function rebuildAgentSession(
+  session: AcpThreadSession,
+  construction: AcpSessionParams,
+): Promise<AcpThreadSession> {
+  const previousProviderThreadId = session.providerThreadId;
+  const reason = session.restartAfterCancelError
+    ? "The ACP agent failed during cancellation; its session was rebuilt before continuing."
+    : "Execution settings changed; the ACP session was rebuilt to apply them.";
+  const queuedInputs = session.queuedInputs.splice(0);
+  const continuingTurn = session.activePromptKind === "turn";
+  finishTurn(session, "cancelled");
+  let replacement: AcpThreadSession;
+  try {
+    replacement = await startAgentSession({
+      kind: "resume",
+      params: construction,
+      resumeProviderThreadId: previousProviderThreadId,
+    });
+  } catch (error) {
+    if (continuingTurn) {
+      emitSessionError(
+        session,
+        error instanceof Error ? error.message : String(error),
+      );
+    }
+    throw error;
+  }
+  replacement.queuedInputs.push(...queuedInputs);
+  sendNotification(BRIDGE_NOTIFICATION_METHODS.sessionReplaced, {
+    threadId: session.bbThreadId,
+    providerThreadId: replacement.providerThreadId,
+    reason,
+    contextLost: replacement.providerThreadId !== previousProviderThreadId,
+  });
+  return replacement;
 }
 
 function startCompaction(
@@ -2639,31 +2746,13 @@ async function handleRequest(
         sendError(request.id, -32000, "A turn is already active");
         return;
       }
-      if (Object.keys(params.options.envVars ?? {}).length > 0) {
-        const envVars = {
-          ...(decodeLaunchSpec(params.options.providerOptions)?.env ?? {}),
-          ...params.options.envVars,
-        };
-        if (!isDeepStrictEqual(envVars, session.construction.envVars ?? {})) {
-          const previousProviderThreadId = session.providerThreadId;
-          session = await startAgentSession({
-            kind: "resume",
-            params: { ...session.construction, envVars },
-            resumeProviderThreadId: previousProviderThreadId,
-          });
-          sendNotification(BRIDGE_NOTIFICATION_METHODS.sessionReplaced, {
-            threadId: params.threadId,
-            providerThreadId: session.providerThreadId,
-            reason:
-              "Execution settings changed; the ACP session was rebuilt to apply them.",
-            contextLost: session.providerThreadId !== previousProviderThreadId,
-          });
-        }
-      }
+      const reconciled = reconcileExecutionSettings(session, params.options);
+      session = reconciled instanceof Promise ? await reconciled : reconciled;
       const pending: AcpPendingTurnInput = {
         clientRequestId: params.clientRequestId,
         input: params.input,
         requestId: request.id,
+        options: params.options,
       };
       if (isStandaloneBuiltinCompactCommand(params.input)) {
         startCompaction(session, pending);
@@ -2682,7 +2771,7 @@ async function handleRequest(
       }
       if (session.activePromptKind !== "turn") {
         const message = "No active turn to steer";
-        sendError(request.id, ACP_BRIDGE_NO_ACTIVE_TURN_ERROR_CODE, message, {
+        sendError(request.id, BRIDGE_JSON_RPC_ERRORS.NO_ACTIVE_TURN, message, {
           recovery: { kind: "staleTurn", message, retryable: false },
         });
         return;
@@ -2691,6 +2780,7 @@ async function handleRequest(
         clientRequestId: params.clientRequestId,
         input: params.input,
         requestId: null,
+        options: params.options,
       });
       requestSteerCancel(session);
       sendResult(request.id, { threadId: params.threadId });

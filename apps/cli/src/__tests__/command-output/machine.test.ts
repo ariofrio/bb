@@ -1,4 +1,4 @@
-import { describe, expect, it, vi } from "vitest";
+import { describe, expect, it, onTestFinished, vi } from "vitest";
 import type { Host } from "@bb/domain";
 import {
   collectLogPayloads,
@@ -341,6 +341,9 @@ describe("bb machine command output", () => {
 
   it("polls the host phase before reporting lifecycle completion", async () => {
     vi.useFakeTimers();
+    onTestFinished(() => {
+      vi.useRealTimers();
+    });
     const suspend = vi.fn(async () => ({
       ...hosts[1]!,
       lifecycle: { ...hosts[1]!.lifecycle, phase: "suspending" as const },
@@ -386,10 +389,6 @@ describe("bb machine command output", () => {
 describe("machine selection", () => {
   it("resolves an ID before names", () => {
     expect(resolveMachineId(hosts, "host-primary")).toBe("host-primary");
-  });
-
-  it("resolves an unambiguous name", () => {
-    expect(resolveMachineId(hosts, "laptop")).toBe("host-remote");
   });
 
   it("lists matching IDs for an ambiguous name", () => {

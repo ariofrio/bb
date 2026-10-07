@@ -12,7 +12,9 @@
   default model on the target machine.
 - Select a target with `--environment`, `--new-environment`, `--base-branch`,
   or `--machine`. Select execution with `--provider`, `--model`,
-  `--reasoning-level`, `--service-tier`, and `--permission-mode`.
+  `--reasoning-level`, `--service-tier`, and `--permission-mode`. A service
+  tier is a provider-defined id (`default`, `fast`, Codex `ultrafast`);
+  `bb provider models <provider-id>` lists the tiers each model accepts.
 - List plugin-provisioned environment choices with `bb environment providers`. Add `--project <id>` and optionally `--machine <id>` to omit providers whose declared requirements are unmet. Without a machine, the project listing includes providers structurally eligible on any persistent machine. Git inspection and plugin availability run only for the selected provider and machine during thread creation. `--json` includes each provider's `description` and `icon`, its `requires` facts and its `inputs` JSON Schema or null.
   Pass the selected ID to `--environment-provider`. Add
   `--environment-inputs <json>` only when the provider's schema does not accept
@@ -33,14 +35,12 @@ worktree` only; a provider takes its branch through `--environment-inputs`.
 - Spawn also accepts `--title`, `--origin-kind`, `--source-thread`,
   `--source-seq-end`, `--agent-context-seed`, and `--json`.
 - Add repeatable `--file <path>` / `--image <path>` flags for structured prompt
-  attachments, and `--section <id>` to add the new thread to a section.
+  attachments, `--section <id>` to add the new thread to a section, and
+  `--pinned` to pin it at creation. Section and pinning can be combined;
+  unpinning then reveals the thread in its section.
   Both flags upload absolute paths and `file:` URLs from the CLI machine
   before sending and pass relative server-upload tokens through unchanged.
   Use an absolute path (for example, `--file "$PWD/report.pdf"`) for local files.
-- `--draft` saves the prompt as a draft thread instead of sending it: the
-  thread stays `pending` with nothing provisioned. Read or change the draft
-  with `bb thread draft show|set|clear <thread-id>`; start the thread with
-  `bb thread tell <thread-id> "..."`. Sending does not clear the draft.
 - Spawn creates a root thread unless you pass `--parent-thread`.
 - Handoff can target any model, including one from the source provider. In
   the follow-up picker, choose **Handoff to new thread**; **Exit handoff** in
@@ -58,7 +58,10 @@ worktree` only; a provider takes its branch through `--environment-inputs`.
   source environment. Anchor with
   `--source-seq-end` on a completed source turn (the clone and inherited
   timeline both end with the turn containing that sequence). Permission mode
-  inherits the source thread unless explicitly overridden.
+  inherits the source thread unless explicitly overridden. A visible idle fork
+  without `--title` is named after its source with a numbered prefix (`foo` →
+  `(1) foo`, `(1) foo` → `(2) foo`); a fork with a first prompt is titled from
+  that prompt.
 - Pass `--visibility hidden` for background/plugin workers that should remain
   out of sidebar organization without contributing unread/pending favicon
   attention. `bb thread list` excludes them by
@@ -112,6 +115,9 @@ worktree` only; a provider takes its branch through `--environment-inputs`.
   `bb updates app apply [--yes] [--no-wait]` downloads the
   update and restarts bb into it, without rolling back if it fails to start.
   Running it from a thread restarts bb and interrupts that thread.
+  Source installs show their Git revision and use manual Git updates without the
+  update shim. They are never compared with npm releases; unavailable release
+  checks report “Latest unknown”.
 - Use `bb project create --name <name> --root <path> --machine <id-or-name>`
   to bind a new project's local path to a connected enrolled machine. Use
   `--host` as an alias. Without a selector, the CLI asks its local host daemon.
@@ -266,14 +272,14 @@ archive encrypted by an older bb. A rerun rolls back an interrupted import from
 `server-import-journal.json` before importing again (`--json` reports
 `rolledBackInterruptedImport: true`), and bb refuses to start a
 server on an interrupted import until then. Stop the original server before
-you start the imported one: both hold the same connect credential and would
+you start the imported one: both hold the same bb account credential and would
 take each other's tunnel.
 
 An import also writes `server-connect-hold.json`, so the imported server starts
-without its connect tunnel. After the original server is stopped,
+without its connect tunnel or bb account. After the original server is stopped,
 `bb server allow-connect [--data-dir <dir>] [--yes] [--json]` removes the hold
-(`--json` prints `dataDir` and `connectHoldRemoved`); the tunnel starts the next
-time that server starts.
+(`--json` prints `dataDir` and `connectHoldRemoved`); both start the next time
+that server starts.
 
 The old computer's data directory keeps a `server-moved.json` lock, so bb runs
 there as a regular machine. `bb server delete-old-copy` deletes the server files
@@ -282,7 +288,8 @@ self-updating machine service there after the move; until that succeeds, and
 after a move from `bb-app`, the machine stays connected only while the app runs.
 `bb server install-machine-service [--data-dir <dir>] [--yes] [--json]` stops
 bb there and runs `install-machine.sh --adopt --data-dir <dir>` to install the
-persistent, self-updating service with the same machine ID. It needs Node.js
+persistent, self-updating service with the same machine ID. It runs on macOS
+and Linux only and refuses on Windows. It needs Node.js
 22.19 or newer on the PATH, and `bb server unlock` refuses while the service
 exists. `bb server unlock` removes the lock so
 the old copy can start again; everything since the move is lost there, and the

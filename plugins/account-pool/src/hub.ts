@@ -15,7 +15,10 @@ import {
 } from "./codex-adapter.js";
 import type { ProviderAdapter } from "./provider-adapter.js";
 import type { ImportedProviderAccount } from "./provider-adapter.js";
-import { TransientOAuthRefreshError } from "./provider-adapter.js";
+import {
+  OAuthRefreshError,
+  TransientOAuthRefreshError,
+} from "./provider-adapter.js";
 import type {
   ImportedClaudeCredentials,
   ImportedCodexCredentials,
@@ -24,8 +27,10 @@ import {
   accountStatus,
   blockingResetAt,
   governingWeeklyResetAt,
+  hasExtraUsage,
   isQuotaExhausted,
   isSharedQuotaExhausted,
+  isUsageRestricted,
   retryAfterMilliseconds,
 } from "./quota.js";
 import type {
@@ -78,6 +83,12 @@ interface HubOptions {
   getParentRoute: () => ParentPool | null;
   onAccountsChanged: () => void;
   onUpstreamError: (provider: PoolProvider, error: unknown) => void;
+  onOAuthRefresh: (
+    provider: PoolProvider,
+    accountId: string,
+    outcome: "succeeded" | "failed",
+    message: string,
+  ) => void;
 }
 
 interface SelectedAccount {
@@ -445,8 +456,16 @@ export class AccountPoolHub {
           routing,
           signal,
         );
-        if (selected === null) {
-          if (usageRefreshed) break;
+        if (
+          !usageRefreshed &&
+          (selected === null ||
+            isQuotaExhausted(
+              selected.quota,
+              family,
+              this.options.getSettings().switchThreshold,
+              this.options.now(),
+            ))
+        ) {
           usageRefreshed = true;
           await abortable(
             this.refreshExhaustedUsage(candidateIds, attempted, family),
@@ -454,6 +473,7 @@ export class AccountPoolHub {
           );
           continue;
         }
+        if (selected === null) break;
         let pacing: PacingFlight | null = null;
         const heldMs = (selected.quota.heldUntil ?? 0) - this.options.now();
         let activePacing = this.pacingByAccount.get(selected.account.id);
@@ -831,11 +851,32 @@ export class AccountPoolHub {
         account,
         quota: this.options.quotas.get(account.id),
       }))
-      .filter(({ quota }) => quota.error === null)
-      .filter(({ quota }) => !isSharedQuotaExhausted(quota, threshold, now));
-    const eligible = available.filter(
+      .filter(
+        ({ quota }) => quota.error === null && !isUsageRestricted(quota, now),
+      )
+      .filter(
+        ({ quota }) =>
+          !isSharedQuotaExhausted(quota, threshold, now) ||
+          hasExtraUsage(quota),
+      );
+    let eligible = available.filter(
+      ({ quota }) =>
+        !isQuotaExhausted(quota, family, threshold, now) ||
+        hasExtraUsage(quota),
+    );
+    const included = eligible.filter(
       ({ quota }) => !isQuotaExhausted(quota, family, threshold, now),
     );
+    if (
+      included.some(
+        ({ account, quota }) =>
+          candidateIds.has(account.id) &&
+          !attempted.has(account.id) &&
+          (quota.heldUntil === null || quota.heldUntil <= now),
+      )
+    ) {
+      eligible = included;
+    }
     const unattempted = eligible.filter(
       ({ account }) =>
         candidateIds.has(account.id) && !attempted.has(account.id),
@@ -921,8 +962,12 @@ export class AccountPoolHub {
     routing.binding ??= binding ?? null;
     routing.active ??= active;
     const familyDetour = (accountId: string | null) =>
-      available.some(({ account }) => account.id === accountId) &&
-      !eligible.some(({ account }) => account.id === accountId);
+      available.some(
+        ({ account, quota }) =>
+          account.id === accountId &&
+          !isSharedQuotaExhausted(quota, threshold, now) &&
+          isQuotaExhausted(quota, family, threshold, now),
+      );
     const rebind =
       affinityKey !== null &&
       !familyDetour(boundAccountId) &&
@@ -1053,11 +1098,23 @@ export class AccountPoolHub {
               });
               this.refreshBackoffs.delete(account.id);
               if (result.refreshed) {
+                this.options.onOAuthRefresh(
+                  account.provider,
+                  account.id,
+                  "succeeded",
+                  `previousExpiresAt=${secret.kind === "oauth" ? secret.expiresAt : null}, expiresAt=${result.secret.kind === "oauth" ? result.secret.expiresAt : null}, forced=${forceRefresh}.`,
+                );
                 const quota = this.options.quotas.get(account.id);
                 this.options.quotas.put({ ...quota, error: null });
               }
               return result.secret;
             } catch (error) {
+              this.options.onOAuthRefresh(
+                account.provider,
+                account.id,
+                "failed",
+                `${error instanceof OAuthRefreshError ? error.message : "Stored credential refresh failed."} expiresAt=${secret.kind === "oauth" ? secret.expiresAt : null}, forced=${forceRefresh}.`,
+              );
               if (
                 !(error instanceof TransientOAuthRefreshError) ||
                 secret.kind !== "oauth"
@@ -1219,10 +1276,13 @@ export class AccountPoolHub {
       .flatMap((account) => {
         const quota = this.options.quotas.get(account.id);
         if (quota.error !== null) return [];
-        const quotaResetAt = blockingResetAt(quota, family, threshold, now);
+        const quotaResetAt = hasExtraUsage(quota)
+          ? null
+          : blockingResetAt(quota, family, threshold, now);
         if (
           quotaResetAt === null &&
-          isQuotaExhausted(quota, family, threshold, now)
+          isQuotaExhausted(quota, family, threshold, now) &&
+          !hasExtraUsage(quota)
         )
           return [];
         const resetAt = Math.max(quota.heldUntil ?? 0, quotaResetAt ?? 0);
@@ -1319,6 +1379,7 @@ export function createHub(options: {
   getParentRoute?: () => ParentPool | null;
   onAccountsChanged?: () => void;
   onUpstreamError?: (provider: PoolProvider, error: unknown) => void;
+  onOAuthRefresh?: HubOptions["onOAuthRefresh"];
 }): AccountPoolHub {
   const adapters: ReadonlyMap<PoolProvider, ProviderAdapter> = new Map([
     [
@@ -1353,6 +1414,7 @@ export function createHub(options: {
     getParentRoute: options.getParentRoute ?? (() => null),
     onAccountsChanged: options.onAccountsChanged ?? (() => {}),
     onUpstreamError: options.onUpstreamError ?? (() => {}),
+    onOAuthRefresh: options.onOAuthRefresh ?? (() => {}),
   });
 }
 

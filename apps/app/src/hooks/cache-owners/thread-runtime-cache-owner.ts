@@ -683,6 +683,7 @@ function buildOptimisticUserMessageRow({
     role: "user",
     threadId,
     turnId: null,
+    messageSeq: 0,
     sourceSeqStart: 0,
     sourceSeqEnd: 0,
     startedAt: createdAt,
@@ -718,7 +719,6 @@ function applyOptimisticAcceptedTurnThreadState({
     runtime: {
       ...thread.runtime,
       displayStatus:
-        thread.runtime.displayStatus === "host-reconnecting" ||
         thread.runtime.displayStatus === "waiting-for-host"
           ? thread.runtime.displayStatus
           : "active",
@@ -886,11 +886,6 @@ export function prefetchThreadQueuedMessages({
   });
 }
 
-interface ThreadResultCacheArgs {
-  queryClient: QueryClient;
-  thread: ThreadResponse;
-}
-
 export function applyCreateThreadResult({
   queryClient,
   request,
@@ -918,14 +913,16 @@ export function applyCreateThreadResult({
     thread,
     cachedHostId ?? selectedHostId,
   );
-  prependProjectPromptHistory(
-    queryClient,
-    request.projectId,
-    buildAcceptedPromptHistoryEntry({
-      createdAt: thread.createdAt,
-      input: request.input,
-    }),
-  );
+  if (request.input.length > 0) {
+    prependProjectPromptHistory(
+      queryClient,
+      request.projectId,
+      buildAcceptedPromptHistoryEntry({
+        createdAt: thread.createdAt,
+        input: request.input,
+      }),
+    );
+  }
   invalidateProjectPromptHistoryQueries({
     queryClient,
     projectId: request.projectId,
@@ -936,22 +933,6 @@ export function applyCreateThreadResult({
     });
   }
   refetchThreadListsAfterComposerThreadCreate({ queryClient });
-}
-
-export function applyCreateDraftThreadResult({
-  queryClient,
-  thread,
-}: ThreadResultCacheArgs): void {
-  queryClient.setQueryData<ThreadResponse>(threadQueryKey(thread.id), thread);
-  optimisticallyInsertThread(queryClient, thread);
-  refetchThreadListsAfterComposerThreadCreate({ queryClient });
-}
-
-export function applyThreadDraftUpdateResult({
-  queryClient,
-  thread,
-}: ThreadResultCacheArgs): void {
-  queryClient.setQueryData<ThreadResponse>(threadQueryKey(thread.id), thread);
 }
 
 export async function beginSendThreadMessageTransaction({

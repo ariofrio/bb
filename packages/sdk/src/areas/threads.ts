@@ -34,6 +34,7 @@ import type {
   ThreadCountQuery,
   ThreadCountResponse,
   ThreadListResponse,
+  ThreadMessageResponse,
   ThreadRunningResponse,
   ThreadOpenResponse,
   ThreadPaneAction,
@@ -75,7 +76,6 @@ import type {
   TimelineTurnSummaryDetailsQuery,
   UpdateThreadTabsRequest,
   UpdateThreadRequest,
-  UpdateThreadDraftRequest,
   UpdateQueuedMessageRequest,
 } from "@bb/server-contract";
 import { signalRequestArgs, type CreateSdkAreaArgs } from "./common.js";
@@ -163,6 +163,7 @@ export type ThreadCountResult = ThreadCountResponse;
 export type ThreadRunningResult = ThreadRunningResponse;
 export type ThreadListResult = ThreadListResponse;
 export type ThreadSearchResult = ThreadSearchResponse;
+export type ThreadMessageResult = ThreadMessageResponse;
 export type ThreadResolveMentionsResult = ResolveThreadMentionsResponse;
 export interface ThreadOutputResponse {
   output: string | null;
@@ -246,10 +247,6 @@ export interface ThreadForkArgs extends Omit<
 }
 
 export interface ThreadUpdateArgs extends UpdateThreadRequest {
-  threadId: string;
-}
-
-export interface ThreadUpdateDraftArgs extends UpdateThreadDraftRequest {
   threadId: string;
 }
 
@@ -408,6 +405,14 @@ export interface ThreadTimelineArgs extends ThreadTimelineQuery {
 export interface ThreadOutputArgs {
   signal?: AbortSignal;
   threadId: string;
+}
+
+export interface ThreadMessageArgs {
+  signal?: AbortSignal;
+  threadId: string;
+  seq: number;
+  before?: number;
+  after?: number;
 }
 
 export interface ThreadInteractionListArgs {
@@ -585,6 +590,7 @@ export interface ThreadsArea {
   markUnread(args: ThreadActionArgs): Promise<ThreadReadStateResult>;
   open(args: ThreadOpenArgs): Promise<ThreadOpenResult>;
   paneAction(args: ThreadPaneActionArgs): Promise<ThreadPaneActionResult>;
+  message(args: ThreadMessageArgs): Promise<ThreadMessageResult>;
   output(args: ThreadOutputArgs): Promise<ThreadOutputResponse>;
   pin(args: ThreadActionArgs): Promise<ThreadMutationResult>;
   promptHistory(
@@ -635,12 +641,6 @@ export interface ThreadsArea {
   unarchive(args: ThreadActionArgs): Promise<ThreadUnarchiveResult>;
   unpin(args: ThreadActionArgs): Promise<ThreadMutationResult>;
   update(args: ThreadUpdateArgs): Promise<ThreadMutationResult>;
-  /**
-   * Replace the thread's saved, unsent draft message. An empty `input` clears
-   * it. On a `pending` thread the draft also becomes the thread's fallback
-   * title. Sending a message does not clear the draft; clear it explicitly.
-   */
-  updateDraft(args: ThreadUpdateDraftArgs): Promise<ThreadMutationResult>;
   wait(args: ThreadWaitArgs): Promise<ThreadWaitResult>;
 }
 
@@ -1237,6 +1237,24 @@ export function createThreadsArea(args: CreateSdkAreaArgs): ThreadsArea {
         ),
       );
     },
+    async message(input) {
+      return transport.readJson(
+        transport.api.v1.threads[":id"].messages[":seq"].$get(
+          {
+            param: { id: input.threadId, seq: String(input.seq) },
+            query: {
+              ...(input.before === undefined
+                ? {}
+                : { before: String(input.before) }),
+              ...(input.after === undefined
+                ? {}
+                : { after: String(input.after) }),
+            },
+          },
+          ...signalRequestArgs(input.signal),
+        ),
+      );
+    },
     async output(input) {
       return transport.readJson(
         transport.api.v1.threads[":id"].output.$get(
@@ -1475,14 +1493,6 @@ export function createThreadsArea(args: CreateSdkAreaArgs): ThreadsArea {
         transport.api.v1.threads[":id"].$patch({
           param: { id: input.threadId },
           json: updateJson(input),
-        }),
-      );
-    },
-    async updateDraft(input) {
-      return transport.readJson(
-        transport.api.v1.threads[":id"].draft.$put({
-          param: { id: input.threadId },
-          json: { input: input.input },
         }),
       );
     },

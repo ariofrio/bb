@@ -9,6 +9,7 @@ import type { PromptMentionLinkResolver } from "@/components/promptbox/editor/pr
 import { Button } from "@bb/shared-ui/button";
 import { ConversationTimeline } from "@/components/ui/conversation.js";
 import { HeightTransition } from "@/components/ui/height-transition.js";
+import { useDelayedBusyIndicator } from "@/components/ui/route-navigation-indicator";
 import { Icon } from "@bb/shared-ui/icon";
 import { Skeleton } from "@bb/shared-ui/skeleton";
 import { toUserAttachmentImageSrc } from "@/lib/user-attachment-images";
@@ -33,7 +34,6 @@ import type {
 
 export interface HostConnectionNotice {
   label: string;
-  tone: "pending" | "error";
 }
 
 export interface ThreadTimelineSurfaceProps {
@@ -43,6 +43,7 @@ export interface ThreadTimelineSurfaceProps {
   threadOriginKind?: ThreadOriginKind | null;
   hasOlderTimelineRows?: boolean;
   hostConnectionNotice?: HostConnectionNotice | null;
+  isCatchingUpTimeline?: boolean;
   isLoadingOlderTimelineRows?: boolean;
   isThreadTimelinePending: boolean;
   timelineError: boolean;
@@ -145,6 +146,7 @@ export function ThreadTimelineSurface({
   threadOriginKind = null,
   hasOlderTimelineRows = false,
   hostConnectionNotice,
+  isCatchingUpTimeline = false,
   isLoadingOlderTimelineRows = false,
   isThreadTimelinePending,
   timelineError,
@@ -178,6 +180,10 @@ export function ThreadTimelineSurface({
   unreadDividerPlacement,
   workspaceRootPath,
 }: ThreadTimelineSurfaceProps) {
+  const showCatchUpIndicator =
+    useDelayedBusyIndicator(
+      isCatchingUpTimeline && !isThreadTimelinePending && !timelineError,
+    ) && !showOngoingIndicator;
   const showActiveThinking =
     activeThinking !== null && ongoingIndicatorLabel === undefined;
   const activeThinkingText = activeThinking?.text.trim() ?? "";
@@ -254,13 +260,21 @@ export function ThreadTimelineSurface({
         {hostConnectionNotice ? (
           <TimelineStatusIndicator
             label={hostConnectionNotice.label}
-            className={
-              hostConnectionNotice.tone === "error"
-                ? "mt-4 text-destructive"
-                : "mt-4"
-            }
+            className="mt-4 text-destructive"
           />
         ) : null}
+        <HeightTransition visible={showCatchUpIndicator}>
+          {showCatchUpIndicator ? (
+            <TimelineStatusIndicator
+              label={
+                <span role="status" className="animate-shine">
+                  {CATCH_UP_INDICATOR_LABEL}
+                </span>
+              }
+              className="mt-4 flex min-h-7 items-center"
+            />
+          ) : null}
+        </HeightTransition>
         <HeightTransition visible={showOngoingIndicator}>
           <TimelineWorkingIndicator
             key={ongoingIndicatorKey}
@@ -320,6 +334,7 @@ function LoadOlderMessages({
 }
 
 const LOADING_INDICATOR_REVEAL_DELAY_MS = 200;
+const CATCH_UP_INDICATOR_LABEL = "Loading latest messages…";
 
 function DelayedThreadLoadingIndicator() {
   const [visible, setVisible] = useState(false);

@@ -1,3 +1,4 @@
+import { SidebarFooterCustomizeHeader } from "./SidebarFooterCustomizeHeader";
 import { useEffect, useRef } from "react";
 import { closestCenter, DndContext, type DragEndEvent } from "@dnd-kit/core";
 import {
@@ -5,11 +6,9 @@ import {
   SortableContext,
   verticalListSortingStrategy,
 } from "@dnd-kit/sortable";
-import { Button } from "@bb/shared-ui/button";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@bb/shared-ui/tooltip";
 import { Icon } from "@bb/shared-ui/icon";
 import { cn } from "@bb/shared-ui/lib/utils";
-import { CHROME_SECTION_LABEL_CLASS } from "@bb/shared-ui/chrome-style-tokens";
 import { FooterItemIcon } from "@/components/plugin/PluginSidebarFooterItems";
 import {
   type FooterItem,
@@ -61,29 +60,14 @@ export function SidebarFooterCustomize({ onDone }: { onDone: () => void }) {
         onDone();
       }}
     >
-      <div className="flex items-center gap-1 px-1 pb-1">
-        <div
-          className={cn("min-w-0 flex-1 px-2 py-1", CHROME_SECTION_LABEL_CLASS)}
-        >
-          Customize footer
-        </div>
-        <Button
-          type="button"
-          variant="ghost"
-          size="sm"
-          className="h-6 shrink-0 px-2 text-xs text-sidebar-foreground ring-sidebar-ring hover:bg-sidebar-accent focus-visible:ring-2"
-          onClick={onDone}
-        >
-          Done
-        </Button>
-      </div>
+      <SidebarFooterCustomizeHeader onDone={onDone} />
       <div
         ref={footerRowRef}
-        className="flex items-center gap-1 overflow-hidden bg-sidebar-accent py-2"
+        className="relative flex items-center gap-1 overflow-hidden bg-sidebar-accent px-3 py-2"
       >
         <ul
           aria-label="Footer icons"
-          className="flex min-w-0 items-center gap-1"
+          className="flex min-w-0 flex-1 items-center justify-between gap-1"
           onClickCapture={footerDnd.onClickCapture}
         >
           <DndContext {...footerDnd.dndContextProps}>
@@ -117,18 +101,16 @@ export function SidebarFooterCustomize({ onDone }: { onDone: () => void }) {
           aria-hidden="true"
           className={cn(
             SIDEBAR_FOOTER_ACTION_CLASS,
-            "flex shrink-0 items-center justify-center text-muted-foreground",
+            "invisible absolute pointer-events-none",
           )}
-        >
-          <Icon name="MoreHorizontal" />
-        </span>
+        />
       </div>
       {preferences.more.length > 0 && (
         <>
           <ZoneLabel label="More menu" />
           <ul
             aria-label="More menu items"
-            className="space-y-0.5 px-1"
+            className="space-y-0.5 px-2"
             onClickCapture={moreDnd.onClickCapture}
           >
             <DndContext {...moreDnd.dndContextProps}>
@@ -156,7 +138,7 @@ export function SidebarFooterCustomize({ onDone }: { onDone: () => void }) {
 
 function ZoneLabel({ label }: { label: string }) {
   return (
-    <div className="px-2 pb-1 pt-2 text-xs text-muted-foreground">{label}</div>
+    <div className="px-3 pb-1 pt-2 text-xs text-muted-foreground">{label}</div>
   );
 }
 
@@ -199,7 +181,7 @@ function FooterIconTile({
         type="button"
         aria-label={`Remove ${item.label} from footer`}
         data-footer-placement-toggle={item.key}
-        className={cn(BADGE_CLASS, "absolute -right-1 -top-1")}
+        className={cn(BADGE_CLASS, "absolute -top-1.5 right-0")}
         onPointerDown={(event) => event.stopPropagation()}
         onClick={onRemove}
       >

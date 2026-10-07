@@ -5,7 +5,6 @@ import {
   getEnvironment,
   getProjectSourceByHost,
   getThread,
-  setThreadExecutionOverride,
 } from "@bb/db";
 import type {
   ProjectExecutionDefaults,
@@ -30,7 +29,7 @@ import {
   rememberProjectExecutionDefaultsForCreate,
   resolveProjectExecutionDefaultsForCreate,
 } from "./project-execution-defaults.js";
-import { validatePromptAttachmentReferences } from "../projects/attachments.js";
+import { resolvePromptAttachmentReferences } from "../projects/attachments.js";
 import {
   appendPluginMentionContext,
   captureUserMessageSentTelemetry,
@@ -64,7 +63,7 @@ import {
   type ThreadCreateServiceRequest,
 } from "./thread-create-request.js";
 import { resolveDispatchAuthor } from "./dispatch-author.js";
-import { deriveTitleFallback } from "./title-generation.js";
+import { deriveForkTitle, deriveTitleFallback } from "./title-generation.js";
 import type { ThreadProvisionEnvironmentIntent } from "./thread-startup-store.js";
 import { resolveSystemProviderModels } from "../system/execution-options.js";
 import {
@@ -427,38 +426,30 @@ async function createPendingThreadAndAttemptFirstDispatch(
       args.request,
       executionPlanArgs,
     );
-    if (args.request.draft === true) {
-      setThreadExecutionOverride(deps.db, {
-        threadId: thread.id,
-        modelOverride: execution.model,
-        reasoningLevelOverride: execution.reasoningLevel,
-      });
-    } else {
-      await attemptDispatch(deps, {
-        thread,
-        payload: {
-          input: args.request.input,
-          mode: "start",
-          model: execution.model,
-          reasoningLevel: execution.reasoningLevel,
-          serviceTier: execution.serviceTier,
-          permissionMode: execution.permissionMode,
-          ...(args.request.executionInputSources !== undefined
-            ? { executionInputSources: args.request.executionInputSources }
-            : {}),
-          ...(args.sendAt !== undefined ? { sendAt: args.sendAt } : {}),
-        },
-        source: { kind: "inline" },
-        queuePayload: { kind: "inline" },
-        pluginSubmission: args.request.pluginSubmission ?? null,
-        startContext,
-        executionDefaults: executionPlanArgs,
-        origin: args.request.origin,
-        originPluginId: args.request.originPluginId ?? null,
-        startedOnBehalfOf: args.request.startedOnBehalfOf,
-        trigger: "user",
-      });
-    }
+    await attemptDispatch(deps, {
+      thread,
+      payload: {
+        input: args.request.input,
+        mode: "start",
+        model: execution.model,
+        reasoningLevel: execution.reasoningLevel,
+        serviceTier: execution.serviceTier,
+        permissionMode: execution.permissionMode,
+        ...(args.request.executionInputSources !== undefined
+          ? { executionInputSources: args.request.executionInputSources }
+          : {}),
+        ...(args.sendAt !== undefined ? { sendAt: args.sendAt } : {}),
+      },
+      source: { kind: "inline" },
+      queuePayload: { kind: "inline" },
+      pluginSubmission: args.request.pluginSubmission ?? null,
+      startContext,
+      executionDefaults: executionPlanArgs,
+      origin: args.request.origin,
+      originPluginId: args.request.originPluginId ?? null,
+      startedOnBehalfOf: args.request.startedOnBehalfOf,
+      trigger: "user",
+    });
   } catch (error) {
     emitPluginThreadDeleted({
       ...thread,
@@ -550,11 +541,9 @@ export async function createThreadFromRequest(
   }
   const pluginMetadata = resolveCreateThreadPluginMetadata(rawRequestInput);
   const requestInput = { ...rawRequestInput };
-  if (requestInput.draft !== true) {
-    requestInput.input = (
-      await appendPluginMentionContext({ input: requestInput.input })
-    ).input;
-  }
+  requestInput.input = (
+    await appendPluginMentionContext({ input: requestInput.input })
+  ).input;
   assertProjectWorkspaceCompatibility(project, requestInput);
   const originKind = requestInput.originKind ?? null;
   const sourceThreadId =
@@ -634,12 +623,6 @@ export async function createThreadFromRequest(
       );
     }
   }
-  await validatePromptAttachmentReferences({
-    db: deps.db,
-    dataDir: deps.config.dataDir,
-    input: requestInput.input,
-    projectId: requestInput.projectId,
-  });
   await deps.providerRegistry.whenRegistrationsSettled();
   const {
     executionDefaults,
@@ -694,6 +677,18 @@ export async function createThreadFromRequest(
     providerId,
     titleFallback: deriveTitleFallback(requestInput.input),
   };
+  if (
+    request.title === undefined &&
+    request.originKind === "fork" &&
+    request.visibility === "visible" &&
+    request.input.every((item) => item.visibility === "agent-only") &&
+    sourceThread !== null
+  ) {
+    const forkTitle = deriveForkTitle(sourceThread);
+    if (forkTitle !== null) {
+      request.title = forkTitle;
+    }
+  }
   const resolvedEnvironment =
     requestedEnvironment.type === "provider"
       ? null
@@ -716,7 +711,7 @@ export async function createThreadFromRequest(
     originKind: request.originKind ?? null,
     sourceThread,
   });
-  if (childHostId !== null && request.draft !== true) {
+  if (childHostId !== null) {
     await ensureHostSessionReadyForWork(deps, { hostId: childHostId });
   }
   const modelCatalogCwd =
@@ -759,6 +754,13 @@ export async function createThreadFromRequest(
       projectId: request.projectId,
       requestedEnvironment: request.environment,
     });
+  request.input = await resolvePromptAttachmentReferences({
+    db: deps.db,
+    dataDir: deps.config.dataDir,
+    input: request.input,
+    projectId: request.projectId,
+    hostId: hostIdForEnvironmentIntent(deps, environmentIntent),
+  });
 
   const fork = resolveForkPoint(deps, {
     originKind: request.originKind ?? null,
@@ -801,11 +803,7 @@ export async function createThreadFromRequest(
     senderThreadId: null,
     startedOnBehalfOf: request.startedOnBehalfOf,
   });
-  if (
-    initiator === "user" &&
-    request.draft !== true &&
-    request.input.length > 0
-  ) {
+  if (initiator === "user" && request.input.length > 0) {
     captureUserMessageSentTelemetry(deps, {
       isChildThread: parentThread !== null,
       messageSource: "thread_create",

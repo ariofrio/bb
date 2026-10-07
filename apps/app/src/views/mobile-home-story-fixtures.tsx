@@ -26,6 +26,7 @@ import {
 } from "../../.ladle/story-fixtures";
 import { RootComposeCompactHome } from "./RootComposeCompactHome";
 import { RootComposeMobileRecents } from "./RootComposeMobileRecents";
+import { ThreadActionsProvider } from "@/components/thread/ThreadActionsProvider";
 
 export const projectNamesById = new Map<string, string>([
   [PROJECT_IDS.bb, PROJECT_NAMES.bb],
@@ -62,7 +63,7 @@ export const HOME_THREADS: ThreadListEntry[] = [
     titleFallback: "Reduce style recalculation",
     status: "starting",
     latestAttentionAt: 860,
-    runtime: { displayStatus: "starting", hostReconnectGraceExpiresAt: null },
+    runtime: { displayStatus: "starting" },
   }),
   makeThreadListEntry({
     id: "thr_home_automations",
@@ -192,13 +193,15 @@ export function StoryComposer() {
 
 export function HomeRecents({ threads }: { threads: ThreadListEntry[] }) {
   return (
-    <RootComposeMobileRecents
-      highlightedThreadId={null}
-      projectNamesById={projectNamesById}
-      providersById={STORY_PROVIDERS_BY_ID}
-      showCreatingRow={false}
-      threads={threads}
-    />
+    <ThreadActionsProvider>
+      <RootComposeMobileRecents
+        highlightedThreadId={null}
+        projectNamesById={projectNamesById}
+        providersById={STORY_PROVIDERS_BY_ID}
+        showCreatingRow={false}
+        threads={threads}
+      />
+    </ThreadActionsProvider>
   );
 }
 

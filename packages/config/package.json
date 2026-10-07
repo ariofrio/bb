@@ -103,6 +103,11 @@
       "types": "./src/app-runtime-file.ts",
       "default": "./src/app-runtime-file.ts"
     },
+    "./app-install": {
+      "source": "./src/app-install.ts",
+      "types": "./src/app-install.ts",
+      "default": "./src/app-install.ts"
+    },
     "./app-update": {
       "source": "./src/app-update.ts",
       "types": "./src/app-update.ts",
@@ -141,13 +146,15 @@
   },
   "scripts": {
     "clean": "rimraf dist tsconfig.tsbuildinfo",
+    "lint": "oxlint src",
     "typecheck": "tsc --noEmit",
     "test": "vitest run --config vitest.config.ts"
   },
   "dependencies": {
     "@bb/domain": "workspace:*",
+    "@bb/process-utils": "workspace:*",
     "fs-native-extensions": "1.5.0",
-    "zod": "4.3.6"
+    "zod": "4.6.5"
   },
   "devDependencies": {
     "@bb/tsconfig": "workspace:*",

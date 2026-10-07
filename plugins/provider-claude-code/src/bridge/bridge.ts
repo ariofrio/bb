@@ -84,6 +84,7 @@ import {
   buildMutableFlagSettings,
   buildSessionOptions,
   buildWorkspaceWriteDenialMessage,
+  buildWorkspaceWriteSandbox,
   toSdkEffort,
   type BuildSessionOptionsArgs,
   type PermissionEscalationWorkContext,
@@ -102,15 +103,17 @@ import {
   type ClaudeInteractiveResponse,
   type ClaudePermissionMode,
   type ClaudePermissionRequestApprovalParams,
+  type ClaudePermissionRule,
   type ClaudeSuggestedPermissionUpdate,
   type ClaudeUserQuestionInput,
   type ClaudeUserQuestionRequestParams,
+  CLAUDE_BASH_TOOL_NAME,
   CLAUDE_EXIT_PLAN_MODE_TOOL_NAME,
   CLAUDE_USER_QUESTION_TOOL_NAME,
   claudeExitPlanModeInputSchema,
   claudeSuggestedPermissionUpdateSchema,
   claudeUserQuestionInputSchema,
-  shouldRequestClaudePermissionApproval,
+  getSuggestedRules,
   toPendingInteractionPermissionProfile,
 } from "../interactive-contract.js";
 
@@ -185,6 +188,7 @@ interface PendingPermissionRequest extends PendingInteractiveRequestBase {
   kind: "permission_request";
   originalInput: Record<string, unknown>;
   permissions: PendingInteractionGrantedPermissionProfile;
+  suggestedRules: ClaudePermissionRule[];
   toolName: string;
 }
 
@@ -318,13 +322,6 @@ interface ClaudeCodeThreadStopResult {
   ok: true;
 }
 
-interface ClaudeCanUseToolDecisionContext {
-  blockedPath: string | undefined;
-  decisionReason: string | undefined;
-  suggestions: ClaudeSuggestedPermissionUpdate[] | undefined;
-  toolName: string;
-}
-
 interface BuildInteractiveRequestParamsArgs {
   providerThreadId: string;
   threadId: string;
@@ -398,6 +395,8 @@ function requireSkillPluginsRoot(): string {
 
 const THREAD_STOP_CLOSE_TIMEOUT_MS = 4_000;
 const CLAUDE_CHROME_SETTING_RESTART_REASON = "Claude in Chrome setting changed";
+const CLAUDE_SANDBOX_SETTING_RESTART_REASON =
+  "Claude Code sandbox setting changed";
 
 const { send, sendResult, sendError } = createBridgeIo<
   BridgeEventNotification | BridgeToolCallRequest
@@ -437,6 +436,110 @@ function applyChromeSetting(
       showRuntimeNote: false,
     };
   }
+}
+
+function applyContextWindowSetting(
+  attachment: ThreadAttachment,
+  disabled: boolean | undefined,
+): void {
+  const sessionOptions = attachment.sessionConstructionConfig.sessionOptions;
+  if (disabled === undefined || sessionOptions.disable1MContext === disabled) {
+    return;
+  }
+  sessionOptions.disable1MContext = disabled;
+  attachment.sessionOptions.env = {
+    ...attachment.sessionOptions.env,
+    CLAUDE_CODE_DISABLE_1M_CONTEXT: disabled ? "1" : "0",
+  };
+  if (attachment.residentSession) {
+    attachment.residentSession.restartBeforeNextTurn = {
+      reason: "Claude Code 1M context setting changed",
+      showRuntimeNote: false,
+    };
+  }
+}
+
+function applySandboxSetting(
+  attachment: ThreadAttachment,
+  enabled: boolean | undefined,
+): void {
+  const sessionOptions = attachment.sessionConstructionConfig.sessionOptions;
+  if (enabled === undefined || sessionOptions.sandboxEnabled === enabled) {
+    return;
+  }
+  sessionOptions.sandboxEnabled = enabled;
+  const sandbox = buildWorkspaceWriteSandbox({
+    ...sessionOptions,
+    permissionMode: attachment.approvedPlanPermissionMode,
+  });
+  if (sandbox) {
+    attachment.sessionOptions.sandbox = sandbox;
+  } else {
+    delete attachment.sessionOptions.sandbox;
+  }
+  if (attachment.residentSession) {
+    attachment.residentSession.restartBeforeNextTurn = {
+      reason: CLAUDE_SANDBOX_SETTING_RESTART_REASON,
+      showRuntimeNote: false,
+    };
+  }
+}
+
+function applyPermissionSettings(
+  attachment: ThreadAttachment,
+  params: TurnStartParams | TurnSteerParams,
+): boolean {
+  const construction = attachment.sessionConstructionConfig.sessionOptions;
+  const writeRoots =
+    params.permissionScope === "workspace"
+      ? params.additionalWorkspaceWriteRoots
+      : [];
+  if (
+    attachment.approvedPlanPermissionMode === params.permissionMode &&
+    construction.permissionScope === params.permissionScope &&
+    isDeepStrictEqual(
+      construction.additionalWorkspaceWriteRoots ?? [],
+      writeRoots,
+    )
+  ) {
+    return false;
+  }
+  const permissionMode =
+    attachment.permissionMode === "plan" ? "plan" : params.permissionMode;
+  construction.permissionMode = permissionMode;
+  construction.permissionScope = params.permissionScope;
+  construction.additionalWorkspaceWriteRoots = writeRoots;
+  attachment.permissionMode = permissionMode;
+  attachment.approvedPlanPermissionMode = params.permissionMode;
+  attachment.sessionPermissionGrants = [];
+  const rebuilt = buildSessionOptions(
+    {
+      ...construction,
+      ...attachment.liveSettings,
+      permissionMode: params.permissionMode,
+    },
+    attachment.sessionOptions.env ?? {},
+  );
+  attachment.sessionOptions.permissionMode = permissionMode;
+  attachment.sessionOptions.allowBypassPermissions = rebuilt.allowBypassPermissions;
+  if (rebuilt.sandbox) {
+    attachment.sessionOptions.sandbox = rebuilt.sandbox;
+  } else {
+    delete attachment.sessionOptions.sandbox;
+  }
+  if (rebuilt.additionalDirectories) {
+    attachment.sessionOptions.additionalDirectories =
+      rebuilt.additionalDirectories;
+  } else {
+    delete attachment.sessionOptions.additionalDirectories;
+  }
+  if (attachment.residentSession) {
+    attachment.residentSession.restartBeforeNextTurn = {
+      reason: "Claude Code permissions changed",
+      showRuntimeNote: false,
+    };
+  }
+  return true;
 }
 
 function createForwardToolCall(getThreadId: () => string): ToolCallForwarder {
@@ -581,6 +684,12 @@ function sessionPermissionGrantCovers(
 function hasClaudeSessionPermissionGrant(
   args: ClaudeSessionPermissionCoverageArgs,
 ): boolean {
+  if (
+    args.permissions.network === null &&
+    args.permissions.fileSystem === null
+  ) {
+    return false;
+  }
   return args.grants.some((grant) =>
     sessionPermissionGrantCovers({
       grant,
@@ -628,6 +737,7 @@ async function applyLiveSessionSettings(
 ): Promise<void> {
   const current = threadSession.attachment.liveSettings;
   if (current.model !== next.model) {
+    threadSession.contextUsageCollector.invalidateCapacity();
     await threadSession.session.setModel(next.model);
     seedModelContextWindowHint(threadSession, threadId, next.model);
   }
@@ -856,12 +966,13 @@ function toSessionConstructionConfig(
       additionalWorkspaceWriteRoots: params.additionalWorkspaceWriteRoots,
       baseInstructions: params.baseInstructions,
       chromeEnabled: params.chromeEnabled,
+      disable1MContext: params.disable1MContext,
       cwd: params.cwd,
-      disallowedTools: params.disallowedTools,
       instructionMode: params.instructionMode,
       permissionMode: params.permissionMode,
       permissionScope: params.permissionScope,
       plugins: params.plugins,
+      sandboxEnabled: params.sandboxEnabled,
     },
   };
 }
@@ -1226,9 +1337,11 @@ function buildTrackedSessionOptions(
     {
       ...toSessionConstructionConfig(params).sessionOptions,
       ...toInitialLiveSessionSettings(params),
+      permissionMode: params.approvedPlanPermissionMode,
     },
     env,
   );
+  sessionOptions.permissionMode = params.permissionMode;
   sessionOptions.hooks = buildSessionTrackingHooks(threadIdRef);
   sessionOptions.recordThreadId = () => threadIdRef.current;
   return sessionOptions;
@@ -1374,9 +1487,10 @@ function createOnSdkMessage(
     });
     if (
       message.type === "result" ||
-      (message.type === "system" && message.subtype === "compact_boundary")
+      (message.type === "system" &&
+        (message.subtype === "init" || message.subtype === "compact_boundary"))
     ) {
-      if (message.type === "system") {
+      if (message.type === "system" && message.subtype === "compact_boundary") {
         sendThreadDeltas(args.threadIdRef.current, [
           {
             kind: "contextWindow",
@@ -1395,17 +1509,25 @@ function createOnSdkMessage(
               sessionSerial: args.sessionSerial,
               threadId: args.threadIdRef.current,
             }) === threadSession && !threadSession.streamEnded,
-          publish: (snapshot) =>
+          publish: (snapshot, snapshotCurrent) => {
+            const capacity =
+              threadSession.translator.setClaudeReportedContextWindow(
+                args.threadIdRef.current,
+                snapshot.contextWindowTokens,
+              );
             sendThreadDeltas(args.threadIdRef.current, [
-              {
-                kind: "contextWindow",
-                used: snapshot.usedTokens,
-                size: snapshot.contextWindowTokens,
-                estimated: snapshot.estimated,
-                snapshot,
-                attach: "currentOrLast",
-              },
-            ]),
+              snapshotCurrent
+                ? {
+                    kind: "contextWindow",
+                    used: snapshot.usedTokens,
+                    size: snapshot.contextWindowTokens,
+                    estimated: snapshot.estimated,
+                    snapshot,
+                    attach: "currentOrLast",
+                  }
+                : capacity,
+            ]);
+          },
         });
       }
     }
@@ -1528,7 +1650,13 @@ function applyTurnEnvironment(
     ...attachment.sessionConstructionConfig,
     config,
   };
-  attachment.sessionOptions.env = buildSessionEnv(envOverrides);
+  attachment.sessionOptions.env = {
+    ...buildSessionEnv(envOverrides),
+    CLAUDE_CODE_DISABLE_1M_CONTEXT: attachment.sessionConstructionConfig
+      .sessionOptions.disable1MContext
+      ? "1"
+      : "0",
+  };
   if (attachment.residentSession) {
     attachment.residentSession.restartBeforeNextTurn = {
       reason:
@@ -1569,6 +1697,7 @@ function buildInteractiveRequestParams(
       blockedPath: args.blockedPath,
       suggestions: args.suggestions,
     }),
+    suggestedRules: getSuggestedRules(args.suggestions),
   };
 }
 
@@ -1596,7 +1725,10 @@ function decodePendingInteractiveResponse(
     return null;
   }
   try {
-    return buildClaudeInteractiveResponse(outcome.data);
+    return buildClaudeInteractiveResponse(
+      outcome.data,
+      pending.kind === "permission_request" ? pending.suggestedRules : [],
+    );
   } catch {
     return null;
   }
@@ -1711,6 +1843,7 @@ function createForwardInteractiveRequest(
         payload,
         originalInput: args.input,
         permissions: params.permissions,
+        suggestedRules: params.suggestedRules,
         resolve: finish,
         toolName: args.toolName,
       });
@@ -1895,16 +2028,13 @@ function createCanUseTool(threadIdRef: ThreadIdRef): CanUseTool {
       options.suggestions,
     );
 
-    const requestContext: ClaudeCanUseToolDecisionContext = {
+    const requestedPermissions = toPendingInteractionPermissionProfile({
       toolName,
       blockedPath: options.blockedPath,
-      decisionReason: options.decisionReason,
       suggestions,
-    };
-    const requestedPermissions =
-      toPendingInteractionPermissionProfile(requestContext);
+    });
     if (
-      toolName === "Bash" &&
+      toolName === CLAUDE_BASH_TOOL_NAME &&
       shouldAutoDenyInteractiveRequest(interactiveRequestPolicy) &&
       typeof input === "object" &&
       input !== null &&
@@ -1929,18 +2059,6 @@ function createCanUseTool(threadIdRef: ThreadIdRef): CanUseTool {
         updatedInput: input,
         toolUseID: options.toolUseID,
         decisionClassification: "user_permanent",
-      };
-    }
-
-    const shouldRequestApproval =
-      shouldRequestClaudePermissionApproval(requestContext) ||
-      (options.suggestions?.length ?? 0) > 0;
-
-    if (!shouldRequestApproval) {
-      return {
-        behavior: "allow",
-        updatedInput: input,
-        toolUseID: options.toolUseID,
       };
     }
 
@@ -2022,7 +2140,10 @@ async function handleRequest(request: ClaudeCodeJsonRpcRequest): Promise<void> {
       sendResult(request.id, await getClaudeProviderUsage());
       break;
     case "provider/installation/status":
-      sendResult(request.id, await getClaudeProviderInstallationStatus());
+      sendResult(
+        request.id,
+        await getClaudeProviderInstallationStatus(request.params.checkUpdates),
+      );
       break;
     case "provider/installation/run":
       sendResult(
@@ -2243,7 +2364,6 @@ function toClaudeSessionParams(
     options: params.options,
     instructionMode: params.instructionMode,
     dynamicTools: params.dynamicTools,
-    disallowedTools: params.disallowedTools,
     skillRoots: configuredSkillRoots ?? undefined,
   });
 }
@@ -2266,9 +2386,17 @@ async function runTurnInput(
       applyTurnEnvironment(attachment, params.config);
     }
     applyChromeSetting(attachment, params.chromeEnabled);
+    applyContextWindowSetting(attachment, params.disable1MContext);
+    applySandboxSetting(attachment, params.sandboxEnabled);
   }
 
-  const threadSession = await getWritableThreadSession(params.threadId, intent);
+  const permissionsChanged = attachment
+    ? applyPermissionSettings(attachment, params)
+    : false;
+  const threadSession = await getWritableThreadSession(
+    params.threadId,
+    permissionsChanged ? "new-turn" : intent,
+  );
   if (!threadSession) {
     sendError(id, -32000, "No active session");
     return;
@@ -2497,6 +2625,7 @@ function handleParsedMessage(parsed: unknown): void {
     }
     if (
       pending.kind === "permission_request" &&
+      pending.toolName !== CLAUDE_BASH_TOOL_NAME &&
       shouldCacheClaudeSessionPermission(interactiveResponse)
     ) {
       threadSession.attachment.sessionPermissionGrants.push({

@@ -29,6 +29,7 @@ import CleanIcon from "@hugeicons/core-free-icons/CleanIcon";
 import Clock01Icon from "@hugeicons/core-free-icons/Clock01Icon";
 import ClockArrowDownIcon from "@hugeicons/core-free-icons/ClockArrowDownIcon";
 import ClockArrowUpIcon from "@hugeicons/core-free-icons/ClockArrowUpIcon";
+import ComputerCloudIcon from "@hugeicons/core-free-icons/ComputerCloudIcon";
 import CloudIcon from "@hugeicons/core-free-icons/CloudIcon";
 import CloudOffIcon from "@hugeicons/core-free-icons/CloudOffIcon";
 import Coffee02Icon from "@hugeicons/core-free-icons/Coffee02Icon";
@@ -63,6 +64,7 @@ import Layers01Icon from "@hugeicons/core-free-icons/Layers01Icon";
 import LayoutTwoColumnIcon from "@hugeicons/core-free-icons/Layout2ColumnIcon";
 import LayoutTwoRowIcon from "@hugeicons/core-free-icons/Layout2RowIcon";
 import LimitationIcon from "@hugeicons/core-free-icons/LimitationIcon";
+import Link02Icon from "@hugeicons/core-free-icons/Link02Icon";
 import LinkSquare02Icon from "@hugeicons/core-free-icons/LinkSquare02Icon";
 import ListEndIcon from "@hugeicons/core-free-icons/ListEndIcon";
 import ListViewIcon from "@hugeicons/core-free-icons/ListViewIcon";
@@ -245,6 +247,7 @@ export const EXTENDED_ICON_MAP: ExtendedIconMap = {
   Clock: Clock01Icon,
   ClockArrowUp: ClockArrowUpIcon,
   ClockArrowDown: ClockArrowDownIcon,
+  ComputerCloud: ComputerCloudIcon,
   Cloud: CloudIcon,
   CloudOff: CloudOffIcon,
   Coffee: Coffee02Icon,
@@ -284,6 +287,7 @@ export const EXTENDED_ICON_MAP: ExtendedIconMap = {
   Laptop: LaptopIcon,
   Layers: Layers01Icon,
   Limitation: LimitationIcon,
+  Link: Link02Icon,
   ListEnd: ListEndIcon,
   ListView: ListViewIcon,
   Lock: LockIcon,

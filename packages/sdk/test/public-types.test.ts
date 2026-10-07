@@ -222,6 +222,7 @@ interface NodeSurface {
 
 type ExpectedBbSdkKey =
   | "experimental_desktopBrowsers"
+  | "experimental_promptHistory"
   | "experimental_server"
   | "environments"
   | "files"
@@ -242,6 +243,7 @@ type ExpectedBbSdkKey =
 type ExpectedRealtimeKey = "subscribe";
 
 type ExpectedEnvironmentsKey =
+  | "experimental_cleanup"
   | "archiveThreads"
   | "commit"
   | "delete"
@@ -321,6 +323,8 @@ type ExpectedPluginCatalogKey = "install" | "installPlan" | "search" | "status";
 
 type ExpectedPluginMarketplacesKey = "add" | "list" | "refresh" | "remove";
 
+type ExpectedExperimentalPromptHistoryKey = "list";
+
 type ExpectedProjectsKey =
   | "machineEnvironment"
   | "replaceMachineEnvironment"
@@ -346,12 +350,14 @@ type ExpectedProjectsKey =
 type ExpectedProjectSourcesKey = "add" | "delete" | "update";
 type ExpectedProjectAttachmentsKey = "copy" | "read" | "upload";
 
-type ExpectedProvidersKey = "list" | "models";
+type ExpectedProvidersKey = "catalog" | "list" | "models" | "setEnabled";
 
 type ExpectedStatusKey = "get";
 
 type ExpectedSystemKey =
   | "acknowledgeAppUpdate"
+  | "mobileAppDownloads"
+  | "mobileAppReleases"
   | "appUpdate"
   | "applyAppUpdate"
   | "setMachineEnvironmentVariable"
@@ -406,6 +412,7 @@ type ExpectedThreadsKey =
   | "listRunning"
   | "markRead"
   | "markUnread"
+  | "message"
   | "open"
   | "output"
   | "paneAction"
@@ -430,7 +437,6 @@ type ExpectedThreadsKey =
   | "unarchive"
   | "unpin"
   | "update"
-  | "updateDraft"
   | "wait";
 
 type ExpectedThreadEventsKey = "list" | "wait";
@@ -567,6 +573,9 @@ describe("SDK public type entrypoints", () => {
     expectTypeOf<
       keyof RootBbSdk["projects"]["sources"]
     >().toEqualTypeOf<ExpectedProjectSourcesKey>();
+    expectTypeOf<
+      keyof RootBbSdk["experimental_promptHistory"]
+    >().toEqualTypeOf<ExpectedExperimentalPromptHistoryKey>();
     expectTypeOf<
       keyof RootBbSdk["providers"]
     >().toEqualTypeOf<ExpectedProvidersKey>();

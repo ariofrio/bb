@@ -92,7 +92,7 @@ const FIRST_PARTY_PROVIDER_DECLARATIONS = [
     supportsThreadArchive: false,
     supportsThreadRename: false,
     fork: "none",
-    supportsManualCompaction: false,
+    supportsManualCompaction: true,
     supportsUsage: false,
     visibility: "installed",
     hasLogo: true,
@@ -352,7 +352,7 @@ describe("first-party provider plugins", () => {
           harness.deps.providerRegistry
             .get("codex")
             ?.info.serviceTiers?.map((tier) => tier.id),
-        ).toEqual(["default", "fast"]);
+        ).toEqual(["default", "fast", "ultrafast"]);
       },
     );
   }, 60_000);

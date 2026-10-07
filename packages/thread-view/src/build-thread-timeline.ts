@@ -26,7 +26,6 @@ import {
   type ThreadTimelinePendingTodos,
 } from "@bb/domain";
 import type {
-  EventProjectionErrorMessage,
   EventProjectionFileEditChange,
   EventProjectionMessage,
   EventProjection,
@@ -314,12 +313,6 @@ function filterDelegationChildRows(childRows: TimelineRow[]): TimelineRow[] {
   return childRows.filter((row) => !isDelegationLifecycleChildRow(row));
 }
 
-function isReconnectErrorMessage(
-  message: EventProjectionErrorMessage,
-): boolean {
-  return message.reconnectAttempt !== undefined || message.willRetry === true;
-}
-
 function toConversationAttachments(
   attachments: Extract<EventProjectionMessage, { kind: "user" }>["attachments"],
 ): TimelineConversationAttachments | null {
@@ -494,6 +487,7 @@ function convertMessage(
           ...buildTimelineRowBase(message, options.rowIdPrefix),
           kind: "conversation",
           role: "user",
+          messageSeq: message.messageSeq,
           text: message.text,
           mentions: message.mentions,
           attachments: toConversationAttachments(message.attachments),
@@ -510,6 +504,7 @@ function convertMessage(
           ...buildTimelineRowBase(message, options.rowIdPrefix),
           kind: "conversation",
           role: "assistant",
+          messageSeq: message.sourceSeqEnd,
           text: message.text,
           attachments: null,
           turnRequest: null,
@@ -809,7 +804,7 @@ function convertMessage(
     }
     case "error": {
       const errorDisplay = buildTimelineErrorDisplay(message);
-      const isReconnect = isReconnectErrorMessage(message);
+      const isReconnect = message.willRetry === true;
       return [
         {
           ...buildTimelineRowBase(message, options.rowIdPrefix),
@@ -847,6 +842,7 @@ function convertSteerMessage(
     ...buildTimelineRowBase(message, rowIdPrefix),
     kind: "conversation",
     role: "user",
+    messageSeq: message.messageSeq,
     text: message.text,
     mentions: message.mentions,
     attachments: toConversationAttachments(message.attachments),

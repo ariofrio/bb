@@ -117,6 +117,10 @@ function runCompaction(threadId) {
       turnId,
       item: { type: "contextCompaction", id: itemId },
     });
+    if (COMPACTION_MODE === "wait-for-interrupt") {
+      openTurnIdsByThreadId.set(threadId, turnId);
+      return;
+    }
     notify("item/completed", {
       threadId,
       turnId,
@@ -205,6 +209,7 @@ const scriptPath = scriptPathFromArgs(process.argv.slice(2));
 const script = scriptPath ? JSON.parse(readFileSync(scriptPath, "utf8")) : null;
 const scriptedTurns = script?.turns ?? null;
 const requestLogPath = script?.requestLogPath ?? null;
+const responseLogPath = script?.responseLogPath ?? null;
 const modelListFailOnceMarkerPath = script?.modelListFailOnceMarkerPath ?? null;
 
 const archiveStatePath = script?.archiveStatePath ?? null;
@@ -411,11 +416,24 @@ async function handleRequest(message) {
       respond(id, {});
       return;
     case "account/rateLimits/read":
+      if (script?.rateLimitRead) {
+        if (script.rateLimitRead.hang) return;
+        setTimeout(() => {
+          if (script.rateLimitRead.error)
+            respondError(id, -32603, "Quota read unavailable");
+          else respond(id, script.rateLimitRead.result);
+        }, script.rateLimitRead.delayMs ?? 0);
+        return;
+      }
       respond(id, { rateLimits: {} });
       return;
     case "model/list":
       if (shouldFailThisModelList()) {
         respond(id, { data: [] });
+        return;
+      }
+      if (script?.modelList) {
+        respond(id, script.modelList);
         return;
       }
       respond(id, {
@@ -433,6 +451,13 @@ async function handleRequest(message) {
           },
         ],
       });
+      return;
+    case "config/read":
+      if (script?.configReadError) {
+        respondError(id, -32601, "Configuration read unavailable");
+      } else {
+        respond(id, script?.configRead ?? { config: { model: null } });
+      }
       return;
     case "skills/extraRoots/set":
       respond(id, {});
@@ -593,7 +618,7 @@ async function handleRequest(message) {
           threadId: params.threadId,
           turn: { id: turnId, status: "inProgress" },
         });
-        respond(id, {});
+        setTimeout(() => respond(id, {}), script?.startResponseDelayMs ?? 0);
         return;
       }
       if (scriptedTurns) {
@@ -759,6 +784,9 @@ stdinLines.on("line", (line) => {
     const resolve = pendingOutboundRequests.get(parsed.id);
     if (resolve) {
       pendingOutboundRequests.delete(parsed.id);
+      if (responseLogPath !== null) {
+        appendFileSync(responseLogPath, `${JSON.stringify(parsed)}\n`);
+      }
       resolve(parsed);
     }
   }

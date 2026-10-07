@@ -32,7 +32,6 @@ export const environmentGroupingSchema = z.union([
   z.literal("auto"),
   z.boolean(),
 ]);
-export type EnvironmentGrouping = z.infer<typeof environmentGroupingSchema>;
 
 export const THREAD_ROW_ACTION_IDS = [
   "split",
@@ -71,7 +70,7 @@ function definePreference<Schema extends z.ZodTypeAny>(
 export const preferenceDefinitions = {
   showProviderIcons: definePreference(
     z.boolean(),
-    false,
+    true,
     "Show each thread's agent provider icon before its title.",
     null,
   ),
@@ -96,6 +95,12 @@ export const preferenceDefinitions = {
     "auto",
     "Whether sibling threads sharing a worktree collapse into one row. auto groups them in every organization except chronological.",
     "sidebar.threadGrouping.environment",
+  ),
+  groupByReadStatus: definePreference(
+    z.boolean(),
+    false,
+    "List threads that show an unread dot above the rest, keeping the selected sort within each group. The open thread keeps its place until another thread is opened.",
+    null,
   ),
   chronologicalSort: definePreference(
     chronologicalSortSchema,
@@ -260,6 +265,3 @@ export const preferencesChangedSignalSchema = z
     value: z.unknown(),
   })
   .strict();
-export type PreferencesChangedSignal = z.infer<
-  typeof preferencesChangedSignalSchema
->;
