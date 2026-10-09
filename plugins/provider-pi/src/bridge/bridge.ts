@@ -1,11 +1,6 @@
 #!/usr/bin/env node
 
-import {
-  existsSync,
-  mkdirSync,
-  rmSync,
-  writeFileSync,
-} from "node:fs";
+import { existsSync, mkdirSync, rmSync, writeFileSync } from "node:fs";
 import { randomUUID } from "node:crypto";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
@@ -52,6 +47,10 @@ import {
   type PiSessionParams,
 } from "../session-params.js";
 import { piSessionNeedsRelocation } from "./session-cwd.js";
+import {
+  BACKGROUND_TASK_TOOLS,
+  BackgroundTaskTracker,
+} from "./background-tasks.js";
 import { BB_PI_EXTENSION_SOURCE } from "./bb-pi-extension.js";
 import {
   createExtensionUiCoordinator,
@@ -194,6 +193,7 @@ interface CurrentThreadSessionArgs {
 }
 
 interface ThreadSession {
+  backgroundTasks: BackgroundTaskTracker;
   session: PiRpcSession;
   sessionSerial: number;
   closing: boolean;
@@ -251,15 +251,22 @@ const piDeltaTranslator = createPiDeltaTranslator({
   resolveModelContextWindow: contextWindows.resolve,
 });
 
-function createForwardToolCall(getThreadId: () => string): ToolCallForwarder {
+function createForwardToolCall(
+  threadId: string,
+  sessionSerial: number,
+): ToolCallForwarder {
   return (toolName, args) => {
-    const threadId = getThreadId();
-    const threadSession = sessions.get(threadId);
+    const threadSession = getCurrentThreadSession({ threadId, sessionSerial });
     if (!threadSession || threadSession.closing) {
       return Promise.resolve({
         content: "Thread session not found",
         isError: true,
       });
+    }
+    if (BACKGROUND_TASK_TOOLS.some((tool) => tool.name === toolName)) {
+      return threadSession.backgroundTasks
+        .execute(toolName, args, threadSession.construction.shellEnvOverrides)
+        .then((content) => ({ content }));
     }
     return forwardToolCall({
       arguments: args,
@@ -287,9 +294,12 @@ async function closeThreadSession(args: {
   resolvePendingToolCalls(threadSession, args.message);
   extensionUi.cancelPendingForScope(threadSession);
   const closePromise = Promise.resolve()
-    .then(() =>
-      threadSession.session.closeGracefully(THREAD_STOP_CLOSE_TIMEOUT_MS),
-    )
+    .then(async () => {
+      await threadSession.backgroundTasks.dispose();
+      return threadSession.session.closeGracefully(
+        THREAD_STOP_CLOSE_TIMEOUT_MS,
+      );
+    })
     .finally(() => {
       if (sessions.get(args.threadId) === threadSession) {
         sessions.delete(args.threadId);
@@ -732,9 +742,13 @@ async function buildSessionOptions(args: {
     ...(args.params.thinkingLevel
       ? { thinkingLevel: args.params.thinkingLevel }
       : {}),
-    ...(args.params.dynamicTools && args.params.dynamicTools.length > 0
-      ? { dynamicTools: args.params.dynamicTools }
-      : {}),
+    dynamicTools: [
+      ...BACKGROUND_TASK_TOOLS,
+      ...(args.params.dynamicTools ?? []).filter(
+        (tool) =>
+          !BACKGROUND_TASK_TOOLS.some((builtIn) => builtIn.name === tool.name),
+      ),
+    ],
     scratchDir: requireScratchDir(),
     extensionPath: requireExtensionPath(),
     recordThreadId: args.threadId,
@@ -749,6 +763,7 @@ async function constructPiThreadSession(
   threadId: string,
   providerThreadId: string,
   params: PiSessionParams,
+  backgroundTasks?: BackgroundTaskTracker,
 ): Promise<ThreadSession> {
   const sessionSerial = nextSessionSerial();
   const sessionOptions = await buildSessionOptions({
@@ -759,11 +774,30 @@ async function constructPiThreadSession(
   });
   const session = new PiRpcSession(
     sessionOptions,
-    createForwardToolCall(() => threadId),
+    createForwardToolCall(threadId, sessionSerial),
     createOnPiEvent({ sessionSerial, threadId }),
     createOnSessionDone({ sessionSerial, threadId }),
   );
   const threadSession: ThreadSession = {
+    backgroundTasks:
+      backgroundTasks ??
+      new BackgroundTaskTracker({
+        cwd: params.cwd,
+        threadId,
+        emit: (deltas) => sendThreadDeltas(threadId, deltas),
+        notify: async (text) => {
+          const current = sessions.get(threadId);
+          if (current && !current.closing)
+            await current.session.notifyBackgroundTask(text);
+        },
+        reportError: (error) =>
+          reportSessionError({
+            threadId,
+            sessionSerial:
+              sessions.get(threadId)?.sessionSerial ?? sessionSerial,
+            error,
+          }),
+      }),
     session,
     sessionSerial,
     closing: false,
@@ -822,6 +856,7 @@ async function rebuildThreadSession(
       threadId,
       previous.providerThreadId,
       params,
+      previous.backgroundTasks,
     );
   } catch (error) {
     if (!sessions.has(threadId) && !previous.closing) {
@@ -845,6 +880,7 @@ function sendThreadSessionResult(
 ): void {
   sendThreadIdentity(threadId, providerThreadId);
   sendSessionResetBoundary(threadId);
+  sessions.get(threadId)?.backgroundTasks.recover();
   sendResult(id, { providerThreadId, sessionRestorable: true });
 }
 
@@ -866,7 +902,9 @@ async function handleThreadConstruction(
     threadId: providerThreadId,
   });
   const relocate = piSessionNeedsRelocation(sourceFile, params.cwd);
-  const nextProviderThreadId = relocate ? `pi_${randomUUID()}` : providerThreadId;
+  const nextProviderThreadId = relocate
+    ? `pi_${randomUUID()}`
+    : providerThreadId;
   const targetFile = resolvePiSessionFilePath({
     env: process.env,
     threadId: nextProviderThreadId,
