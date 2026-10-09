@@ -40,7 +40,13 @@ function startBridge(workspace: string) {
   const source = `import {createInterface} from 'node:readline'; import {experimental_providerBridge as bridge} from ${JSON.stringify(entry)}; bridge.start({tempDir:${JSON.stringify(workspace)},dataDir:${JSON.stringify(workspace)},pluginId:'provider-pi'}); createInterface({input:process.stdin}).on('line',bridge.handleLine).on('close',bridge.onClose);`;
   const child = spawn(
     process.execPath,
-    ["--import", "tsx", "--input-type=module", "-e", source],
+    [
+      "--import",
+      new URL("./test-typescript-loader.mjs", import.meta.url).href,
+      "--input-type=module",
+      "-e",
+      source,
+    ],
     {
       env: {
         ...process.env,

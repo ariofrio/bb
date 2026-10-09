@@ -1,4 +1,7 @@
-import { readFileSync, existsSync } from "node:fs";
+import { readFileSync, existsSync, writeFileSync } from "node:fs";
+import { join } from "node:path";
+import { pathToFileURL } from "node:url";
+import { experimental_assembleCapturedThreadEvents as assembleCapturedThreadEvents } from "@get-bb/plugin-sdk/provider-bridge/testing";
 import { afterEach, beforeEach, expect, it } from "vitest";
 import { z } from "zod";
 import { vi } from "vitest";
@@ -343,9 +346,56 @@ it("delays completion input until manual compaction finishes", async () => {
 
 it("preserves task ownership and completion across execution-setting session replacement", async () => {
   await launch(
-    nodeCommand("setTimeout(() => console.log('REPLACED_DONE'), 1500)"),
+    nodeCommand("setTimeout(() => console.log('REPLACED_DONE'), 3000)"),
   );
   const opened = tasks("item.open")[0]!;
+  const since = harness.deltasOf(threadId).length;
+  for (const setting of ["first", "second"]) {
+    const response = await harness.request(++requestId, "turn/start", {
+      threadId,
+      providerThreadId: providerId(),
+      clientRequestId: "creq_bg23456789",
+      input: [{ type: "text", text: "continue work", mentions: [] }],
+      options: {
+        ...FULL_PERMISSION_OPTIONS,
+        envVars: { PI_BG_TEST_SETTING: setting },
+      },
+    });
+    expect(response.error).toBeUndefined();
+  }
+  await harness.waitForDelta(
+    threadId,
+    (delta) =>
+      delta.kind === "input.provider" &&
+      String(delta.text).includes("REPLACED_DONE"),
+    since,
+  );
+  const events = assembleCapturedThreadEvents(harness.messages);
+  const openIds = new Set<string>();
+  for (const event of events) {
+    if (!("item" in event) || event.item.type !== "backgroundTask") continue;
+    if (event.type === "item/backgroundTask/progress")
+      expect(openIds.has(event.item.id)).toBe(true);
+    if (event.item.status === "pending") openIds.add(event.item.id);
+    else openIds.delete(event.item.id);
+  }
+  expect([...openIds]).toEqual([]);
+  expect(tasks("item.close").at(-1)).toMatchObject({
+    familyId: opened.familyId,
+    taskStatus: "completed",
+  });
+});
+
+it("delivers completion to the original session after replacement startup fails", async () => {
+  const wrapper = join(harness.workspaceDir, "failed-pi.mjs");
+  writeFileSync(
+    wrapper,
+    `if (process.env.PI_BG_FAIL_REBUILD === '1') { await new Promise(r => setTimeout(r, 1800)); process.exit(17); } await import(${JSON.stringify(pathToFileURL(fakePiPath).href)});`,
+  );
+  vi.stubEnv(PI_BRIDGE_ARGS_ENV, JSON.stringify([wrapper]));
+  await launch(
+    nodeCommand("setTimeout(() => console.log('RESTORED_DONE'), 800)"),
+  );
   const since = harness.deltasOf(threadId).length;
   const response = await harness.request(++requestId, "turn/start", {
     threadId,
@@ -354,20 +404,69 @@ it("preserves task ownership and completion across execution-setting session rep
     input: [{ type: "text", text: "continue work", mentions: [] }],
     options: {
       ...FULL_PERMISSION_OPTIONS,
-      envVars: { PI_BG_TEST_SETTING: "new" },
+      envVars: { PI_BG_FAIL_REBUILD: "1" },
     },
   });
-  expect(response.error).toBeUndefined();
-  await harness.waitForDelta(
-    threadId,
-    (delta) =>
-      delta.kind === "input.provider" &&
-      String(delta.text).includes("REPLACED_DONE"),
-    since,
-  );
-  expect(tasks("item.close")).toHaveLength(1);
-  expect(tasks("item.close")[0]).toMatchObject({
-    familyId: opened.familyId,
-    taskStatus: "completed",
-  });
+  expect(response.error).toBeDefined();
+  await prompt("continue after failed replacement");
+  await harness.waitForTurnBoundary(threadId, since);
+  expect(
+    harness
+      .deltasOf(threadId)
+      .filter(
+        (delta) =>
+          delta.kind === "input.provider" &&
+          String(delta.text).includes("RESTORED_DONE"),
+      ),
+  ).toHaveLength(1);
+  expect(tasks("item.close").at(-1)?.taskStatus).toBe("completed");
 });
+
+it.skipIf(process.platform === "win32").each(["timeout", "release"] as const)(
+  "bounds %s even when the worker is suspended",
+  async (mode) => {
+    await launch(
+      'echo WORKER_PAUSED; kill -STOP "$PPID"; sleep 30',
+      mode === "timeout" ? { timeout_sec: 1 } : {},
+    );
+    const opened = tasks("item.open")[0]!;
+    const registry = z
+      .array(z.object({ pid: z.number() }))
+      .parse(
+        JSON.parse(
+          readFileSync(join(opened.outputFile, "..", "registry.json"), "utf8"),
+        ),
+      );
+    const pid = registry[0]!.pid;
+    process.kill(pid, "SIGSTOP");
+    await new Promise((resolve) => setTimeout(resolve, 30));
+    let settled = false;
+    let disposal: Promise<unknown> = Promise.resolve();
+    try {
+      if (mode === "release")
+        disposal = harness
+          .request(++requestId, "thread/stop", {
+            threadId,
+            providerThreadId: providerId(),
+            intent: "release",
+            activeTurnId: null,
+          })
+          .then((response) => {
+            expect(response.error).toBeUndefined();
+            settled = true;
+          });
+      await new Promise((resolve) => setTimeout(resolve, 2000));
+      if (mode === "release") expect(settled).toBe(true);
+      expect(tasks("item.close")).toHaveLength(1);
+      expect(tasks("item.close")[0]).toMatchObject({
+        taskStatus: mode === "timeout" ? "failed" : "stopped",
+        ...(mode === "timeout" ? { error: "timeout" } : {}),
+      });
+    } finally {
+      try {
+        process.kill(-pid, "SIGKILL");
+      } catch {}
+      await disposal;
+    }
+  },
+);

@@ -15,6 +15,7 @@ import { join, resolve } from "node:path";
 import { z } from "zod";
 import {
   backgroundTaskItemStatus,
+  experimental_killPortableProcess as killPortableProcess,
   experimental_spawnPortableProcess as spawnPortableProcess,
   type BackgroundTaskStatus,
   type DeltaBackgroundTaskShape,
@@ -67,6 +68,8 @@ interface RunningTask {
   child: ChildProcess;
   settled: Promise<void>;
   stopReason: string | null;
+  deadline: ReturnType<typeof setTimeout> | null;
+  killEscalation: ReturnType<typeof setTimeout> | null;
 }
 
 function outputTail(path: string): string {
@@ -203,6 +206,8 @@ export class BackgroundTaskTracker {
       record,
       child,
       stopReason: null,
+      deadline: null,
+      killEscalation: null,
       settled: new Promise<void>((resolveSettled) => {
         settle = resolveSettled;
       }),
@@ -229,9 +234,7 @@ export class BackgroundTaskTracker {
         },
       ]);
       if (this.disposed) {
-        task.stopReason = "stopped";
-        child.stdin?.end();
-        await task.settled;
+        await this.stop(task, "stopped");
         throw new Error("Session stopped before background task launch");
       }
       child.stdin?.write(
@@ -241,15 +244,55 @@ export class BackgroundTaskTracker {
           resultFile: this.resultFile(taskId),
         }) + "\n",
       );
+      if (params.timeout_sec) {
+        task.deadline = setTimeout(() => {
+          void this.stop(task, "timeout").catch(this.options.reportError);
+        }, params.timeout_sec * 1000);
+      }
     } catch (error) {
-      child.stdin?.end();
-      await task.settled;
+      await this.stop(task, "stopped");
       throw error;
     }
     return (
       JSON.stringify({ taskId, outputFile }) +
       "\nCompletion will be delivered automatically. Continue other work without polling."
     );
+  }
+
+  hasRunningTasks(): boolean {
+    return this.tasks.size > 0;
+  }
+
+  sessionResetDeltas(turnDeltas: readonly ThreadDelta[]): ThreadDelta[] {
+    const deltas: ThreadDelta[] = [];
+    for (const task of this.tasks.values()) {
+      const item = {
+        ...this.shape(task.record, "stopped"),
+        summary: "Task tracking continues in the replacement Pi session.",
+      };
+      deltas.push({
+        kind: "item.close",
+        key: this.key(task.record.taskId),
+        status: item.status,
+        item,
+      });
+    }
+    const turnOpen = turnDeltas.findIndex(
+      (delta) => delta.kind === "turn.open",
+    );
+    deltas.push(
+      { kind: "session.reset" },
+      ...turnDeltas.slice(0, turnOpen + 1),
+    );
+    for (const task of this.tasks.values())
+      deltas.push({
+        kind: "item.open",
+        key: this.key(task.record.taskId),
+        item: this.shape(task.record, "running"),
+        attach: "currentOrLast",
+      });
+    deltas.push(...turnDeltas.slice(turnOpen + 1));
+    return deltas;
   }
 
   async dispose(): Promise<void> {
@@ -264,11 +307,27 @@ export class BackgroundTaskTracker {
     task.stopReason ??= reason;
     task.child.stdin?.write(JSON.stringify({ stop: task.stopReason }) + "\n");
     task.child.stdin?.end();
+    if (task.killEscalation === null && this.tasks.has(task.record.taskId)) {
+      task.killEscalation = setTimeout(() => {
+        if (!this.tasks.has(task.record.taskId)) return;
+        if (process.platform === "win32")
+          killPortableProcess(task.child, "SIGKILL");
+        else {
+          try {
+            process.kill(-task.record.pid, "SIGKILL");
+          } catch {
+            task.child.kill("SIGKILL");
+          }
+        }
+      }, 500);
+    }
     await task.settled;
   }
 
   private complete(task: RunningTask): void {
     if (!this.tasks.delete(task.record.taskId)) return;
+    if (task.deadline) clearTimeout(task.deadline);
+    if (task.killEscalation) clearTimeout(task.killEscalation);
     const resultPath = this.resultFile(task.record.taskId);
     let result: TaskResult = {
       code: task.child.exitCode,

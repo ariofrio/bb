@@ -194,6 +194,7 @@ interface CurrentThreadSessionArgs {
 
 interface ThreadSession {
   backgroundTasks: BackgroundTaskTracker;
+  pendingSessionReset: boolean;
   session: PiRpcSession;
   sessionSerial: number;
   closing: boolean;
@@ -211,6 +212,7 @@ const { send, sendResult, sendError } = createBridgeIo<
 >();
 
 const sessions = new Map<string, ThreadSession>();
+const sessionReplacements = new Map<string, Promise<void>>();
 const closingSessions = new Map<string, Promise<string | undefined>>();
 const { forwardToolCall, handleToolCallResponse, resolvePendingToolCalls } =
   createPendingToolCallTracker({ sendToolCall: send });
@@ -337,13 +339,21 @@ function emitForSession(
   method: string,
   params: Record<string, unknown>,
 ): void {
-  sendThreadDeltas(
-    threadId,
-    piDeltaTranslator.translate(
-      { jsonrpc: "2.0", method, params },
-      { threadId, cwd: sessions.get(threadId)?.cwd },
-    ),
+  const threadSession = sessions.get(threadId);
+  const deltas = piDeltaTranslator.translate(
+    { jsonrpc: "2.0", method, params },
+    { threadId, cwd: threadSession?.cwd },
   );
+  if (
+    threadSession?.pendingSessionReset &&
+    deltas.some((delta) => delta.kind === "turn.open")
+  ) {
+    threadSession.pendingSessionReset = false;
+    sendThreadDeltas(
+      threadId,
+      threadSession.backgroundTasks.sessionResetDeltas(deltas),
+    );
+  } else sendThreadDeltas(threadId, deltas);
 }
 
 function sendThreadIdentity(threadId: string, providerThreadId: string): void {
@@ -786,6 +796,7 @@ async function constructPiThreadSession(
         threadId,
         emit: (deltas) => sendThreadDeltas(threadId, deltas),
         notify: async (text) => {
+          await sessionReplacements.get(threadId);
           const current = sessions.get(threadId);
           if (current && !current.closing)
             await current.session.notifyBackgroundTask(text);
@@ -800,6 +811,7 @@ async function constructPiThreadSession(
       }),
     session,
     sessionSerial,
+    pendingSessionReset: false,
     closing: false,
     providerThreadId,
     cwd: params.cwd,
@@ -850,6 +862,11 @@ async function rebuildThreadSession(
   previous: ThreadSession,
   params: PiSessionParams,
 ): Promise<ThreadSession> {
+  let finishReplacement: () => void = () => undefined;
+  const replacing = new Promise<void>((resolve) => {
+    finishReplacement = resolve;
+  });
+  sessionReplacements.set(threadId, replacing);
   let replacement: ThreadSession;
   try {
     replacement = await constructPiThreadSession(
@@ -858,19 +875,39 @@ async function rebuildThreadSession(
       params,
       previous.backgroundTasks,
     );
+    retireReplacedPiChild(previous);
+    sendThreadIdentity(threadId, replacement.providerThreadId);
+    sendSessionResetBoundary(threadId);
+    send({
+      jsonrpc: "2.0",
+      method: BRIDGE_NOTIFICATION_METHODS.sessionReplaced,
+      params: {
+        threadId,
+        providerThreadId: replacement.providerThreadId,
+        reason:
+          "Execution settings changed; the pi session was rebuilt to apply them.",
+        contextLost: false,
+      },
+    });
+    return replacement;
   } catch (error) {
     if (!sessions.has(threadId) && !previous.closing) {
       sessions.set(threadId, previous);
     }
     throw error;
+  } finally {
+    if (sessionReplacements.get(threadId) === replacing)
+      sessionReplacements.delete(threadId);
+    finishReplacement();
   }
-  retireReplacedPiChild(previous);
-  return replacement;
 }
 
 function sendSessionResetBoundary(threadId: string): void {
   piDeltaTranslator.resetThread(threadId);
-  sendThreadDeltas(threadId, [{ kind: "session.reset" }]);
+  const threadSession = sessions.get(threadId);
+  if (threadSession?.backgroundTasks.hasRunningTasks()) {
+    threadSession.pendingSessionReset = true;
+  } else sendThreadDeltas(threadId, [{ kind: "session.reset" }]);
 }
 
 function sendThreadSessionResult(
@@ -1077,19 +1114,6 @@ async function reconcileTurnOptions(
     ...(turnOptions.thinkingLevel === undefined
       ? {}
       : { thinkingLevel: turnOptions.thinkingLevel }),
-  });
-  sendThreadIdentity(threadId, replacement.providerThreadId);
-  sendSessionResetBoundary(threadId);
-  send({
-    jsonrpc: "2.0",
-    method: BRIDGE_NOTIFICATION_METHODS.sessionReplaced,
-    params: {
-      threadId,
-      providerThreadId: replacement.providerThreadId,
-      reason:
-        "Execution settings changed; the pi session was rebuilt to apply them.",
-      contextLost: false,
-    },
   });
   return replacement;
 }

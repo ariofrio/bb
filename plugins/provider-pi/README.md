@@ -42,6 +42,8 @@ own process group. Restart recovery reports pending registry entries as failed;
 it never kills a process by an unverified, persisted PID. Each BB thread has its
 own registry under `.bb-pi-bg`, including when threads share a workspace. Forks do
 not inherit running work; execution-setting changes within a thread preserve it.
+A replacement defers its reset until the next real turn, settling the old tracking
+generation and reopening running tasks for the same family in that turn.
 See the [Pi provider skill](skills/pi-provider/SKILL.md#background-shell-tasks) for
 CLI usage and the tool/lifecycle contract.
 
