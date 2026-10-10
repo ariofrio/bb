@@ -321,12 +321,71 @@ jobs:
             apps/desktop/release/desktop-version-windows.json
           if-no-files-found: error
 
+  bb-app:
+    name: bb-app npm tarball
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - name: Set up pnpm
+        uses: pnpm/action-setup@0977fd99725f1db4007ccb2928dbb4e90d06cc86 # v6.0.10
+        with:
+          version: ${{ env.PNPM_VERSION }}
+          run_install: false
+
+      - name: Set up Node.js
+        uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: pnpm
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile --prefer-offline
+
+      - name: Apply the fork version
+        if: ${{ vars.DESKTOP_VERSION_SUFFIX != '' }}
+        env:
+          DESKTOP_VERSION_SUFFIX: ${{ vars.DESKTOP_VERSION_SUFFIX }}
+        run: node scripts/prepare-fork-version.mjs
+
+      # A fork cannot publish bb-app to npm, so servers that run the packaged
+      # launcher install this release asset instead. smoke:tarball builds
+      # bb-app and proves the packed tarball runs at the release version.
+      - name: Smoke bb-app tarball
+        run: pnpm exec turbo run smoke:tarball --filter=bb-app --force --output-logs=new-only
+
+      - name: Pack bb-app
+        working-directory: packages/bb-app
+        run: |
+          set -euo pipefail
+          destination="$GITHUB_WORKSPACE/release/bb-app"
+          mkdir -p "$destination"
+          npm pack --pack-destination "$destination"
+          cd "$destination"
+          for tarball in bb-app-*.tgz; do
+            sha256sum "$tarball" > "$tarball.sha256"
+            cat "$tarball.sha256"
+          done
+
+      - name: Upload bb-app tarball
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: bb-app-npm
+          path: |
+            release/bb-app/bb-app-*.tgz
+            release/bb-app/bb-app-*.tgz.sha256
+          if-no-files-found: error
+
   publish:
     name: Publish stable desktop release
     needs:
       - macos
       - linux
       - windows
+      - bb-app
     runs-on: ubuntu-24.04
     timeout-minutes: 20
     permissions:
@@ -406,6 +465,13 @@ jobs:
           name: bb-desktop-windows-x64
           path: release/windows
 
+      - name: Download bb-app tarball
+        if: steps.release_plan.outputs.should_publish == 'true'
+        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
+        with:
+          name: bb-app-npm
+          path: release/bb-app
+
       - name: Publish stable desktop release feed
         if: steps.release_plan.outputs.should_publish == 'true'
         env:
@@ -420,6 +486,7 @@ jobs:
           MACOS_DIR="release/macos"
           LINUX_DIR="release/linux"
           WINDOWS_DIR="release/windows"
+          BB_APP_DIR="release/bb-app"
 
           RELEASE_ASSETS=()
 
@@ -456,6 +523,8 @@ jobs:
           add_required_glob "$WINDOWS_DIR/latest.yml"
           add_required_glob "$WINDOWS_DIR"/*.exe
           add_required_glob "$WINDOWS_DIR"/*.blockmap
+          add_required_glob "$BB_APP_DIR"/bb-app-*.tgz
+          add_required_glob "$BB_APP_DIR"/bb-app-*.tgz.sha256
 
           if [[ "$PUBLISH_MACOS_BINARIES" == "true" ]]; then
             add_required_glob "$MACOS_DIR/latest-mac.yml"
