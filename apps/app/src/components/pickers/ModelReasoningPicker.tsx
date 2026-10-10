@@ -1,4 +1,3 @@
-import { useSplitPreload } from "@/lib/define-split";
 import {
   useCallback,
   useEffect,
@@ -228,7 +227,6 @@ export function ModelReasoningPicker({
   disabled,
   handoff,
 }: ModelReasoningPickerProps) {
-  useSplitPreload(ModelReasoningMenu);
   const isCompactViewport = useIsCompactViewport();
   const [open, setOpen] = useState(false);
   const triggerRef = useRef<HTMLButtonElement>(null);
@@ -359,15 +357,6 @@ export function ModelReasoningPicker({
     ...providerRouting,
     providerId: isPreviewing ? previewProviderId : undefined,
   });
-  const previewCatalogIsVerified =
-    isPreviewing &&
-    previewQuery.data !== undefined &&
-    !previewQuery.isPlaceholderData &&
-    !previewQuery.isError &&
-    previewQuery.data.modelLoadError === null;
-  const previewSelectionBlocked =
-    requireVerifiedProviderPreview && isPreviewing && !previewCatalogIsVerified;
-
   const previewProvider = useMemo(
     () =>
       isPreviewing
@@ -377,12 +366,26 @@ export function ModelReasoningPicker({
         : undefined,
     [isPreviewing, previewProviderId, previewQuery.data?.providers],
   );
+  const previewCatalogIsVerified =
+    isPreviewing &&
+    previewProvider !== undefined &&
+    previewQuery.data !== undefined &&
+    !previewQuery.isPlaceholderData &&
+    !previewQuery.isError &&
+    previewQuery.data.modelLoadError === null;
+  const previewSelectionBlocked =
+    isPreviewing &&
+    (previewProvider === undefined ||
+      (requireVerifiedProviderPreview && !previewCatalogIsVerified));
+
   const previewSelection = useMemo(
     () =>
       isPreviewing
         ? resolveModelCatalogSelection({
-            models: previewQuery.data?.models ?? [],
-            selectedOnlyModels: previewQuery.data?.selectedOnlyModels ?? [],
+            models: previewProvider ? (previewQuery.data?.models ?? []) : [],
+            selectedOnlyModels: previewProvider
+              ? (previewQuery.data?.selectedOnlyModels ?? [])
+              : [],
             selectedModel: "",
             preferredReasoningLevel: reasoningValue,
             provider: previewProvider,
@@ -1007,11 +1010,12 @@ export function ModelReasoningPicker({
   }
 
   const showSearchInput =
-    hasActiveModelOptions &&
-    !activeModelIsLoading &&
-    !isShowingModelError &&
-    activeModelOptions.length + activeMoreModelOptions.length >
-      MODEL_SEARCH_MIN_OPTIONS;
+    isCompactViewport ||
+    (hasActiveModelOptions &&
+      !activeModelIsLoading &&
+      !isShowingModelError &&
+      activeModelOptions.length + activeMoreModelOptions.length >
+        MODEL_SEARCH_MIN_OPTIONS);
 
   return (
     <Popover open={open} onOpenChange={setOpen} modal={modal}>
@@ -1019,9 +1023,10 @@ export function ModelReasoningPicker({
       <PopoverContent
         align={align}
         mobileTitle={handoffMode ? "Handoff to new thread" : "Model"}
-        mobileClassName={
-          handoffMode ? HANDOFF_DRAWER_TOP_CLASS_NAME : undefined
-        }
+        mobileClassName={cn(
+          "h-[min(32rem,80dvh)]",
+          handoffMode && HANDOFF_DRAWER_TOP_CLASS_NAME,
+        )}
         onKeyDown={handleReasoningArrowKeyDown}
         onMobileContentAnimationEnd={handleMobileContentAnimationEnd}
         autoFocusRef={showSearchInput ? searchInputRef : undefined}
@@ -1029,7 +1034,7 @@ export function ModelReasoningPicker({
           "flex min-h-0 flex-col p-0",
           MODEL_PICKER_MENU_WIDTH_CLASS_NAME,
           isCompactViewport
-            ? "overflow-y-hidden"
+            ? "flex-1 overflow-y-hidden"
             : "max-h-[min(var(--radix-popover-content-available-height),calc(100dvh-0.5rem))] overflow-hidden",
         )}
       >
