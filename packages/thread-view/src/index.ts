@@ -37,7 +37,11 @@ export type {
   TimelineTitleTone,
 } from "./timeline-row-title.js";
 export { THREAD_TIMELINE_EXCLUDED_EVENT_TYPES } from "./timeline-noise-events.js";
-export { extractShellCommandFromString } from "./tool-call-parsing.js";
+export {
+  extractShellCommandFromString,
+  parseSentThreadMessage,
+  type ThreadTellCommand,
+} from "./tool-call-parsing.js";
 export {
   getFileChangeAction,
   isPatchMetadataLine,
@@ -58,6 +62,7 @@ export type {
   BuildTimelineViewRowsOptions,
   ThreadTimelineViewRow,
   TimelineQuestionViewWorkRow,
+  TimelineViewDelegationWorkRow,
   TimelineViewTurnRow,
   TimelineViewWorkflowWorkRow,
   TimelineViewWorkRow,

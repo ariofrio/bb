@@ -150,6 +150,11 @@ const canonicalPromptMentionResourceSchema = z.discriminatedUnion("kind", [
     itemId: z.string(),
     label: z.string(),
   }),
+  z.object({
+    kind: z.literal("attachment"),
+    path: z.string(),
+    label: z.string(),
+  }),
 ]);
 
 function normalizeLegacyPromptMentionResource(value: unknown): unknown {
@@ -194,11 +199,15 @@ export const promptInputSchema = z.discriminatedUnion("type", [
   z.object({
     type: z.literal("localImage"),
     path: z.string(),
+    sourceProjectId: z.string().min(1).optional(),
+    hostId: z.string().min(1).optional(),
     ...promptInputVisibilityFields,
   }),
   z.object({
     type: z.literal("localFile"),
     path: z.string(),
+    sourceProjectId: z.string().min(1).optional(),
+    hostId: z.string().min(1).optional(),
     name: z.string().optional(),
     sizeBytes: z.number().int().nonnegative().optional(),
     mimeType: z.string().optional(),

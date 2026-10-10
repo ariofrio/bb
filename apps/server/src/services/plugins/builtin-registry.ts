@@ -35,6 +35,11 @@ const REPO_PLUGINS_DIRECTORY_NAME = "plugins";
 
 export const BUILTIN_PLUGINS = [
   {
+    name: "storage-retention",
+    pluginId: "bb--storage-retention",
+    defaultEnabled: false,
+  },
+  {
     name: "bb-guide",
     pluginId: "bb-guide",
     defaultEnabled: true,
@@ -170,9 +175,9 @@ export const BUILTIN_PLUGINS = [
     defaultEnabled: true,
   },
   {
-    name: "navigation",
-    pluginId: "navigation",
-    defaultEnabled: true,
+    name: "prompt-library",
+    pluginId: "bb--prompt-library",
+    defaultEnabled: false,
   },
   {
     name: "scheduled-send",

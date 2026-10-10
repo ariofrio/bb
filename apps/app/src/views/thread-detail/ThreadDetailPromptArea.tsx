@@ -1,4 +1,5 @@
 import { createCoreComposerActions } from "@/lib/plugin-composer-handle";
+import { useQueuedMessagesExpanded } from "@/components/promptbox/banner/queued-messages-expanded";
 import type { MachineRemovalStatus } from "@/lib/machine-removal-display";
 import { ThreadMachineStatus } from "@/components/promptbox/banner/ThreadMachineStatus";
 import {
@@ -52,7 +53,7 @@ import {
   waitUntilComposerStateSettled,
   type CommittedComposerState,
 } from "@/components/promptbox/composer-selection-settle";
-import { ThreadPendingInteractionBanner } from "@/components/thread/pending-interactions/ThreadPendingInteractionBanner";
+import { ThreadPendingInteractionBanners } from "@/components/thread/pending-interactions/ThreadPendingInteractionBanner";
 import {
   type PluginComposerHost,
   useComposerHostDraftNotifier,
@@ -70,7 +71,7 @@ import {
 import { ThreadGoalCard } from "@/components/promptbox/banner/ThreadGoalCard";
 import { ThreadTodoCard } from "@/components/promptbox/banner/ThreadTodoCard";
 import { ThreadPromptModeCard } from "@/components/promptbox/banner/ThreadPromptModeCard";
-import { ThreadWorkflowCard } from "@/components/promptbox/banner/ThreadWorkflowCard";
+import { ThreadWorkflowStack } from "@/components/promptbox/banner/ThreadWorkflowStack";
 import { ThreadBackgroundCommandsCard } from "@/components/promptbox/banner/ThreadBackgroundCommandsCard";
 import { ThreadModelFallbackCard } from "@/components/promptbox/banner/ThreadModelFallbackCard";
 import { InlineMessageEditorFrame } from "@/components/promptbox/InlineMessageEditorFrame";
@@ -116,7 +117,7 @@ import {
   useUnarchiveThread,
 } from "@/hooks/mutations/thread-state-mutations";
 import {
-  getLatestPendingInteraction,
+  orderPendingInteractions,
   useThreadQueuedMessages,
   useThreadPromptHistory,
 } from "@/hooks/queries/thread-queries";
@@ -203,12 +204,12 @@ interface ThreadDetailPromptAreaProps {
   pullRequestMergeMethod: PullRequestMergeMethod;
   isEnvironmentActionPending: boolean;
   pendingInteractions: readonly PendingInteraction[];
-  pendingInteractionsInitialLoading: boolean;
   queuedMessageCount: number;
   onChangedFileClick: (selection: WorkspaceChangedFileSelection) => void;
   projectId: string;
   resolveMentionLink: PromptMentionLinkResolver;
   workspaceChangedFilesSection: WorkspaceChangedFilesSection | null;
+  showGitChanges: boolean;
   workspaceStatusPending: boolean;
   contextBannerMergeBase: ContextBannerMergeBaseConfig | null;
   pendingTodos: ThreadTimelinePendingTodos | null;
@@ -418,12 +419,12 @@ export function ThreadDetailPromptArea({
   pullRequestMergeMethod,
   isEnvironmentActionPending,
   pendingInteractions,
-  pendingInteractionsInitialLoading,
   queuedMessageCount,
   onChangedFileClick,
   projectId,
   resolveMentionLink,
   workspaceChangedFilesSection,
+  showGitChanges,
   workspaceStatusPending,
   contextBannerMergeBase,
   pendingTodos,
@@ -525,7 +526,7 @@ export function ThreadDetailPromptArea({
     activeComposerDraft,
     activeComposerDraftInput,
     handleChangeMessage: handleComposerMessageChange,
-    removeActiveComposerAttachment,
+    updateActiveComposerAttachments,
   } = useActiveComposerDraft({
     draftScope: {
       kind: "thread",
@@ -653,6 +654,19 @@ export function ThreadDetailPromptArea({
       return next;
     });
   }, []);
+  const [workflowStackExpandedThreadId, setWorkflowStackExpandedThreadId] =
+    useState<string | null>(null);
+  const runningWorkflowCount = activeWorkflows.filter(
+    (workflow) => workflow.status === "pending",
+  ).length;
+  if (workflowStackExpandedThreadId !== null && runningWorkflowCount < 2) {
+    setWorkflowStackExpandedThreadId(null);
+  }
+  const isWorkflowStackExpanded = workflowStackExpandedThreadId === thread.id;
+  const [queueExpanded, setQueueExpanded] = useQueuedMessagesExpanded({
+    threadId: thread.id,
+    queuedMessages: queuedMessagesQuery.data ?? null,
+  });
   const [isBackgroundCommandsExpanded, setIsBackgroundCommandsExpanded] =
     useState(false);
   const [isFollowUpShortcutSending, setIsFollowUpShortcutSending] =
@@ -888,9 +902,9 @@ export function ThreadDetailPromptArea({
   const isStopRequested =
     thread.status === "stopping" ||
     (stopThread.isPending && stopThread.variables === thread.id);
-  const activePendingInteraction =
-    getLatestPendingInteraction(pendingInteractions);
-  const hasPendingInteraction = activePendingInteraction !== null;
+  const orderedPendingInteractions =
+    orderPendingInteractions(pendingInteractions);
+  const hasPendingInteraction = orderedPendingInteractions.length > 0;
   const shouldHideComposer =
     environmentGoneStatus !== null || thread.archivedAt !== null;
   const {
@@ -943,7 +957,6 @@ export function ThreadDetailPromptArea({
     return buildFollowUpSubmitMode({
       hasPendingInteraction,
       isDefaultExecutionOptionsLoading,
-      isPendingInteractionsInitialLoading: pendingInteractionsInitialLoading,
       isStopRequested,
       onStop: handleStopThread,
       runtimeDisplayStatus,
@@ -955,7 +968,6 @@ export function ThreadDetailPromptArea({
     isDefaultExecutionOptionsLoading,
     isHandoffSelection,
     modelLoadFailed,
-    pendingInteractionsInitialLoading,
     isStopRequested,
     runtimeDisplayStatus,
   ]);
@@ -1477,7 +1489,7 @@ export function ThreadDetailPromptArea({
       pendingUploads: bottomPendingUploads,
       error: bottomAttachmentError,
       onAttachFiles: handleAttachBottomFiles,
-      onRemove: promptDraft.removeAttachment,
+      onUpdate: promptDraft.updateAttachments,
     }),
     [
       bottomAttachmentError,
@@ -1486,7 +1498,7 @@ export function ThreadDetailPromptArea({
       isAttachingBottomFiles,
       bottomPendingUploads,
       projectId,
-      promptDraft.removeAttachment,
+      promptDraft.updateAttachments,
     ],
   );
   const handleBottomComposerSubmit = useCallback(() => {
@@ -1894,7 +1906,7 @@ export function ThreadDetailPromptArea({
           pendingUploads: inlinePendingUploads,
           error: inlineAttachmentError,
           onAttachFiles: handleAttachInlineFiles,
-          onRemove: removeActiveComposerAttachment,
+          onUpdate: updateActiveComposerAttachments,
         },
         canModifierSubmit:
           activeComposerDraftInput.length > 0 && !isUpdateQueuedMessagePending,
@@ -1945,7 +1957,7 @@ export function ThreadDetailPromptArea({
     promptPlaceholder,
     queuedComposerTextEffects,
     queuedMessagePluginComposerHost,
-    removeActiveComposerAttachment,
+    updateActiveComposerAttachments,
     runtimeDisplayStatus,
     thread.id,
     inlineTypeaheadConfig,
@@ -2031,12 +2043,10 @@ export function ThreadDetailPromptArea({
             pendingUploads: sentMessagePendingUploads,
             error: sentMessageAttachmentError,
             onAttachFiles: handleAttachSentMessageFiles,
-            onRemove: (path) => {
+            onUpdate: (update) => {
               sentMessageEdit.updateDraft((current) => ({
                 ...current,
-                attachments: current.attachments.filter(
-                  (attachment) => attachment.path !== path,
-                ),
+                attachments: update(current.attachments),
               }));
             },
           },
@@ -2099,9 +2109,9 @@ export function ThreadDetailPromptArea({
   const childPendingInteractionBanners = useMemo(
     () =>
       childPendingInteractions.map((item) => (
-        <ThreadPendingInteractionBanner
-          key={item.interaction.id}
-          interaction={item.interaction}
+        <ThreadPendingInteractionBanners
+          key={item.childThreadId}
+          interactions={item.interactions}
           sourceThread={{ href: item.href, title: item.childTitle }}
           threadId={item.childThreadId}
         />
@@ -2112,14 +2122,17 @@ export function ThreadDetailPromptArea({
     () => (
       <>
         {childPendingInteractionBanners}
-        {activeWorkflows.map((workflow) => (
-          <ThreadWorkflowCard
-            key={workflow.id}
-            workflow={workflow}
-            isExpanded={expandedWorkflowIds.has(workflow.id)}
-            onToggle={() => toggleWorkflowExpanded(workflow.id)}
-          />
-        ))}
+        <ThreadWorkflowStack
+          workflows={activeWorkflows}
+          isStackExpanded={isWorkflowStackExpanded}
+          onToggleStack={() =>
+            setWorkflowStackExpandedThreadId((current) =>
+              current === thread.id ? null : thread.id,
+            )
+          }
+          expandedWorkflowIds={expandedWorkflowIds}
+          onToggleWorkflow={toggleWorkflowExpanded}
+        />
         <ThreadBackgroundCommandsCard
           commands={activeBackgroundCommands}
           isExpanded={isBackgroundCommandsExpanded}
@@ -2166,9 +2179,9 @@ export function ThreadDetailPromptArea({
           }
           parentThreadSection={parentThreadSection}
           childThreadsSection={childThreadsSection}
-          pullRequestSection={pullRequestSection}
+          pullRequestSection={showGitChanges ? pullRequestSection : null}
           gitSection={
-            workspaceChangedFilesSection
+            workspaceChangedFilesSection && showGitChanges
               ? {
                   changedFiles: workspaceChangedFilesSection,
                   mergeBase: contextBannerMergeBase,
@@ -2178,7 +2191,7 @@ export function ThreadDetailPromptArea({
                 }
               : null
           }
-          gitSectionPending={workspaceStatusPending}
+          gitSectionPending={workspaceStatusPending && showGitChanges}
           expandedSection={expandedBannerSection}
           onToggleSection={handleToggleBannerSection}
         />
@@ -2190,7 +2203,10 @@ export function ThreadDetailPromptArea({
           />
         ) : null}
         {shouldHideComposer ? null : queuedMessagesPending ? (
-          <QueuedMessagesPendingCard queuedMessageCount={queuedMessageCount} />
+          <QueuedMessagesPendingCard
+            expanded={queueExpanded}
+            queuedMessageCount={queuedMessageCount}
+          />
         ) : (
           <LazyQueuedMessagesList
             attachedToComposer={true}
@@ -2212,11 +2228,15 @@ export function ThreadDetailPromptArea({
             onSetGroupBoundary={handleSetQueuedMessageGroupBoundary}
             onEdit={beginEditQueuedMessage}
             onDelete={handleDeleteQueuedMessage}
+            expanded={queueExpanded}
+            onExpandedChange={setQueueExpanded}
           />
         )}
       </>
     ),
     [
+      queueExpanded,
+      setQueueExpanded,
       canUseGitUi,
       childPendingInteractionBanners,
       contextBannerMergeBase,
@@ -2242,6 +2262,7 @@ export function ThreadDetailPromptArea({
       activePromptModeCard,
       isTodoExpanded,
       activeWorkflows,
+      isWorkflowStackExpanded,
       expandedWorkflowIds,
       toggleWorkflowExpanded,
       activeBackgroundCommands,
@@ -2263,21 +2284,27 @@ export function ThreadDetailPromptArea({
       thread.archivedAt,
       thread.id,
       workspaceChangedFilesSection,
+      showGitChanges,
       workspaceStatusPending,
     ],
   );
 
   const pendingInteractionNode = useMemo(() => {
-    if (!activePendingInteraction || shouldHideComposer) {
+    if (!hasPendingInteraction || shouldHideComposer) {
       return null;
     }
     return (
-      <ThreadPendingInteractionBanner
-        interaction={activePendingInteraction}
+      <ThreadPendingInteractionBanners
+        interactions={orderedPendingInteractions}
         threadId={thread.id}
       />
     );
-  }, [activePendingInteraction, shouldHideComposer, thread.id]);
+  }, [
+    hasPendingInteraction,
+    orderedPendingInteractions,
+    shouldHideComposer,
+    thread.id,
+  ]);
   const pendingInteractionStack = useMemo(
     () => (
       <>

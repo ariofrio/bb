@@ -1369,7 +1369,8 @@ export function NewThreadComposer({
   }, [uploadTargetKey]);
   const handleAttachFiles = useCallback(
     async (files: File[]) => {
-      if (!projectId || files.length === 0) return;
+      const added: PromptDraftAttachment[] = [];
+      if (!projectId || files.length === 0) return added;
       const capturedTarget = `${projectId}\0${promptDraft.storageKey}`;
       setAttachmentError(null);
       pendingUploadCountRef.current += 1;
@@ -1382,8 +1383,9 @@ export function NewThreadComposer({
               projectId,
               file: upload.file,
             });
-            if (currentUploadTargetRef.current !== capturedTarget) return;
+            if (currentUploadTargetRef.current !== capturedTarget) return added;
             promptDraft.addAttachment(uploaded);
+            added.push(uploaded);
           } catch (error) {
             if (currentUploadTargetRef.current === capturedTarget) {
               setAttachmentError(
@@ -1403,6 +1405,7 @@ export function NewThreadComposer({
         pendingUploadCountRef.current -= 1;
         setIsUploading(pendingUploadCountRef.current > 0);
       }
+      return added;
     },
     [
       projectId,
@@ -1581,7 +1584,7 @@ export function NewThreadComposer({
     : (selectedEnvironment ??
       (selectionScope === "new-thread" ? seed?.environment : undefined) ??
       null);
-  const submitDisabledReason = resolveNewThreadSubmitDisabledReason({
+  const submissionReadinessReason = resolveNewThreadSubmitDisabledReason({
     environmentProviderInputsBlocker:
       machineProviderInputs.blockedReason ?? environmentProviderInputsBlocker,
     environmentSetupRequiredReason:
@@ -1593,12 +1596,15 @@ export function NewThreadComposer({
     modelLoadError,
     projectDefaultsStatus: projectDefaultsState.status,
     projectDefaultsUnavailable,
-    promptInputEmpty,
+    promptInputEmpty: false,
     providerDisplayName: selectedProviderDisplayName,
     selectedProviderId,
     selectedThreadModel,
     submissionEnvironmentUnavailable: submissionEnvironment === null,
   });
+  const submitDisabledReason =
+    submissionReadinessReason ??
+    (promptInputEmpty ? "Enter a prompt or attach a file." : null);
   const submitDraft = useCallback(
     async (
       blockedReason: string | null,
@@ -1609,7 +1615,7 @@ export function NewThreadComposer({
       const input = promptDraftToInput(submittedDraft);
       if (
         blockedReason !== null ||
-        submitDisabledReason !== null ||
+        submissionReadinessReason !== null ||
         input.length === 0 ||
         isSubmittingRef.current ||
         projectDefaultsUnavailable ||
@@ -1619,7 +1625,7 @@ export function NewThreadComposer({
       ) {
         throw new Error(
           blockedReason ??
-            submitDisabledReason ??
+            submissionReadinessReason ??
             (input.length === 0
               ? "Type a message first."
               : "This composer is not ready to submit yet."),
@@ -1675,7 +1681,7 @@ export function NewThreadComposer({
       promptDraft,
       reasoningLevel,
       seededExecutionInputSources,
-      submitDisabledReason,
+      submissionReadinessReason,
       submissionEnvironment,
       selectedProviderId,
       selectedThreadModel,
@@ -1959,7 +1965,7 @@ export function NewThreadComposer({
             pendingUploads,
             projectId,
             onAttachFiles: handleAttachFiles,
-            onRemove: promptDraft.removeAttachment,
+            onUpdate: promptDraft.updateAttachments,
             isAttaching: isUploading || isCopyingAttachments,
             error: attachmentError,
           }}
