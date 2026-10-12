@@ -182,6 +182,14 @@ it.each(["active", "idle"] as const)(
         delta.kind === "item.textDelta" &&
         String(delta.text).includes(`Received ${marker}`),
     );
+    await harness.waitForDelta(
+      threadId,
+      () =>
+        harness
+          ?.deltasOf(threadId)
+          .filter((delta) => delta.kind === "turn.boundary").length ===
+        (mode === "active" ? 1 : 2),
+    );
     const deltas = harness.deltasOf(threadId);
     const taskItems = deltas.filter(
       (delta) =>

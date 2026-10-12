@@ -1,5 +1,6 @@
 import { prependOlderTimelineRows } from "@bb/client-core";
 import {
+  infiniteQueryOptions,
   useInfiniteQuery,
   useQuery,
   useQueryClient,
@@ -1067,11 +1068,10 @@ function mergeTimelineTurnSummaryDetailsPages(
   return rows;
 }
 
-export function useThreadTimelineTurnSummaryDetails(
+function threadTimelineTurnSummaryDetailsQueryOptions(
   identity: ThreadTimelineTurnSummaryDetailsQueryIdentity,
-  options?: ThreadTimelineTurnSummaryDetailsQueryOptions,
 ) {
-  return useInfiniteQuery<
+  return infiniteQueryOptions<
     TimelineTurnSummaryDetailsResponse,
     Error,
     TimelineRow[],
@@ -1096,31 +1096,52 @@ export function useThreadTimelineTurnSummaryDetails(
     initialPageParam: undefined,
     getNextPageParam: (lastPage) => lastPage.olderCursor ?? undefined,
     select: mergeTimelineTurnSummaryDetailsPages,
-    enabled:
-      (options?.enabled ?? true) &&
-      Boolean(identity.threadId) &&
-      Boolean(identity.turnId),
     meta: {
       errorMessage: "Failed to load turn summary details.",
       showErrorToast: false,
     },
-    refetchOnMount: options?.refetchOnMount ?? true,
-    staleTime: options?.staleTime ?? Infinity,
+    staleTime: Infinity,
     ...HEAVY_PAYLOAD_QUERY_POLICY,
   });
 }
 
-export function getLatestPendingInteraction(
-  interactions: readonly PendingInteraction[] | undefined,
-): PendingInteraction | null {
-  if (!interactions || interactions.length === 0) {
-    return null;
+export function prefetchThreadTimelineTurnSummaryDetails(
+  queryClient: QueryClient,
+  identity: ThreadTimelineTurnSummaryDetailsQueryIdentity,
+): void {
+  if (!identity.threadId || !identity.turnId) {
+    return;
   }
+  void queryClient.prefetchInfiniteQuery(
+    threadTimelineTurnSummaryDetailsQueryOptions(identity),
+  );
+}
 
-  const [firstInteraction, ...restInteractions] = interactions;
-  return restInteractions.reduce<PendingInteraction>(
-    (latest, interaction) =>
-      interaction.createdAt > latest.createdAt ? interaction : latest,
-    firstInteraction,
+export function useThreadTimelineTurnSummaryDetails(
+  identity: ThreadTimelineTurnSummaryDetailsQueryIdentity,
+  options?: ThreadTimelineTurnSummaryDetailsQueryOptions,
+) {
+  return useInfiniteQuery({
+    ...threadTimelineTurnSummaryDetailsQueryOptions(identity),
+    enabled:
+      (options?.enabled ?? true) &&
+      Boolean(identity.threadId) &&
+      Boolean(identity.turnId),
+    refetchOnMount: options?.refetchOnMount ?? true,
+    staleTime: options?.staleTime ?? Infinity,
+  });
+}
+
+const EMPTY_PENDING_INTERACTIONS: readonly PendingInteraction[] = [];
+
+export function orderPendingInteractions(
+  interactions: readonly PendingInteraction[] | undefined,
+): readonly PendingInteraction[] {
+  if (!interactions || interactions.length === 0) {
+    return EMPTY_PENDING_INTERACTIONS;
+  }
+  return [...interactions].sort(
+    (left, right) =>
+      left.createdAt - right.createdAt || left.id.localeCompare(right.id),
   );
 }

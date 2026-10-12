@@ -109,6 +109,7 @@ async function launch(command: string, extra = {}): Promise<void> {
 it("returns before the command finishes, closes one card, and triggers idle completion input", async () => {
   const started = Date.now();
   await launch(nodeCommand("setTimeout(() => console.log('DONE'), 2000)"));
+  const completionStart = harness.deltasOf(threadId).length;
   expect(Date.now() - started).toBeLessThan(1500);
   expect(tasks("item.open")).toHaveLength(1);
   expect(tasks("item.close")).toHaveLength(0);
@@ -138,6 +139,7 @@ it("returns before the command finishes, closes one card, and triggers idle comp
       delta.kind === "item.textDelta" &&
       String(delta.text).includes("Background task"),
   );
+  await harness.waitForTurnBoundary(threadId, completionStart);
 });
 
 it.each([
@@ -384,7 +386,7 @@ it("preserves task ownership and completion across execution-setting session rep
     familyId: opened.familyId,
     taskStatus: "completed",
   });
-});
+}, 15000);
 
 it("delivers completion to the original session after replacement startup fails", async () => {
   const wrapper = join(harness.workspaceDir, "failed-pi.mjs");

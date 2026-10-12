@@ -1,10 +1,13 @@
 import { useState, type MouseEvent as ReactMouseEvent } from "react";
-import { useSidebarThreadReveal } from "@/components/sidebar/useSidebarThreadReveal";
-import { AppNavRail } from "@/components/sidebar/AppNavRail";
+import {
+  AppNavRail,
+  NavRailSettingsButton,
+} from "@/components/sidebar/AppNavRail";
 import { AppSidebar } from "@/components/sidebar/AppSidebar";
 import { SettingsSidebar } from "@/components/settings/SettingsSidebar";
 import { ResourceSidebar } from "@/components/tools/ResourceSidebar";
 import { useSidebar } from "@/components/ui/sidebar.js";
+import { useMobileRecentsThreadReveal } from "@/views/useMobileRecentsThreadReveal";
 
 export type AppLayoutSidebarMode = "app" | "settings" | "plugins" | "skills";
 
@@ -21,7 +24,7 @@ export function AppLayoutSidebar({
   isResizing,
   settingsRoutePath,
 }: AppLayoutSidebarProps) {
-  useSidebarThreadReveal();
+  useMobileRecentsThreadReveal();
   const { isCompactViewport, isMobileSidebarClosing } = useSidebar();
   const holdCurrentMode = isCompactViewport && isMobileSidebarClosing;
   const [lastVisibleMode, setLastVisibleMode] = useState(mode);
@@ -36,13 +39,14 @@ export function AppLayoutSidebar({
       isResizing={isResizing}
       isBodyHidden={renderedMode !== "app"}
       renderRail={(customize) => (
-        <AppNavRail
-          isAppMode={renderedMode === "app"}
-          isSettingsActive={renderedMode === "settings"}
-          settingsRoutePath={settingsRoutePath}
-          customize={customize}
-        />
+        <AppNavRail isAppMode={mode === "app"} customize={customize} />
       )}
+      railFooter={
+        <NavRailSettingsButton
+          isSettingsActive={mode === "settings"}
+          settingsRoutePath={settingsRoutePath}
+        />
+      }
       alternateBody={
         renderedMode === "settings" ? (
           <SettingsSidebar

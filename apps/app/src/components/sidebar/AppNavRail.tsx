@@ -50,7 +50,7 @@ import {
   NEW_THREAD_NAVIGATION_ITEM_ID,
   type SidebarNavigationItem,
 } from "./sidebarNavigationItems";
-import { PROJECT_LIST_ACTION_BUTTON_CLASS } from "./sidebarRowClasses";
+import { PROJECT_LIST_ACTION_BUTTON_CLASS } from "@bb/shared-ui/sidebar-row-classes";
 
 export interface NavRailCustomizeState {
   isOpen: boolean;
@@ -58,6 +58,7 @@ export interface NavRailCustomizeState {
 }
 
 const RAIL_ICON_CLASS = "size-(--bb-sidebar-control-icon-size)";
+const RAIL_MENU_SIDE_OFFSET = 12;
 
 const RAIL_BUTTON_CLASS = cn(
   "size-(--bb-sidebar-control-size) shrink-0 rounded-md p-0 text-muted-foreground ring-sidebar-ring",
@@ -220,6 +221,8 @@ function RailMoreMenu({
       <DropdownMenuContent
         side="right"
         align="start"
+        sideOffset={RAIL_MENU_SIDE_OFFSET}
+        data-testid="nav-rail-more-menu"
         onCloseAutoFocus={onMenuCloseAutoFocus}
       >
         {hidden.map((item) => (
@@ -244,13 +247,9 @@ function RailMoreMenu({
 
 export function AppNavRail({
   isAppMode,
-  isSettingsActive,
-  settingsRoutePath,
   customize,
 }: {
   isAppMode: boolean;
-  isSettingsActive: boolean;
-  settingsRoutePath: string;
   customize: NavRailCustomizeState;
 }) {
   const { items, activeItemId } = useSidebarNavigation();
@@ -258,7 +257,6 @@ export function AppNavRail({
   const customizeAfterMenuCloseRef = useRef(false);
   const location = useLocation();
   const navigate = useNavigate();
-  const settingsShortcut = useAppCommandShortcut("settings.open");
   const [desktopInfo] = useState(getBbDesktopInfo);
   const isFramed = useIsSidebarFramed();
   const isCompactViewport = useIsCompactViewport();
@@ -296,6 +294,8 @@ export function AppNavRail({
       className={cn(
         "relative z-10 flex shrink-0 flex-col",
         NAV_RAIL_WIDTH_CLASS,
+        !isFramed &&
+          "-mt-[env(safe-area-inset-top)] bg-surface-recessed pt-[env(safe-area-inset-top)]",
       )}
     >
       {isFramed ? null : (
@@ -303,7 +303,7 @@ export function AppNavRail({
           aria-hidden="true"
           className={cn(
             CHROME_ROW_HEIGHT_CLASS,
-            "shrink-0 bg-surface-recessed",
+            "shrink-0",
             shouldUseMacosDesktopChrome(desktopInfo) && MACOS_WINDOW_DRAG_CLASS,
           )}
         />
@@ -311,8 +311,8 @@ export function AppNavRail({
       <nav
         aria-label="Primary navigation"
         className={cn(
-          "flex min-h-0 flex-1 flex-col items-center gap-2.5 pb-2.5",
-          isFramed ? "pt-2" : "bg-surface-recessed",
+          "flex min-h-0 flex-1 flex-col items-center gap-2.5 pb-2",
+          isFramed && "pt-2",
         )}
       >
         <div className="flex min-h-0 w-full flex-1 flex-col items-center gap-2.5 overflow-y-auto py-0.5 [scrollbar-width:none]">
@@ -352,7 +352,7 @@ export function AppNavRail({
             <PopoverContent
               side="right"
               align="start"
-              sideOffset={12}
+              sideOffset={RAIL_MENU_SIDE_OFFSET}
               aria-label="Customize rail"
               mobileTitle="Customize rail"
               data-testid="nav-rail-customize"
@@ -368,22 +368,34 @@ export function AppNavRail({
             </PopoverContent>
           </Popover>
         </div>
-        <RailButton
-          label={
-            settingsShortcut
-              ? `Settings (${settingsShortcut.label})`
-              : "Settings"
-          }
-          active={isSettingsActive}
-          aria-keyshortcuts={settingsShortcut?.ariaKeyshortcuts}
-          onClick={() => {
-            if (!isSettingsActive) void navigate(settingsRoutePath);
-          }}
-        >
-          <Icon name="Settings" aria-hidden="true" />
-        </RailButton>
       </nav>
     </div>
+  );
+}
+
+export function NavRailSettingsButton({
+  isSettingsActive,
+  settingsRoutePath,
+}: {
+  isSettingsActive: boolean;
+  settingsRoutePath: string;
+}) {
+  const navigate = useNavigate();
+  const settingsShortcut = useAppCommandShortcut("settings.open");
+  return (
+    <RailButton
+      label={
+        settingsShortcut ? `Settings (${settingsShortcut.label})` : "Settings"
+      }
+      active={isSettingsActive}
+      className="h-8 max-md:pointer-coarse:h-9"
+      aria-keyshortcuts={settingsShortcut?.ariaKeyshortcuts}
+      onClick={() => {
+        if (!isSettingsActive) void navigate(settingsRoutePath);
+      }}
+    >
+      <Icon name="Settings" aria-hidden="true" />
+    </RailButton>
   );
 }
 
@@ -394,7 +406,7 @@ export function NavRailNewThreadButton() {
   const item = items.find(
     (candidate) => candidate.action.kind === "new-thread",
   );
-  if (item === undefined || !item.isVisible) return null;
+  if (item === undefined) return null;
   const shortcut = isShortcutModifierHeld ? item.shortcut : null;
 
   return (

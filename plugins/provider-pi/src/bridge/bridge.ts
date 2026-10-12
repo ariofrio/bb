@@ -1030,7 +1030,7 @@ function startPiPrompt(
     images.length > 0 ? images : undefined,
   );
   void dispatch.settled.then((outcome) => {
-    if (outcome === null) {
+    if (outcome === null || outcome.boundaryDelivered) {
       return;
     }
     reportPromptSettled({
