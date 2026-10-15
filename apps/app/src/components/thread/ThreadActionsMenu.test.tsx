@@ -216,7 +216,11 @@ function twoPaneLayout(focusedPaneId: string): SplitLayout {
         {
           type: "pane",
           paneId: "pane_other",
-          content: { kind: "thread", projectId: "proj_a", threadId: "thr_other" },
+          content: {
+            kind: "thread",
+            projectId: "proj_a",
+            threadId: "thr_other",
+          },
         },
         {
           type: "pane",
@@ -334,6 +338,21 @@ const CUSTOMIZE: PluginThreadActionsInlineItem = {
 };
 
 describe.each(SURFACES)("thread actions on the $name", (surface) => {
+  if (!surface.compact) {
+    it("keeps outside controls reachable and dismisses when they receive focus", async () => {
+      renderSurface(surface, { thread: baseThread });
+      render(<button type="button">Outside control</button>);
+      await surface.open();
+      await openMenu();
+
+      expect(getComputedStyle(document.body).pointerEvents).not.toBe("none");
+      const outside = screen.getByRole("button", { name: "Outside control" });
+      outside.focus();
+      await waitFor(() => expect(screen.queryByRole("menu")).toBeNull());
+      expect(document.activeElement).toBe(outside);
+    });
+  }
+
   it.each([
     {
       state: "a top-level thread",
@@ -515,7 +534,11 @@ describe.each(SURFACES)("thread actions on the $name", (surface) => {
   ])(
     "lists the items for $state",
     async ({ thread, route, layout, desktop, compact }) => {
-      renderSurface(surface, { thread, inline: [CUSTOMIZE] }, { route, layout });
+      renderSurface(
+        surface,
+        { thread, inline: [CUSTOMIZE] },
+        { route, layout },
+      );
       await surface.open();
       expect(await menuRows()).toEqual(surface.compact ? compact : desktop);
     },
