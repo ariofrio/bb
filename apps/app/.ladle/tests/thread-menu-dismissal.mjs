@@ -31,10 +31,20 @@ for (const surface of ["dropdown", "context"]) {
       });
     await page.waitForSelector('[role="menu"]');
   };
+  const scrollbarSize = () =>
+    page.evaluate(() =>
+      getComputedStyle(document.body).getPropertyValue("--removed-body-scroll-bar-size").trim(),
+    );
+  if ((await scrollbarSize()) !== "0px")
+    throw new Error(`${surface}: missing scrollbar compensation before opening`);
   await open();
+  if ((await scrollbarSize()) !== "0px")
+    throw new Error(`${surface}: opening changed inherited scrollbar compensation`);
   const before = await count();
   await page.click(button);
   await page.waitForFunction(() => !document.querySelector('[role="menu"]'));
+  if ((await scrollbarSize()) !== "0px")
+    throw new Error(`${surface}: dismissal removed inherited scrollbar compensation`);
   if ((await count()) !== before)
     throw new Error(`${surface}: dismissal activated the outside thread`);
   await page.click(button);
