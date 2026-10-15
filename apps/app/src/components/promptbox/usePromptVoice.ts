@@ -3,6 +3,7 @@ import { useVoiceInput } from "@/hooks/useVoiceInput";
 import { transcribeVoiceInput } from "@/lib/api";
 import type { PromptDraftState } from "@bb/client-core";
 import type { PluginComposerHost } from "@/components/plugin/plugin-composer-host";
+import type { VoiceDelivery } from "@/lib/voice-recording-store";
 import type { PromptBoxHandle, PromptVoiceConfig } from "./PromptBoxInternal";
 
 async function requestVoiceTranscription({
@@ -18,20 +19,17 @@ async function requestVoiceTranscription({
   return transcription.text;
 }
 
-function createVoiceAbortError(): DOMException {
-  return new DOMException("Voice transcription was cancelled", "AbortError");
-}
-
 export function usePromptVoice(
   promptBoxRef: RefObject<PromptBoxHandle | null>,
-  draft?: {
-    getCurrent: () => PromptDraftState;
-    setDraft: (draft: PromptDraftState) => void;
-    submit?: PluginComposerHost["submit"];
-  },
+  draft:
+    | {
+        getCurrent: () => PromptDraftState;
+        setDraft: (draft: PromptDraftState) => void;
+        submit?: PluginComposerHost["submit"];
+      }
+    | undefined,
+  recordingKey: string | null,
 ): PromptVoiceConfig {
-  const sendPendingRef = useRef(false);
-  const stoppedRef = useRef(false);
   const mountedRef = useRef(true);
   useEffect(() => {
     mountedRef.current = true;
@@ -41,10 +39,8 @@ export function usePromptVoice(
   }, []);
 
   const onTranscript = useCallback(
-    (text: string) => {
-      const send = sendPendingRef.current;
-      sendPendingRef.current = false;
-      stoppedRef.current = false;
+    (text: string, delivery: VoiceDelivery) => {
+      const send = delivery === "send";
       if (mountedRef.current && promptBoxRef.current) {
         if (send) {
           promptBoxRef.current.sendVoiceTranscript(text);
@@ -71,71 +67,53 @@ export function usePromptVoice(
     [promptBoxRef],
   );
 
-  const transcribeAfterCompletionTransition = useCallback(
-    async (args: Parameters<typeof requestVoiceTranscription>[0]) => {
-      const text = await requestVoiceTranscription(args);
-      await promptBoxRef.current?.playVoiceCompletionTransition();
-      if (args.signal?.aborted) {
-        throw createVoiceAbortError();
-      }
-      return text;
-    },
+  const playCompletionTransition = useCallback(
+    () => promptBoxRef.current?.playVoiceCompletionTransition(),
     [promptBoxRef],
   );
 
   const voiceInput = useVoiceInput({
+    recordingKey,
     onTranscript,
-    onTranscribe: transcribeAfterCompletionTransition,
+    onTranscribe: requestVoiceTranscription,
     getPromptContext,
+    playCompletionTransition,
   });
 
-  const stop = useCallback(() => {
-    if (voiceInput.state !== "recording" || stoppedRef.current) return;
-    stoppedRef.current = true;
-    sendPendingRef.current = false;
-    voiceInput.stop();
-  }, [voiceInput]);
-  const send = useCallback(() => {
-    if (voiceInput.state !== "recording" || stoppedRef.current) return;
-    stoppedRef.current = true;
-    sendPendingRef.current = true;
-    voiceInput.stop();
-  }, [voiceInput]);
-  const cancel = useCallback(() => {
-    sendPendingRef.current = false;
-    stoppedRef.current = false;
-    voiceInput.cancel();
-  }, [voiceInput]);
-  useEffect(() => {
-    if (
-      voiceInput.state !== "recording" &&
-      voiceInput.state !== "transcribing"
-    ) {
-      stoppedRef.current = false;
-      sendPendingRef.current = false;
-    }
-  }, [voiceInput.state]);
+  const { stop: stopVoiceInput } = voiceInput;
+  const stop = useCallback(() => stopVoiceInput("insert"), [stopVoiceInput]);
+  const send = useCallback(() => stopVoiceInput("send"), [stopVoiceInput]);
 
   return useMemo<PromptVoiceConfig>(
     () => ({
       state: voiceInput.state,
+      delivery: voiceInput.delivery,
       microphoneWarning: voiceInput.microphoneWarning,
       isSupported: voiceInput.isSupported,
       stream: voiceInput.stream,
+      failedRecordings: voiceInput.failedRecordings,
       start: voiceInput.start,
       stop,
       send,
-      cancel,
+      retry: voiceInput.retry,
+      discard: voiceInput.discard,
+      download: voiceInput.download,
+      cancel: voiceInput.cancel,
     }),
     [
       voiceInput.state,
+      voiceInput.delivery,
       voiceInput.microphoneWarning,
       voiceInput.isSupported,
       voiceInput.stream,
+      voiceInput.failedRecordings,
       voiceInput.start,
       stop,
       send,
-      cancel,
+      voiceInput.retry,
+      voiceInput.discard,
+      voiceInput.download,
+      voiceInput.cancel,
     ],
   );
 }
