@@ -29,6 +29,8 @@ jobs:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
         with:
           fetch-depth: 2
+      - name: Check fork runner policy
+        run: node scripts/check-fork-runners.mjs
       - name: Check source files for literal NUL bytes
         run: node scripts/check-source-nul.mjs
       - name: Resolve comparison base
