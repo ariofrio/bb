@@ -339,16 +339,23 @@ const CUSTOMIZE: PluginThreadActionsInlineItem = {
 
 describe.each(SURFACES)("thread actions on the $name", (surface) => {
   if (!surface.compact) {
-    it("keeps outside controls reachable and dismisses when they receive focus", async () => {
+    it("keeps focus in the menu until dismissal and then releases outside controls", async () => {
       renderSurface(surface, { thread: baseThread });
       render(<button type="button">Outside control</button>);
-      await surface.open();
-      await openMenu();
-
-      expect(getComputedStyle(document.body).pointerEvents).not.toBe("none");
       const outside = screen.getByRole("button", { name: "Outside control" });
-      outside.focus();
+      await surface.open();
+      const menu = await openMenu();
+
+      act(() => outside.focus());
+      await waitFor(() =>
+        expect(menu.contains(document.activeElement)).toBe(true),
+      );
+      expect(screen.getByRole("menu")).toBe(menu);
+
+      fireEvent.keyDown(menu, { key: "Escape" });
       await waitFor(() => expect(screen.queryByRole("menu")).toBeNull());
+      expect(getComputedStyle(document.body).pointerEvents).not.toBe("none");
+      act(() => outside.focus());
       expect(document.activeElement).toBe(outside);
     });
   }
