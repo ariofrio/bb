@@ -81,6 +81,7 @@ Read the installed SDK declarations for the exact current signatures.
 - `experimental_useProviders`
 - `experimental_useCodeTheme`
 - `experimental_copyToClipboard`
+- `experimental_saveFile`
 
 ## Type exports
 
@@ -170,6 +171,8 @@ Read the installed SDK declarations for the exact current signatures.
 - `PluginCodeThemeData`
 - `PluginCodeThemeState`
 - `ExperimentalClipboardContent`
+- `ExperimentalSaveFileRequest`
+- `ExperimentalSaveFileOutcome`
 - `PluginSidebarThreadDraftState`
 - `PluginSidebarThreadRowStatus`
 - `PluginSidebarThreadShortcut`

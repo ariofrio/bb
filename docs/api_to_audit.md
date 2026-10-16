@@ -1563,12 +1563,12 @@ batches. Confirm the platform coverage (Linux
 `/proc`, macOS `lsof`) and whether the grace should be per call.
 
 0b. **Process identity.** `experimental_readProcessIdentity(pid)` from
-   `@get-bb/plugin-sdk/host` returns `{ command, startedAt }` (`ps` on POSIX,
-   CIM on Windows) or null. bb's launcher uses the same probe to confirm a
-   recorded PID before stopping it. Storage & retention checks a development
-   instance's recorded launcher entry path and start time before signalling
-   it, so a reused PID is never killed. Confirm start-time precision per
-   platform and whether a combined verified-stop helper should replace it.
+`@get-bb/plugin-sdk/host` returns `{ command, startedAt }` (`ps` on POSIX,
+CIM on Windows) or null. bb's launcher uses the same probe to confirm a
+recorded PID before stopping it. Storage & retention checks a development
+instance's recorded launcher entry path and start time before signalling
+it, so a reused PID is never killed. Confirm start-time precision per
+platform and whether a combined verified-stop helper should replace it.
 
 0. **Call timeout.** `ExperimentalHostCallOptions.timeoutMs` (default 30s,
    capped at 30 minutes) lets a plugin run a long host call — a setup
@@ -2151,6 +2151,36 @@ true when it is omitted or no slot has rendered.
    Confirm on Linux Wayland and X11 that the bridge write lands.
 4. **Feedback.** Every caller pairs the result with a toast or a manual-copy
    fallback. Decide whether a shared toast helper belongs in the SDK.
+
+## `app.experimental_saveFile` (`@get-bb/plugin-sdk/app`)
+
+**What it does.** `experimental_saveFile({ fileName, url } | { fileName, blob })`
+starts a download through `saveFile`, the function bb's file preview, chat
+attachment fallback, and voice-input downloads call. Tasks attachment cards
+use the same function. It clicks a temporary download anchor, using an object
+URL for a blob. Browsers and bb Desktop handle their normal downloads. The
+bb iOS shell uses `WKDownload` to write the resource directly from WebKit to
+cache, preserving the WebView's request context, then presents the system
+share sheet. File bytes and cookies do not cross bb's JavaScript bridge.
+
+The promise resolves `started` once the link is clicked or `failed` if it
+could not start, with an error toast. Completion and share-sheet cancellation
+are not reported to the page. Native download and share failures show a
+native toast. Older shells retain their anchor behavior. Callers keep a real
+`href` on their link for accessibility and copy-link.
+
+The test harness resolves `started` and records nothing.
+
+**Audit before stabilizing.**
+
+1. **Outcome shape.** Decide whether callers need completion or cancellation
+   beyond the browser-compatible `started` result.
+2. **Android.** The native download implementation is iOS only. Decide on
+   Android file sharing and browser-created blob download support.
+3. **Harness inspection.** Decide whether the harness should record requests
+   the way it records clipboard writes.
+4. **Link helper.** Decide whether the repeated click handler belongs in a
+   shared link component.
 
 ## `app.experimental_usePluginId` (`@get-bb/plugin-sdk/app`)
 
