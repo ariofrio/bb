@@ -114,6 +114,16 @@ function contrastRatio(foreground: OklchColor, background: OklchColor): number {
   return (lighter + 0.05) / (darker + 0.05);
 }
 
+describe("theme.css scroll locking", () => {
+  it("defines zero scrollbar compensation before a scroll lock mounts", () => {
+    const body = css.match(/(?:^|\n)\s*body\s*\{([^{}]*)\}/)?.[1];
+    expect(body).toBeDefined();
+    expect(variableValue(body ?? "", "removed-body-scroll-bar-size")).toBe(
+      "0px",
+    );
+  });
+});
+
 describe("theme.css neutral ramp", () => {
   it("keeps touch sidebar titles stable under hover and open action states", () => {
     const mobileRules = css.slice(css.indexOf("@media (hover: none)"));

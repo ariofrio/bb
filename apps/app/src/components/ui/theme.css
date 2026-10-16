@@ -889,6 +889,7 @@
   body {
     @apply bg-background text-foreground;
     font-family: var(--font-sans);
+    --removed-body-scroll-bar-size: 0px;
   }
 
   button,
