@@ -111,6 +111,54 @@ describe("marketing download", () => {
     expect(waitUntil).not.toHaveBeenCalled();
   });
 
+  it("restarts a resume whose If-Range no longer matches the installer", async () => {
+    const fetchMock = stubReleaseFetch(["bb-0.0.27-arm64.dmg"], () => {
+      const ranged = fetchMock.mock.calls.at(-1)?.[1] !== undefined;
+      return ranged
+        ? new Response("tail", {
+            headers: { "content-range": "bytes 100-103/104", etag: '"new"' },
+            status: 206,
+          })
+        : new Response("whole-new-file", { headers: { etag: '"new"' } });
+    });
+
+    const response = await handleDownload(
+      "macos",
+      new Request("https://getbb.app/download/macos", {
+        headers: { range: "bytes=100-", "if-range": '"old"' },
+      }),
+      {},
+      vi.fn(),
+    );
+
+    expect(response.status).toBe(200);
+    expect(response.headers.get("Content-Range")).toBeNull();
+    expect(await response.text()).toBe("whole-new-file");
+  });
+
+  it("keeps the partial response when If-Range still matches", async () => {
+    stubReleaseFetch(
+      ["bb-0.0.27-arm64.dmg"],
+      () =>
+        new Response("tail", {
+          headers: { "content-range": "bytes 100-103/104", etag: '"same"' },
+          status: 206,
+        }),
+    );
+
+    const response = await handleDownload(
+      "macos",
+      new Request("https://getbb.app/download/macos", {
+        headers: { range: "bytes=100-", "if-range": '"same"' },
+      }),
+      {},
+      vi.fn(),
+    );
+
+    expect(response.status).toBe(206);
+    expect(await response.text()).toBe("tail");
+  });
+
   it("falls back to the release page when the installer fetch fails", async () => {
     stubReleaseFetch(
       ["bb-0.0.26-arm64.dmg"],
@@ -126,6 +174,29 @@ describe("marketing download", () => {
 
     expect(response.status).toBe(302);
     expect(response.headers.get("Location")).toBe(DOWNLOAD_FALLBACK_URL);
+  });
+
+  it("serves the Windows installer from the Windows feed", async () => {
+    const fetchMock = stubReleaseFetch(
+      ["bb-0.45.0-x64.exe", "bb-0.45.0-x64.exe.blockmap"],
+      () => new Response("exe-bytes"),
+    );
+
+    const response = await handleDownload(
+      "windows",
+      new Request("https://getbb.app/download/windows?placement=hero"),
+      {},
+      vi.fn(),
+    );
+
+    expect(fetchMock).toHaveBeenCalledWith(
+      DESKTOP_DOWNLOADS.windows.versionFeedUrl,
+      { headers: { accept: "application/json" } },
+    );
+    expect(response.status).toBe(200);
+    expect(response.headers.get("Content-Disposition")).toBe(
+      'attachment; filename="bb-0.45.0-x64.exe"',
+    );
   });
 
   it("never serves a macOS installer for a Linux request", async () => {
@@ -164,7 +235,9 @@ describe("marketing download", () => {
 
     await handleDownload(
       "linux",
-      new Request("https://getbb.app/download/linux?placement=nav"),
+      new Request(
+        "https://getbb.app/download/linux?placement=nav&utm_campaign=x&gclid=abc",
+      ),
       { LANDING_POSTHOG_KEY: "phc_test" },
       waitUntil,
     );
@@ -177,11 +250,18 @@ describe("marketing download", () => {
     expect(captureCall).toBeTruthy();
     const body = JSON.parse(String(captureCall?.[1]?.body)) as {
       event: string;
-      properties: { download_target: string; placement: string };
+      properties: {
+        download_target: string;
+        placement: string;
+        utm_campaign?: string;
+        gclid?: string;
+      };
     };
     expect(body.event).toBe("landing_download_linux_clicked");
     expect(body.properties.download_target).toBe("linux");
     expect(body.properties.placement).toBe("nav");
+    expect(body.properties.utm_campaign).toBe("x");
+    expect(body.properties.gclid).toBe("abc");
   });
 });
 

@@ -486,6 +486,7 @@ export interface TypeaheadMentionConfig {
   triggers?: readonly PluginMentionTrigger[];
   results: OrderedMentionSuggestions;
   isLoading: boolean;
+  isRefreshing: boolean;
   isError: boolean;
   onQueryChange: (
     query: string | null,
@@ -1328,6 +1329,7 @@ export function PromptBoxInternal({
     triggers: mentionTriggerChars = DEFAULT_TYPEAHEAD_MENTION_TRIGGERS,
     results: mentionResults,
     isLoading: mentionLoading,
+    isRefreshing: mentionRefreshing,
     isError: mentionError,
     onQueryChange: onMentionQueryChange,
     resolveLink: mentionResolveLink,
@@ -1358,9 +1360,7 @@ export function PromptBoxInternal({
     if (resource.kind !== "attachment") {
       return mentionResolveLink?.(resource) ?? null;
     }
-    const attachment = attachments.find(
-      (item) => item.path === resource.path,
-    );
+    const attachment = attachments.find((item) => item.path === resource.path);
     const projectId = attachment?.sourceProjectId ?? attachmentProjectId;
     if (
       !attachment ||
@@ -2635,12 +2635,14 @@ export function PromptBoxInternal({
     () =>
       attachments
         .filter((attachment) => !isImageAttachment(attachment))
-        .map((attachment): AttachmentMentionSuggestion => ({
-          kind: "attachment",
-          path: attachment.path,
-          name: attachment.name,
-          replacement: `@${attachment.name}`,
-        })),
+        .map(
+          (attachment): AttachmentMentionSuggestion => ({
+            kind: "attachment",
+            path: attachment.path,
+            name: attachment.name,
+            replacement: `@${attachment.name}`,
+          }),
+        ),
     [attachments],
   );
   const composerMentionResults = useMemo(
@@ -2683,14 +2685,22 @@ export function PromptBoxInternal({
 
   const mentionMenuState: MentionMenuState =
     composerMentionResults !== mentionResults
-      ? { kind: "results", results: composerMentionResults }
+      ? {
+          kind: "results",
+          results: composerMentionResults,
+          refreshing: mentionRefreshing,
+        }
       : activeMentionQuery.length === 0
         ? { kind: "hint" }
         : mentionLoading
           ? { kind: "loading" }
           : mentionError
             ? { kind: "error" }
-            : { kind: "results", results: mentionResults };
+            : {
+                kind: "results",
+                results: mentionResults,
+                refreshing: mentionRefreshing,
+              };
 
   const commandMenuState: CommandMenuState = commandLoading
     ? { kind: "loading" }

@@ -2,7 +2,7 @@ import {
   DESKTOP_DOWNLOADS,
   DOWNLOAD_FALLBACK_URL,
   DOWNLOAD_RELEASE_ASSET_BASE_URL,
-  UTM_PARAM_NAMES,
+  CAMPAIGN_PARAM_NAMES,
 } from "./site";
 import type { CtaPlacement, DesktopPlatform } from "./site";
 
@@ -25,6 +25,8 @@ type DownloadEventProperties = {
   $current_url: string;
   $referrer?: string;
   download_target: DesktopPlatform;
+  gbraid?: string;
+  gclid?: string;
   placement: DownloadPlacement;
   tracking_source: typeof TRACKING_SOURCE;
   utm_campaign?: string;
@@ -32,6 +34,7 @@ type DownloadEventProperties = {
   utm_medium?: string;
   utm_source?: string;
   utm_term?: string;
+  wbraid?: string;
 };
 
 type PostHogCapturePayload = {
@@ -71,7 +74,7 @@ export async function handleDownload(
   if (!asset) {
     return redirectResponse(DOWNLOAD_FALLBACK_URL);
   }
-  return streamInstaller(asset, range);
+  return streamInstaller(asset, range, request.headers.get("if-range"));
 }
 
 type InstallerAsset = {
@@ -83,20 +86,46 @@ function isFirstByteRequest(range: string | null): boolean {
   return range === null || /^bytes=0-/.test(range.trim());
 }
 
-async function streamInstaller(
-  asset: InstallerAsset,
+async function fetchInstaller(
+  url: string,
   range: string | null,
-): Promise<Response> {
-  let upstream: Response;
+): Promise<Response | null> {
   try {
-    upstream = await fetch(
-      asset.url,
+    return await fetch(
+      url,
       range === null ? undefined : { headers: { range } },
     );
   } catch {
-    return redirectResponse(DOWNLOAD_FALLBACK_URL);
+    return null;
   }
-  if ((upstream.status !== 200 && upstream.status !== 206) || !upstream.body) {
+}
+
+function matchesValidator(headers: Headers, validator: string): boolean {
+  const trimmed = validator.trim();
+  return (
+    trimmed === headers.get("etag") || trimmed === headers.get("last-modified")
+  );
+}
+
+async function streamInstaller(
+  asset: InstallerAsset,
+  range: string | null,
+  ifRange: string | null,
+): Promise<Response> {
+  let upstream = await fetchInstaller(asset.url, range);
+  if (
+    upstream?.status === 206 &&
+    ifRange !== null &&
+    !matchesValidator(upstream.headers, ifRange)
+  ) {
+    await upstream.body?.cancel();
+    upstream = await fetchInstaller(asset.url, null);
+  }
+  if (
+    !upstream ||
+    (upstream.status !== 200 && upstream.status !== 206) ||
+    !upstream.body
+  ) {
     return redirectResponse(DOWNLOAD_FALLBACK_URL);
   }
 
@@ -362,7 +391,7 @@ type AddUtmPropertiesArgs = {
 };
 
 function addUtmProperties(args: AddUtmPropertiesArgs): void {
-  for (const name of UTM_PARAM_NAMES) {
+  for (const name of CAMPAIGN_PARAM_NAMES) {
     const value = getTrackingParam({
       name,
       referrerSearchParams: args.referrerSearchParams,

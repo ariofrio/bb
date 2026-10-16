@@ -1,10 +1,12 @@
 import { useCallback, useEffect, useMemo, useRef, type RefObject } from "react";
 import { useVoiceInput } from "@/hooks/useVoiceInput";
 import { transcribeVoiceInput } from "@/lib/api";
-import type { PromptDraftState } from "@bb/client-core";
-import type { PluginComposerHost } from "@/components/plugin/plugin-composer-host";
 import type { VoiceDelivery } from "@/lib/voice-recording-store";
 import type { PromptBoxHandle, PromptVoiceConfig } from "./PromptBoxInternal";
+import {
+  deliverPromptVoiceTranscript,
+  type PromptVoiceDraftTarget,
+} from "./prompt-voice-intent";
 
 async function requestVoiceTranscription({
   file,
@@ -21,13 +23,7 @@ async function requestVoiceTranscription({
 
 export function usePromptVoice(
   promptBoxRef: RefObject<PromptBoxHandle | null>,
-  draft:
-    | {
-        getCurrent: () => PromptDraftState;
-        setDraft: (draft: PromptDraftState) => void;
-        submit?: PluginComposerHost["submit"];
-      }
-    | undefined,
+  draft: PromptVoiceDraftTarget | undefined,
   recordingKey: string | null,
 ): PromptVoiceConfig {
   const mountedRef = useRef(true);
@@ -39,26 +35,12 @@ export function usePromptVoice(
   }, []);
 
   const onTranscript = useCallback(
-    (text: string, delivery: VoiceDelivery) => {
-      const send = delivery === "send";
-      if (mountedRef.current && promptBoxRef.current) {
-        if (send) {
-          promptBoxRef.current.sendVoiceTranscript(text);
-        } else {
-          promptBoxRef.current.insertTextAtCursor(text);
-        }
-        return;
-      }
-      if (!draft) return;
-      const current = draft.getCurrent();
-      const separator =
-        current.text.length > 0 && !/\s$/.test(current.text) ? " " : "";
-      draft.setDraft({
-        ...current,
-        text: `${current.text}${separator}${text}`,
-      });
-      if (send) return draft.submit?.({ experimental_data: null }, undefined);
-    },
+    (text: string, delivery: VoiceDelivery) =>
+      deliverPromptVoiceTranscript(text, delivery, {
+        mounted: mountedRef.current,
+        promptBox: promptBoxRef.current,
+        draft,
+      }),
     [draft, promptBoxRef],
   );
 

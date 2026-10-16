@@ -3,6 +3,7 @@ import { usePendingAttachmentUploads } from "./usePendingAttachmentUploads";
 import { useInitialPromptDraft } from "./mentions/initial-prompt-draft";
 import { ProviderRequirementBanner } from "./banner/ProviderRequirementBanner";
 import { Button } from "@bb/shared-ui/button";
+import { recordTelemetryEvent } from "@/components/onboarding/onboarding-telemetry";
 import {
   getPluginConfigurationRoutePath,
   getSettingsRoutePath,
@@ -49,6 +50,13 @@ import {
 import { providerInputsControlRequired } from "@/components/pickers/environment-provider-inputs";
 import { useMachineProviderInputs } from "@/components/pickers/machine-provider-inputs";
 import { formatModelLoadErrorText } from "@/components/pickers/model-load-error-message";
+import {
+  buildSessionOptionMenuSections,
+  declaredSessionOptionViews,
+  SessionOptionsMenu,
+  splitSessionOptionsByPlacement,
+  type SessionOptionChoices,
+} from "@/components/pickers/SessionOptionsMenu";
 import {
   NewThreadPromptBox,
   type NewThreadPromptBoxProps,
@@ -173,6 +181,8 @@ interface NewThreadComposerSelectionState extends CommittedComposerState {
   changeServiceTier: (tier: ServiceTier | undefined) => void;
   changePermissionMode: (mode: PermissionMode) => void;
 }
+
+const NO_SESSION_OPTION_CHOICES: SessionOptionChoices = {};
 
 function readNewThreadComposerSelection(
   state: NewThreadComposerSelectionState,
@@ -857,6 +867,7 @@ export function NewThreadComposer({
   const creationOptions = useThreadCreationOptions({
     scope: selectionScope,
     preferenceProjectId: projectId,
+    catalogProjectId: isProjectless ? undefined : projectId,
     resetKey: `${projectId}\0${seedSignature}`,
     resolveProviderRouting,
     initialProviderId: seed?.providerId ?? projectDefaults?.providerId,
@@ -904,8 +915,34 @@ export function NewThreadComposer({
     supportsPermissionModeSelection,
     supportsServiceTier,
     clearReuseEnvironment,
+    declaredSessionOptions,
+    sessionOptionSelections,
+    setSessionOption,
   } = creationOptions;
   const selectedThreadModel = activeModel?.model ?? selectedModel;
+  const placedSessionOptions = useMemo(
+    () =>
+      splitSessionOptionsByPlacement(
+        declaredSessionOptionViews(
+          declaredSessionOptions,
+          sessionOptionSelections,
+          activeModel?.sessionOptions ?? [],
+        ),
+      ),
+    [
+      activeModel?.sessionOptions,
+      declaredSessionOptions,
+      sessionOptionSelections,
+    ],
+  );
+  const pickerSessionOptionSections = useMemo(
+    () =>
+      buildSessionOptionMenuSections(
+        placedSessionOptions.picker,
+        NO_SESSION_OPTION_CHOICES,
+      ),
+    [placedSessionOptions.picker],
+  );
   const providerIds = useMemo(
     () => providerOptions.map((option) => option.value),
     [providerOptions],
@@ -1418,7 +1455,10 @@ export function NewThreadComposer({
   const changeProject = useCallback(
     async (nextProjectId: string | null): Promise<ProjectChangeOutcome> => {
       const nextValue = nextProjectId ?? PERSONAL_PROJECT_ID;
-      if (nextValue === projectId) return "unchanged";
+      if (nextValue === projectId) {
+        await onProjectChange(nextValue);
+        return "unchanged";
+      }
       if (
         isCopyingAttachmentsRef.current ||
         pendingUploadCountRef.current > 0 ||
@@ -1642,6 +1682,9 @@ export function NewThreadComposer({
         reasoningLevel,
         permissionMode,
         ...(supportsServiceTier && serviceTier ? { serviceTier } : {}),
+        ...(Object.keys(sessionOptionSelections).length > 0
+          ? { sessionOptions: sessionOptionSelections }
+          : {}),
         executionInputSources: resolveSubmittedExecutionSources(
           submissionEnvironment,
           sources,
@@ -1658,10 +1701,22 @@ export function NewThreadComposer({
       setAttachmentError(null);
       const clearedSubmittedDraft =
         promptDraft.clearIfCurrentMatches(submittedDraft);
+      recordTelemetryEvent({
+        name: "new_thread_submit",
+        properties: { outcome: "started" },
+      });
       try {
         await onSubmit(request);
+        recordTelemetryEvent({
+          name: "new_thread_submit",
+          properties: { outcome: "accepted" },
+        });
         clearReuseEnvironment();
       } catch (submitError) {
+        recordTelemetryEvent({
+          name: "new_thread_submit",
+          properties: { outcome: "failed" },
+        });
         if (clearedSubmittedDraft) {
           promptDraft.restoreIfEmpty(submittedDraft);
         }
@@ -1686,6 +1741,7 @@ export function NewThreadComposer({
       selectedProviderId,
       selectedThreadModel,
       serviceTier,
+      sessionOptionSelections,
       supportsServiceTier,
     ],
   );
@@ -1943,6 +1999,7 @@ export function NewThreadComposer({
               triggers: promptMentions.triggers,
               results: promptMentions.results,
               isLoading: promptMentions.isLoading,
+              isRefreshing: promptMentions.isRefreshing,
               isError: promptMentions.isError,
               onQueryChange: promptMentions.setQuery,
               resolveLink:
@@ -1999,6 +2056,14 @@ export function NewThreadComposer({
               onChange: handlePermissionChange,
               supported: supportsPermissionModeSelection,
             },
+            sessionOptionsControl:
+              placedSessionOptions.footer.length === 0 ? null : (
+                <SessionOptionsMenu
+                  options={placedSessionOptions.footer}
+                  choices={NO_SESSION_OPTION_CHOICES}
+                  onChange={setSessionOption}
+                />
+              ),
             environmentProviderInputsSlot,
             machineProviderInputsSlot: machineProviderInputs.control,
             banner:
@@ -2086,6 +2151,14 @@ export function NewThreadComposer({
               options: reasoningOptions,
               onChange: handleReasoningChange,
             },
+            ...(pickerSessionOptionSections.length === 0
+              ? {}
+              : {
+                  agentOptions: {
+                    sections: pickerSessionOptionSections,
+                    onChange: setSessionOption,
+                  },
+                }),
           }}
         />
       );
@@ -2158,6 +2231,9 @@ export function NewThreadComposer({
       providerHostId,
       textEffects,
       serviceTierOptions,
+      pickerSessionOptionSections,
+      placedSessionOptions.footer,
+      setSessionOption,
     ],
   );
 
