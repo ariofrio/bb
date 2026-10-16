@@ -113,6 +113,11 @@
       "types": "./src/cli-command.ts",
       "default": "./src/cli-command.ts"
     },
+    "./app-release": {
+      "source": "./src/app-release.ts",
+      "types": "./src/app-release.ts",
+      "default": "./src/app-release.ts"
+    },
     "./app-update": {
       "source": "./src/app-update.ts",
       "types": "./src/app-update.ts",

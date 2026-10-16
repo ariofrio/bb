@@ -251,6 +251,7 @@ export async function runServer(serverConfig: ServerConfig): Promise<void> {
 
   const appVersion = createAppVersionService({
     installKind: serverConfig.BB_APP_INSTALL_KIND ?? null,
+    releaseRepository: serverConfig.BB_APP_RELEASE_REPOSITORY ?? null,
     sourceCommit: serverConfig.BB_APP_SOURCE_COMMIT ?? null,
     config: runtimeConfig,
     logger,

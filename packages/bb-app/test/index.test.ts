@@ -28,6 +28,7 @@ import {
   createDaemonEnv,
   createHostEnrollKeyRequestBody,
   createServerEnv,
+  readBbAppReleaseRepository,
   createHostDaemonJoinEnv,
   parseLauncherArgs,
   readBbAppPackageVersion,
@@ -244,6 +245,7 @@ async function unexpectedServerMove(): Promise<FullStackSupervisionResult> {
 function createTestStartContext(): BbAppStartContext {
   return {
     appDistDir: "/tmp/bb-app-test/app/dist",
+    appReleaseRepository: null,
     appVersion: "0.0.0-test",
     configFile: "/tmp/bb-app-test/config.json",
     daemonBundleDir: "/tmp/bb-app-test/host-daemon/dist",
@@ -2168,6 +2170,59 @@ describe("bb-app launcher", () => {
         install: { kind: "source", origin: "none" },
       }),
     ).not.toHaveProperty("BB_CLI_LAUNCHER");
+  });
+
+  it("passes the package's release source to the server and ignores an inherited one", () => {
+    const forkEnv = createServerEnv({
+      context: {
+        ...createTestStartContext(),
+        appReleaseRepository: "ariofrio/bb",
+      },
+      cliLauncherPath: null,
+      env: { BB_APP_RELEASE_REPOSITORY: "someone/else" },
+      install: { kind: "npm" },
+    });
+    const upstreamEnv = createServerEnv({
+      context: createTestStartContext(),
+      cliLauncherPath: null,
+      env: { BB_APP_RELEASE_REPOSITORY: "ariofrio/bb" },
+      install: { kind: "npm" },
+    });
+
+    expect(forkEnv.BB_APP_RELEASE_REPOSITORY).toBe("ariofrio/bb");
+    expect(upstreamEnv).not.toHaveProperty("BB_APP_RELEASE_REPOSITORY");
+  });
+
+  it("reads the release source from package.json and refuses malformed metadata", () => {
+    const packageRoot = mkdtempSync(join(tmpdir(), "bb-app-release-source-"));
+    try {
+      expect(readBbAppReleaseRepository(packageRoot)).toBeNull();
+      writeFileSync(
+        join(packageRoot, "package.json"),
+        JSON.stringify({ version: "0.46.1" }),
+      );
+      expect(readBbAppReleaseRepository(packageRoot)).toBeNull();
+      writeFileSync(
+        join(packageRoot, "package.json"),
+        JSON.stringify({
+          bbRelease: { repository: "ariofrio/bb" },
+          version: "0.46.1-ariofrio.8",
+        }),
+      );
+      expect(readBbAppReleaseRepository(packageRoot)).toBe("ariofrio/bb");
+      writeFileSync(
+        join(packageRoot, "package.json"),
+        JSON.stringify({
+          bbRelease: { repository: "https://evil.example" },
+          version: "0.46.1",
+        }),
+      );
+      expect(() => readBbAppReleaseRepository(packageRoot)).toThrow(
+        "invalid bbRelease",
+      );
+    } finally {
+      rmSync(packageRoot, { force: true, recursive: true });
+    }
   });
 });
 

@@ -86,6 +86,10 @@ import {
   type ServerMovedFile,
 } from "@bb/server-archive";
 import {
+  APP_RELEASE_REPOSITORY_ENV_NAME,
+  readAppReleaseRepository,
+} from "@bb/config/app-release";
+import {
   APP_UPDATE_MODE_ENV_NAME,
   APP_UPDATE_SHIM_PROTOCOL_ENV_NAME,
   APP_UPDATE_SHIM_PROTOCOL_VERSION,
@@ -289,6 +293,7 @@ interface RunBbAppOptions {
 
 export interface BbAppStartContext {
   appDistDir: string;
+  appReleaseRepository: string | null;
   appVersion: string;
   configFile: string;
   daemonBundleDir: string;
@@ -1325,6 +1330,19 @@ export function readBbAppPackageVersion(packageRoot: string): string {
   }
 }
 
+export function readBbAppReleaseRepository(packageRoot: string): string | null {
+  try {
+    return readAppReleaseRepository(packageRoot);
+  } catch (error) {
+    if (error instanceof Error && "code" in error && error.code === "ENOENT") {
+      return null;
+    }
+    throw new Error(
+      `bb-app's package.json has an invalid bbRelease: ${error instanceof Error ? error.message : String(error)}`,
+    );
+  }
+}
+
 function runsFromSourceCheckout(entrypointUrl: string): boolean {
   const entrypointDir = dirname(fileURLToPath(entrypointUrl));
   return entrypointDir === resolve(entrypointDir, "..", "src");
@@ -1360,6 +1378,7 @@ export function resolveBbAppStartContext(
 
   return {
     appDistDir,
+    appReleaseRepository: readBbAppReleaseRepository(packageRoot),
     appVersion: readBbAppPackageVersion(packageRoot),
     configFile: formatBbAppConfigPath(dataDir),
     daemonBundleDir,
@@ -2556,12 +2575,18 @@ export function createServerEnv(args: CreateServerEnvArgs): NodeJS.ProcessEnv {
   delete inheritedEnv[APP_SOURCE_COMMIT_ENV_NAME];
   delete inheritedEnv[APP_SOURCE_ORIGIN_ENV_NAME];
   delete inheritedEnv[CLI_LAUNCHER_ENV_NAME];
+  delete inheritedEnv[APP_RELEASE_REPOSITORY_ENV_NAME];
   return {
     ...inheritedEnv,
     ...appInstallEnv(args.install),
     ...(args.cliLauncherPath === null
       ? {}
       : { [CLI_LAUNCHER_ENV_NAME]: args.cliLauncherPath }),
+    ...(args.context.appReleaseRepository === null
+      ? {}
+      : {
+          [APP_RELEASE_REPOSITORY_ENV_NAME]: args.context.appReleaseRepository,
+        }),
     BB_APP_VERSION: args.context.appVersion,
     [APP_SURFACE_ENV_NAME]: resolveServerAppSurface(args.env),
     BB_CLI: join(args.context.daemonBundleDir, "bb"),
@@ -4122,6 +4147,7 @@ export async function runBbApp(
       },
       dataDir: runtime.context.dataDir,
       output: shimOutput,
+      releaseRepository: runtime.context.appReleaseRepository,
       spawnLauncher: (revision, mode) =>
         spawnNpmLauncher({ cliArgs: launcherArgs, mode, revision }),
       useBundled: parsedArgs.options.bundled === true,
@@ -4235,6 +4261,7 @@ export async function runBbApp(
       : createLauncherAppUpdateController({
           current: ownAppRevision,
           dataDir: context.dataDir,
+          releaseRepository: context.appReleaseRepository,
           log: (message) => log(dim("●"), message),
           mode: appUpdateMode,
           repoRoot:

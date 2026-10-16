@@ -343,7 +343,16 @@ repository variable (for example `daneel`). The `Release` workflow
 (`build-desktop.yml`) then versions each run as the next patch of the committed
 version plus `-<suffix>.<run number>` (`0.44.1-daneel.12` on top of 0.44.0) and
 publishes it as a stable release, so every run sorts above the previous one and
-below upstream's next patch. With the `IOS_WITH_DESKTOP_RELEASE` variable set to
+below upstream's next patch. The same step records the repository in
+`packages/bb-app/package.json` as `bbRelease.repository`, and the release
+attaches `bb-app-<version>.tgz` with its `.sha256`. The `bb-app` launcher passes
+that repository to its server, so Settings → Updates, `bb updates`, and in-app
+updates use the fork's GitHub releases and never upstream's npm package.
+Releases built before this field existed carry no `bbRelease` and still check
+npm; move such an install onto the fork by installing a newer release's
+tarball once, after checking it against its `.sha256`, for example
+`npm install -g https://github.com/<owner>/<repo>/releases/download/desktop-v<version>/bb-app-<version>.tgz`.
+With the `IOS_WITH_DESKTOP_RELEASE` variable set to
 `true`, each published release also builds iOS on EAS and submits it to
 TestFlight's internal group.
 

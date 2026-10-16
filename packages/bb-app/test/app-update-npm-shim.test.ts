@@ -1,6 +1,12 @@
-import { mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+import {
+  mkdirSync,
+  mkdtempSync,
+  readFileSync,
+  rmSync,
+  writeFileSync,
+} from "node:fs";
 import { tmpdir } from "node:os";
-import { join } from "node:path";
+import { dirname, join } from "node:path";
 import { afterEach, describe, expect, it } from "vitest";
 import {
   APP_UPDATE_RESTART_EXIT_CODE,
@@ -11,6 +17,12 @@ import {
   type NpmAppRevision,
 } from "@bb/config/app-update";
 import type { ChildProcessExitResult } from "@bb/config/child-process-exit";
+import { APP_RELEASE_PROVENANCE_FILE_NAME } from "@bb/config/app-release";
+import {
+  formatNpmRevisionInstallDir,
+  formatNpmRevisionPackageRoot,
+  NPM_REVISION_REQUIRED_FILES,
+} from "../src/app-update/npm-revision.js";
 import { runNpmShim, selectNpmRevision } from "../src/app-update/npm-shim.js";
 import type {
   LauncherRun,
@@ -110,6 +122,7 @@ function shimArgs(args: {
     dataDir: args.dataDir,
     isUsable: args.isUsable ?? (() => true),
     nodeAbi: NODE_ABI,
+    releaseRepository: null,
     output: args.output ?? output(),
     spawnLauncher: args.spawnLauncher,
     useBundled: args.useBundled ?? false,
@@ -310,5 +323,73 @@ describe("runNpmShim", () => {
     );
 
     expect(launcher.launches).toEqual(["1.0.0"]);
+  });
+
+  describe("for a fork release source", () => {
+    const repository = "ariofrio/bb";
+    const cachedVersion = "0.46.2-ariofrio.1";
+
+    function seedCachedFork(dataDir: string, provenance: boolean) {
+      const packageRoot = formatNpmRevisionPackageRoot(dataDir, cachedVersion);
+      for (const file of NPM_REVISION_REQUIRED_FILES) {
+        mkdirSync(dirname(join(packageRoot, file)), { recursive: true });
+        writeFileSync(join(packageRoot, file), "");
+      }
+      writeFileSync(
+        join(packageRoot, "package.json"),
+        JSON.stringify({ bbRelease: { repository }, version: cachedVersion }),
+      );
+      if (provenance) {
+        writeFileSync(
+          join(
+            formatNpmRevisionInstallDir(dataDir, cachedVersion),
+            APP_RELEASE_PROVENANCE_FILE_NAME,
+          ),
+          JSON.stringify({
+            repository,
+            tarballSha256: "a".repeat(64),
+            tarballUrl: `https://github.com/${repository}/releases/download/desktop-v${cachedVersion}/bb-app-${cachedVersion}.tgz`,
+            version: cachedVersion,
+          }),
+        );
+      }
+      return mutateAppUpdateState(dataDir, (state) => ({
+        ...state,
+        current: {
+          kind: "npm",
+          nodeAbi: NODE_ABI,
+          packageRoot,
+          version: cachedVersion,
+        },
+      }));
+    }
+
+    async function launchFork(dataDir: string) {
+      const launcher = scriptedLauncher([() => exit(0)]);
+      await runNpmShim({
+        bundled: revision("0.46.1-ariofrio.8"),
+        dataDir,
+        nodeAbi: NODE_ABI,
+        output: output(),
+        releaseRepository: repository,
+        spawnLauncher: launcher.spawnLauncher,
+        useBundled: false,
+      });
+      return launcher.launches;
+    }
+
+    it("runs a newer cached fork install with matching provenance", async () => {
+      const dataDir = scratchDir();
+      await seedCachedFork(dataDir, true);
+
+      expect(await launchFork(dataDir)).toEqual([cachedVersion]);
+    });
+
+    it("ignores a newer cached install without fork provenance", async () => {
+      const dataDir = scratchDir();
+      await seedCachedFork(dataDir, false);
+
+      expect(await launchFork(dataDir)).toEqual(["0.46.1-ariofrio.8"]);
+    });
   });
 });

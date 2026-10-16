@@ -237,13 +237,57 @@ describe("prepare-fork-version", () => {
     });
 
     await expect(
-      prepareForkVersion({ repoRoot, runNumber: "7", suffix: "daneel" }),
+      prepareForkVersion({
+        repoRoot,
+        repository: "ariofrio/bb",
+        runNumber: "7",
+        suffix: "daneel",
+      }),
     ).resolves.toBe("0.44.1-daneel.7");
     expect(readVersion(repoRoot, "packages/bb-app/package.json")).toBe(
       "0.44.1-daneel.7",
     );
     expect(readVersion(repoRoot, "apps/desktop/package.json")).toBe(
       "0.44.1-daneel.7",
+    );
+  });
+
+  it("records the fork repository as bb-app's release source", async () => {
+    const repoRoot = createTestRepo({
+      bbAppVersion: "0.44.0",
+      desktopVersion: "0.44.0",
+    });
+
+    await prepareForkVersion({
+      repoRoot,
+      repository: "ariofrio/bb",
+      runNumber: "7",
+      suffix: "daneel",
+    });
+
+    const bbApp = JSON.parse(
+      readPackageContent(repoRoot, "packages/bb-app/package.json"),
+    );
+    expect(bbApp.bbRelease).toEqual({ repository: "ariofrio/bb" });
+    expect(bbApp.version).toBe("0.44.1-daneel.7");
+  });
+
+  it("refuses to build a fork release without a valid repository", async () => {
+    const repoRoot = createTestRepo({
+      bbAppVersion: "0.44.0",
+      desktopVersion: "0.44.0",
+    });
+
+    await expect(
+      prepareForkVersion({
+        repoRoot,
+        repository: "",
+        runNumber: "7",
+        suffix: "daneel",
+      }),
+    ).rejects.toThrow("GITHUB_REPOSITORY");
+    expect(readVersion(repoRoot, "packages/bb-app/package.json")).toBe(
+      "0.44.0",
     );
   });
 });

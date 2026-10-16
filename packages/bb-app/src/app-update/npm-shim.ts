@@ -28,6 +28,7 @@ export interface RunNpmShimArgs {
   isUsable?: (revision: NpmAppRevision) => boolean;
   nodeAbi?: string;
   output: ShimOutput;
+  releaseRepository: string | null;
   spawnLauncher: (
     revision: NpmAppRevision,
     mode: LauncherUpdateMode,
@@ -78,7 +79,10 @@ export function spawnNpmLauncher(args: {
 }
 
 export async function runNpmShim(args: RunNpmShimArgs): Promise<number> {
-  const isUsable = args.isUsable ?? isUsableNpmRevision;
+  const isUsable =
+    args.isUsable ??
+    ((revision: NpmAppRevision) =>
+      isUsableNpmRevision(revision, args.releaseRepository));
   const nodeAbi = args.nodeAbi ?? process.versions.modules;
   let useBundled = args.useBundled;
   let shuttingDown = false;

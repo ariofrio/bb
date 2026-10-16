@@ -1,3 +1,7 @@
+import {
+  APP_RELEASE_REPOSITORY_ENV_NAME,
+  appReleaseRepositorySchema,
+} from "./app-release.js";
 import { z } from "zod";
 import { delimiter } from "node:path";
 import { defaultFeatureFlags } from "@bb/domain";
@@ -70,6 +74,14 @@ function parseAppUpdateModeEnvValue(args: EnvVarParseArgs): AppUpdateMode {
   throw new Error(
     `${args.name} must be one of ${appUpdateModeSchema.options.join(", ")}`,
   );
+}
+
+function parseAppReleaseRepositoryEnvValue(args: EnvVarParseArgs): string {
+  const parsed = appReleaseRepositorySchema.safeParse(args.value);
+  if (parsed.success) {
+    return parsed.data;
+  }
+  throw new Error(`${args.name} must be a GitHub owner/name`);
 }
 
 function parseAppInstallKindEnvValue(args: EnvVarParseArgs): AppInstallKind {
@@ -231,6 +243,13 @@ export const BB_APP_INSTALL_KIND_ENV = defineEnvVar<AppInstallKind>({
     "Internal marker the bb-app launcher hands its server child for telemetry attribution: desktop for the desktop app, npm for package installs, source for pnpm start checkouts. Absent when the server runs without the launcher.",
   name: APP_INSTALL_KIND_ENV_NAME,
   parse: parseAppInstallKindEnvValue,
+});
+
+export const BB_APP_RELEASE_REPOSITORY_ENV = defineEnvVar<string>({
+  description:
+    "Internal marker the bb-app launcher hands its server child when its package was built by a fork release (bbRelease.repository in package.json). The server then discovers updates from that GitHub repository's releases instead of npm.",
+  name: APP_RELEASE_REPOSITORY_ENV_NAME,
+  parse: parseAppReleaseRepositoryEnvValue,
 });
 
 export const BB_APP_SOURCE_ORIGIN_ENV = defineEnvVar<AppSourceOrigin>({

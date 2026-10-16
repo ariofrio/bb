@@ -75,6 +75,7 @@ function createStartContext(args: {
   const dataDir = dirname(args.serverEntry);
   return {
     appDistDir: `${dataDir}/app/dist`,
+    appReleaseRepository: null,
     appVersion: "0.0.0-test",
     configFile: `${dataDir}/config.json`,
     daemonBundleDir: `${dataDir}/host-daemon/dist`,

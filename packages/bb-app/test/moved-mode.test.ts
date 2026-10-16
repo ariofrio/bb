@@ -124,6 +124,7 @@ function createMovedFile(overrides: Partial<ServerMovedFile>): ServerMovedFile {
 function createTestStartContext(): BbAppStartContext {
   return {
     appDistDir: "/tmp/bb-app-moved-test/app/dist",
+    appReleaseRepository: null,
     appVersion: "0.0.0-test",
     configFile: "/tmp/bb-app-moved-test/config.json",
     daemonBundleDir: "/tmp/bb-app-moved-test/host-daemon/dist",
