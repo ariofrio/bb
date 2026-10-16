@@ -142,6 +142,11 @@ with `sdk.system.version({ force: true })`, or by rerunning `bb updates`.
   whichever is newer, that install or the launched `npx` copy; `--bundled`
   always runs the launched copy. bb keeps the running and previous versions.
   Stable installs follow the `latest` dist-tag and nightly builds `nightly`.
+  A `bb-app` built by a fork release names its repository in `package.json`
+  (`bbRelease`); it checks that repository's GitHub releases instead of npm,
+  installs only the release's `bb-app-<version>.tgz` after matching its
+  `.sha256` asset, and runs a cached version only if it was installed from
+  that repository. A failed GitHub check never falls back to npm.
 - **Source checkouts** update only from a clean checkout of the repository's
   default branch (the branch `origin/HEAD` names, else `main`) that
   fast-forwards to its `origin` counterpart; run
@@ -154,8 +159,8 @@ migrated. The outcome is recorded in `<dataDir>/bb-app-update.json` (do not
 edit it). Only one launcher manages updates for a data directory; a second
 `bb-app start` on it runs with in-app updates off. `pnpm dev`, `bb-server`, and a standalone
 `bb-host-daemon` do not offer in-app updates. `BB_APP_UPDATE_MODE`,
-`BB_APP_INSTALL_KIND`, `BB_APP_SOURCE_ORIGIN`, and `BB_APP_SOURCE_COMMIT` are
-internal markers the launcher passes to its server child; do not set them. See
+`BB_APP_INSTALL_KIND`, `BB_APP_SOURCE_ORIGIN`, `BB_APP_SOURCE_COMMIT`, and
+`BB_APP_RELEASE_REPOSITORY` are internal markers the launcher passes to its server child; do not set them. See
 `bb guide machines` for the `bb updates` commands.
 
 Settings → Updates shows the **Server** row for both standalone servers and servers

@@ -1019,13 +1019,15 @@ export function BbAppUpdateRows({
   }
 
   if (systemVersion.latestVersion === null) {
+    const releaseSourceLabel =
+      systemVersion.source === "github" ? "GitHub releases" : "npm";
     return row(
       name,
       unavailableCheckControl,
       undefined,
       isChecking
-        ? "Checking npm for a newer release…"
-        : "Couldn't check npm for a newer release.",
+        ? `Checking ${releaseSourceLabel} for a newer release…`
+        : `Couldn't check ${releaseSourceLabel} for a newer release.`,
     );
   }
   return row(name, settledStatus);

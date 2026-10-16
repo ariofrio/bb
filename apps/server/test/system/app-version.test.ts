@@ -47,6 +47,7 @@ describe("createAppVersionService", () => {
     "reports install kind %s independently of npm lookup failure",
     async (installKind) => {
       const service = createAppVersionService({
+        releaseRepository: null,
         sourceCommit: null,
         installKind,
         config: { appVersion: "0.0.5", isDevelopment: false },
@@ -60,6 +61,7 @@ describe("createAppVersionService", () => {
   it("reports the source commit without comparing the checkout to npm", async () => {
     const calls: FetchCall[] = [];
     const service = createAppVersionService({
+      releaseRepository: null,
       sourceCommit: "a".repeat(40),
       installKind: "source",
       config: { appVersion: "0.0.5", isDevelopment: false },
@@ -76,6 +78,7 @@ describe("createAppVersionService", () => {
   it("skips the npm lookup in development mode", async () => {
     const calls: FetchCall[] = [];
     const service = createAppVersionService({
+      releaseRepository: null,
       sourceCommit: null,
       installKind: "npm",
       config: { appVersion: "0.0.5", isDevelopment: true },
@@ -99,6 +102,7 @@ describe("createAppVersionService", () => {
   it("reports updateAvailable=true when npm latest is greater", async () => {
     const calls: FetchCall[] = [];
     const service = createAppVersionService({
+      releaseRepository: null,
       sourceCommit: null,
       installKind: "npm",
       config: { appVersion: "0.0.5", isDevelopment: false },
@@ -115,6 +119,7 @@ describe("createAppVersionService", () => {
   it("checks the nightly dist-tag when running a nightly build", async () => {
     const calls: FetchCall[] = [];
     const service = createAppVersionService({
+      releaseRepository: null,
       sourceCommit: null,
       installKind: "npm",
       config: { appVersion: "0.43.5-nightly.100.1", isDevelopment: false },
@@ -144,6 +149,7 @@ describe("createAppVersionService", () => {
       });
     }) as typeof fetch;
     const service = createAppVersionService({
+      releaseRepository: null,
       sourceCommit: null,
       installKind: "npm",
       config: { appVersion: "0.43.5-nightly.100.1", isDevelopment: false },
@@ -163,6 +169,7 @@ describe("createAppVersionService", () => {
 
   it("reports updateAvailable=false when versions are equal", async () => {
     const service = createAppVersionService({
+      releaseRepository: null,
       sourceCommit: null,
       installKind: "npm",
       config: { appVersion: "0.0.6", isDevelopment: false },
@@ -176,6 +183,7 @@ describe("createAppVersionService", () => {
 
   it("reports updateAvailable=false when local is ahead of npm latest", async () => {
     const service = createAppVersionService({
+      releaseRepository: null,
       sourceCommit: null,
       installKind: "npm",
       config: { appVersion: "9.9.9", isDevelopment: false },
@@ -190,6 +198,7 @@ describe("createAppVersionService", () => {
   it("returns latestVersion=null when npm fails and there is no cache", async () => {
     const warn = vi.fn();
     const service = createAppVersionService({
+      releaseRepository: null,
       sourceCommit: null,
       installKind: "npm",
       config: { appVersion: "0.0.5", isDevelopment: false },
@@ -215,6 +224,7 @@ describe("createAppVersionService", () => {
 
   it("returns latestVersion=null when npm returns a non-200 status", async () => {
     const service = createAppVersionService({
+      releaseRepository: null,
       sourceCommit: null,
       installKind: "npm",
       config: { appVersion: "0.0.5", isDevelopment: false },
@@ -228,6 +238,7 @@ describe("createAppVersionService", () => {
 
   it("returns latestVersion=null when npm returns an unexpected payload", async () => {
     const service = createAppVersionService({
+      releaseRepository: null,
       sourceCommit: null,
       installKind: "npm",
       config: { appVersion: "0.0.5", isDevelopment: false },
@@ -240,6 +251,7 @@ describe("createAppVersionService", () => {
 
   it("returns latestVersion but updateAvailable=false when current version is not semver", async () => {
     const service = createAppVersionService({
+      releaseRepository: null,
       sourceCommit: null,
       installKind: "npm",
       config: { appVersion: "totally-not-semver", isDevelopment: false },
@@ -254,6 +266,7 @@ describe("createAppVersionService", () => {
   it("caches the npm result and avoids repeat fetches inside the TTL", async () => {
     const calls: FetchCall[] = [];
     const service = createAppVersionService({
+      releaseRepository: null,
       sourceCommit: null,
       installKind: "npm",
       config: { appVersion: "0.0.5", isDevelopment: false },
@@ -273,6 +286,7 @@ describe("createAppVersionService", () => {
   it("bypasses the npm cache for a forced check", async () => {
     const calls: FetchCall[] = [];
     const service = createAppVersionService({
+      releaseRepository: null,
       sourceCommit: null,
       installKind: "npm",
       config: { appVersion: "0.0.5", isDevelopment: false },
@@ -292,6 +306,7 @@ describe("createAppVersionService", () => {
   it("dedupes concurrent inflight requests", async () => {
     const calls: FetchCall[] = [];
     const service = createAppVersionService({
+      releaseRepository: null,
       sourceCommit: null,
       installKind: "npm",
       config: { appVersion: "0.0.5", isDevelopment: false },
@@ -311,6 +326,7 @@ describe("createAppVersionService", () => {
     const calls: FetchCall[] = [];
     let currentTime = 1_000;
     const service = createAppVersionService({
+      releaseRepository: null,
       sourceCommit: null,
       installKind: "npm",
       cacheTtlMs: 100,
@@ -336,6 +352,7 @@ describe("createAppVersionService", () => {
 
   it("treats a published prerelease latest as an update when local is the stable predecessor", async () => {
     const service = createAppVersionService({
+      releaseRepository: null,
       sourceCommit: null,
       installKind: "npm",
       config: { appVersion: "0.0.5", isDevelopment: false },
@@ -349,6 +366,7 @@ describe("createAppVersionService", () => {
 
   it("does not flag updateAvailable when local is the stable that follows a published prerelease", async () => {
     const service = createAppVersionService({
+      releaseRepository: null,
       sourceCommit: null,
       installKind: "npm",
       config: { appVersion: "0.0.5", isDevelopment: false },
@@ -362,6 +380,7 @@ describe("createAppVersionService", () => {
 
   it("ignores semver build metadata when comparing equal versions", async () => {
     const service = createAppVersionService({
+      releaseRepository: null,
       sourceCommit: null,
       installKind: "npm",
       config: { appVersion: "0.0.5", isDevelopment: false },

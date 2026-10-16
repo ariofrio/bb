@@ -286,6 +286,7 @@ export async function createTestAppHarness(
     createAppVersionService({
       sourceCommit: null,
       installKind: null,
+      releaseRepository: null,
       config,
       logger,
     });

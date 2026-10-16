@@ -71,6 +71,7 @@ describe("full-stack supervisor port takeover", () => {
     let restartAttempts = 0;
     const context: BbAppStartContext = {
       appDistDir: "/tmp/bb-app-test/app/dist",
+      appReleaseRepository: null,
       appVersion: "0.0.0-test",
       configFile: "/tmp/bb-app-test/config.json",
       daemonBundleDir: "/tmp/bb-app-test/host-daemon/dist",

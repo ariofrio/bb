@@ -44,6 +44,7 @@ export interface LauncherAppUpdateControllerArgs {
   log: (message: string) => void;
   mode: AppUpdateMode;
   now?: () => Date;
+  releaseRepository: string | null;
   repoRoot: string | null;
   requestShutdown: (message: string) => void;
   restartNoticeMs?: number;
@@ -187,6 +188,7 @@ export function createLauncherAppUpdateController(
           schedulePush();
         },
         onStep: setStep,
+        releaseRepository: args.releaseRepository,
         runner: args.runner,
         signal: abortController.signal,
         version: target.version,

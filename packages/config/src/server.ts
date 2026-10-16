@@ -16,6 +16,7 @@ import {
 } from "./env.js";
 import {
   BB_APP_INSTALL_KIND_ENV,
+  BB_APP_RELEASE_REPOSITORY_ENV,
   BB_APP_SOURCE_COMMIT_ENV,
   BB_APP_SOURCE_ORIGIN_ENV,
   BB_APP_URL_ENV,
@@ -50,6 +51,7 @@ import { loadServerPortConfig, type ServerPortConfig } from "./server-port.js";
 export interface ServerConfig
   extends CommonConfig, DatabaseConfig, ServerPortConfig {
   BB_APP_INSTALL_KIND?: AppInstallKind;
+  BB_APP_RELEASE_REPOSITORY?: string;
   BB_APP_SOURCE_COMMIT?: string;
   BB_APP_SOURCE_ORIGIN?: AppSourceOrigin;
   BB_APP_URL: string;
@@ -209,6 +211,15 @@ export function loadServerConfig(
     value: readOptionalEnvVar({
       context: loader.context,
       definition: BB_APP_INSTALL_KIND_ENV,
+      env: loader.env,
+    }),
+  });
+  assignIfDefined({
+    key: "BB_APP_RELEASE_REPOSITORY",
+    target: config,
+    value: readOptionalEnvVar({
+      context: loader.context,
+      definition: BB_APP_RELEASE_REPOSITORY_ENV,
       env: loader.env,
     }),
   });

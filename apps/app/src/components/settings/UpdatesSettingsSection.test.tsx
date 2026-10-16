@@ -1981,6 +1981,40 @@ The canonical release summary.
     });
   });
 
+  it("names GitHub releases when a fork build's release check fails", async () => {
+    useWebApp();
+    vi.mocked(sdk.system.appUpdate).mockResolvedValue(
+      makeAppUpdateStatus({
+        available: null,
+        blocked: null,
+        support: { kind: "unsupported", reason: "unmanaged" },
+      }),
+    );
+    useUpdateInventoryMock.mockReturnValue(
+      makeInventory({
+        systemVersion: {
+          currentVersion: "0.46.1-ariofrio.8",
+          currentCommit: null,
+          installKind: "npm",
+          source: "github",
+          latestVersion: null,
+          updateAvailable: false,
+          isDevelopment: false,
+          upgradeCommand:
+            "npx https://github.com/ariofrio/bb/releases/download/desktop-v0.46.1-ariofrio.8/bb-app-0.46.1-ariofrio.8.tgz",
+        },
+      }),
+    );
+    renderSection();
+
+    expect(
+      await screen.findByText(
+        "Couldn't check GitHub releases for a newer release.",
+      ),
+    ).toBeDefined();
+    expect(screen.queryByText(/check npm/u)).toBeNull();
+  });
+
   it("retries an unavailable release check from the app row", async () => {
     useWebApp();
     vi.mocked(sdk.system.appUpdate).mockResolvedValue(
