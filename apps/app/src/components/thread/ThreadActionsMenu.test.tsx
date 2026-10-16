@@ -216,11 +216,7 @@ function twoPaneLayout(focusedPaneId: string): SplitLayout {
         {
           type: "pane",
           paneId: "pane_other",
-          content: {
-            kind: "thread",
-            projectId: "proj_a",
-            threadId: "thr_other",
-          },
+          content: { kind: "thread", projectId: "proj_a", threadId: "thr_other" },
         },
         {
           type: "pane",
@@ -296,7 +292,7 @@ async function openMenu(): Promise<HTMLElement> {
 async function menuRows(): Promise<string[]> {
   const menu = await openMenu();
   return Array.from(
-    menu.querySelectorAll('[role="menuitem"], [role="separator"]'),
+    menu.querySelectorAll('[role="menuitem"], [role="separator"], hr'),
   )
     .filter(
       (element) =>
@@ -304,7 +300,7 @@ async function menuRows(): Promise<string[]> {
         menu,
     )
     .map((element) =>
-      element.getAttribute("role") === "separator"
+      element.getAttribute("role") === "separator" || element.tagName === "HR"
         ? "---"
         : (element.textContent?.trim() ?? ""),
     );
@@ -331,7 +327,7 @@ const CUSTOMIZE: PluginThreadActionsInlineItem = {
   key: "surface/customize",
   group: experimental_THREAD_ACTION_GROUPS.settings,
   action: {
-    label: "Customize row actions",
+    label: "Customize actions",
     icon: "FilterHorizontal",
     run: vi.fn(),
   },
@@ -368,14 +364,15 @@ describe.each(SURFACES)("thread actions on the $name", (surface) => {
       layout: null,
       desktop: [
         "Open in split",
+        "Copy link",
         "---",
-        "Copy thread link",
-        "Mark unread",
         "Pin",
-        "Move to section",
-        "Rename",
+        "Mark unread",
         "---",
-        "Customize row actions",
+        "Rename",
+        "Move to section",
+        "---",
+        "Customize actions",
         "---",
         "Archive",
         "Delete",
@@ -383,15 +380,20 @@ describe.each(SURFACES)("thread actions on the $name", (surface) => {
         "Notifications",
       ],
       compact: [
+        "Copy link",
         "New thread in environment",
-        "Copy thread link",
-        "Mark unread",
+        "---",
         "Pin",
-        "Move to section",
+        "Mark unread",
+        "---",
         "Rename",
-        "Customize row actions",
+        "Move to section",
+        "---",
+        "Customize actions",
+        "---",
         "Archive",
         "Delete",
+        "---",
         "Notifications",
       ],
     },
@@ -410,13 +412,14 @@ describe.each(SURFACES)("thread actions on the $name", (surface) => {
       layout: null,
       desktop: [
         "Open in split",
+        "Copy link",
         "---",
-        "Copy thread link",
-        "Mark read",
         "Unpin",
+        "Mark read",
+        "---",
         "Rename",
         "---",
-        "Customize row actions",
+        "Customize actions",
         "---",
         "Unarchive",
         "Delete",
@@ -424,13 +427,18 @@ describe.each(SURFACES)("thread actions on the $name", (surface) => {
         "Notifications",
       ],
       compact: [
-        "Copy thread link",
-        "Mark read",
+        "Copy link",
+        "---",
         "Unpin",
+        "Mark read",
+        "---",
         "Rename",
-        "Customize row actions",
+        "---",
+        "Customize actions",
+        "---",
         "Unarchive",
         "Delete",
+        "---",
         "Notifications",
       ],
     },
@@ -443,13 +451,15 @@ describe.each(SURFACES)("thread actions on the $name", (surface) => {
       }),
       layout: null,
       desktop: [
-        "Copy thread link",
-        "Mark unread",
-        "Pin",
-        "Move to section",
-        "Rename",
+        "Copy link",
         "---",
-        "Customize row actions",
+        "Pin",
+        "Mark unread",
+        "---",
+        "Rename",
+        "Move to section",
+        "---",
+        "Customize actions",
         "---",
         "Archive",
         "Delete",
@@ -457,15 +467,20 @@ describe.each(SURFACES)("thread actions on the $name", (surface) => {
         "Notifications",
       ],
       compact: [
+        "Copy link",
         "New thread in environment",
-        "Copy thread link",
-        "Mark unread",
+        "---",
         "Pin",
-        "Move to section",
+        "Mark unread",
+        "---",
         "Rename",
-        "Customize row actions",
+        "Move to section",
+        "---",
+        "Customize actions",
+        "---",
         "Archive",
         "Delete",
+        "---",
         "Notifications",
       ],
     },
@@ -476,14 +491,15 @@ describe.each(SURFACES)("thread actions on the $name", (surface) => {
       layout: twoPaneLayout("pane_other"),
       desktop: [
         "Focus split",
+        "Copy link",
         "---",
-        "Copy thread link",
-        "Mark unread",
         "Pin",
-        "Move to section",
-        "Rename",
+        "Mark unread",
         "---",
-        "Customize row actions",
+        "Rename",
+        "Move to section",
+        "---",
+        "Customize actions",
         "---",
         "Archive",
         "Delete",
@@ -491,15 +507,20 @@ describe.each(SURFACES)("thread actions on the $name", (surface) => {
         "Notifications",
       ],
       compact: [
+        "Copy link",
         "New thread in environment",
-        "Copy thread link",
-        "Mark unread",
+        "---",
         "Pin",
-        "Move to section",
+        "Mark unread",
+        "---",
         "Rename",
-        "Customize row actions",
+        "Move to section",
+        "---",
+        "Customize actions",
+        "---",
         "Archive",
         "Delete",
+        "---",
         "Notifications",
       ],
     },
@@ -512,13 +533,15 @@ describe.each(SURFACES)("thread actions on the $name", (surface) => {
       }),
       layout: twoPaneLayout("pane_target"),
       desktop: [
-        "Copy thread link",
-        "Mark unread",
-        "Pin",
-        "Move to section",
-        "Rename",
+        "Copy link",
         "---",
-        "Customize row actions",
+        "Pin",
+        "Mark unread",
+        "---",
+        "Rename",
+        "Move to section",
+        "---",
+        "Customize actions",
         "---",
         "Archive",
         "Delete",
@@ -526,30 +549,60 @@ describe.each(SURFACES)("thread actions on the $name", (surface) => {
         "Notifications",
       ],
       compact: [
+        "Copy link",
         "New thread in environment",
-        "Copy thread link",
-        "Mark unread",
+        "---",
         "Pin",
-        "Move to section",
+        "Mark unread",
+        "---",
         "Rename",
-        "Customize row actions",
+        "Move to section",
+        "---",
+        "Customize actions",
+        "---",
         "Archive",
         "Delete",
+        "---",
         "Notifications",
       ],
     },
   ])(
     "lists the items for $state",
     async ({ thread, route, layout, desktop, compact }) => {
-      renderSurface(
-        surface,
-        { thread, inline: [CUSTOMIZE] },
-        { route, layout },
-      );
+      renderSurface(surface, { thread, inline: [CUSTOMIZE] }, { route, layout });
       await surface.open();
       expect(await menuRows()).toEqual(surface.compact ? compact : desktop);
     },
   );
+
+  it("keeps a submenu row's detail out of sight but in its accessible name", async () => {
+    renderSurface(
+      surface,
+      { thread: baseThread },
+      {
+        threadActions: [
+          {
+            id: "level",
+            title: "Level",
+            icon: "Notification",
+            group: experimental_THREAD_ACTION_GROUPS.state,
+            item: () => ({
+              label: "Level",
+              detail: "Muted",
+              icon: "Notification",
+              choices: {
+                items: [{ id: "muted", label: "Muted", selected: true }],
+              },
+              run: vi.fn(),
+            }),
+          },
+        ],
+      },
+    );
+    await surface.open();
+    const row = await screen.findByRole("menuitem", { name: "Level, Muted" });
+    expect(within(row).getByText(", Muted").className).toContain("sr-only");
+  });
 
   it("runs each action's effect", async () => {
     sdkThreads.pin.mockResolvedValue({ ...baseThread, pinnedAt: 9 });
@@ -605,7 +658,7 @@ describe.each(SURFACES)("thread actions on the $name", (surface) => {
 
     await surface.open();
     fireEvent.click(
-      await screen.findByRole("menuitem", { name: "Copy thread link" }),
+      await screen.findByRole("menuitem", { name: "Copy link" }),
     );
     expect(copyToClipboardWithToast).toHaveBeenCalledWith(
       `${window.location.origin}/projects/proj_a/threads/thr_target`,
@@ -757,12 +810,12 @@ describe("thread action registrations", () => {
       screen.getAllByRole("listitem").map((item) => item.textContent),
     ).toEqual([
       "bb--core/split",
-      "bb--core/newThreadInEnvironment",
       "bb--core/copyLink",
-      "bb--core/read",
+      "bb--core/newThreadInEnvironment",
       "bb--core/pin",
-      "fixture/move",
+      "bb--core/read",
       "bb--core/rename",
+      "fixture/move",
       "bb--core/archive",
       "bb--core/delete",
       "fixture/notify",

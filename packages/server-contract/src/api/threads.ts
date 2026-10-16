@@ -10,6 +10,7 @@ import {
   pluginMetadataSchema,
   pendingInteractionResolutionSchema,
   pendingInteractionSchema,
+  threadTimelineSubscriptionTargetSchema,
   permissionModeInputSchema,
   promptInputSchema,
   clientTurnRequestIdSchema,
@@ -17,6 +18,8 @@ import {
   queuedMessageWaitingOnSchema,
   queuedMessageWaitReasonSchema,
   reasoningLevelSchema,
+  sessionOptionSelectionsSchema,
+  sessionOptionValueSchema,
   rawThreadIdSchema,
   serviceTierSchema,
   startedOnBehalfOfSchema,
@@ -36,6 +39,7 @@ import {
 } from "@bb/domain";
 import type { CallerExecutionInputSource } from "@bb/domain";
 import { THREAD_EVENT_LIST_PAGE_SIZE } from "../common.js";
+import { providerCommandSchema } from "./projects.js";
 import {
   timelineConversationRowSchema,
   timelineDeltaSchema,
@@ -102,6 +106,7 @@ export const createThreadRequestSchema = z
     model: z.string().min(1).optional(),
     serviceTier: serviceTierSchema.optional(),
     reasoningLevel: reasoningLevelSchema.optional(),
+    sessionOptions: sessionOptionSelectionsSchema.optional(),
     permissionMode: permissionModeInputSchema.optional(),
     executionInputSources: createExecutionInputSourcesSchema.optional(),
     environment: createThreadEnvironmentArgsSchema,
@@ -588,6 +593,33 @@ export const threadAncestorsListResponseSchema = z
 export type ThreadAncestorsListResponse = z.infer<
   typeof threadAncestorsListResponseSchema
 >;
+export const THREAD_DESCENDANTS_LIST_MAX_IDS = 200;
+
+export const threadDescendantsListRequestSchema = z
+  .object({
+    threadIds: z
+      .array(z.string().min(1))
+      .min(1)
+      .max(THREAD_DESCENDANTS_LIST_MAX_IDS),
+    includeArchived: z.boolean().optional(),
+    includeHidden: z.boolean().optional(),
+  })
+  .strict();
+export type ThreadDescendantsListRequest = z.infer<
+  typeof threadDescendantsListRequestSchema
+>;
+export const threadDescendantsListResponseSchema = z
+  .object({
+    threads: z.array(
+      z
+        .object({ threadId: z.string(), descendantIds: z.array(z.string()) })
+        .strict(),
+    ),
+  })
+  .strict();
+export type ThreadDescendantsListResponse = z.infer<
+  typeof threadDescendantsListResponseSchema
+>;
 export const updateThreadPluginMetadataRequestSchema = z
   .object({
     pluginId: pluginIdSchema,
@@ -690,6 +722,10 @@ export const updateThreadRequestSchema = z
     parentThreadId: z.string().min(1).nullable(),
     model: z.string().min(1).nullable(),
     reasoningLevel: reasoningLevelSchema.nullable(),
+    sessionOptions: z.record(
+      z.string().min(1),
+      sessionOptionValueSchema.nullable(),
+    ),
     visibility: threadVisibilitySchema,
   })
   .partial()
@@ -700,6 +736,7 @@ export const updateThreadRequestSchema = z
       value.parentThreadId !== undefined ||
       value.model !== undefined ||
       value.reasoningLevel !== undefined ||
+      value.sessionOptions !== undefined ||
       value.visibility !== undefined,
     "At least one field must be provided",
   );
@@ -942,22 +979,11 @@ export type TimelinePaginationCursor = z.infer<
 
 export const timelinePageMetadataSchema = z
   .object({
-    kind: z.enum(["latest", "older"]),
-    segmentLimit: z.number().int().positive(),
     returnedSegmentCount: z.number().int().nonnegative(),
-    hasOlderRows: z.boolean(),
     olderCursor: timelinePaginationCursorSchema.nullable(),
-    historySnapshot: z.string().optional(),
-    olderRowsSourceSeqEnd: z.number().int().nonnegative().nullable().optional(),
+    historySnapshot: z.string(),
+    olderRowsSourceSeqEnd: z.number().int().nonnegative().nullable(),
     olderRowUpdates: z.array(timelineRowSchema).optional(),
-    contentPage: z
-      .object({
-        anchorSeq: z.number().int().nonnegative(),
-        start: z.number().int().nonnegative(),
-        end: z.number().int().nonnegative(),
-        total: z.number().int().nonnegative(),
-      })
-      .optional(),
   })
   .strict();
 
@@ -1094,6 +1120,39 @@ export type TimelineTurnSummaryDetailsResponse = z.infer<
   typeof timelineTurnSummaryDetailsResponseSchema
 >;
 
+const threadTimelineSessionOptionBaseShape = {
+  id: z.string().min(1),
+  label: z.string().min(1),
+  description: z.string().nullable(),
+  category: z.string().nullable(),
+};
+
+export const threadTimelineSessionOptionSchema = z.discriminatedUnion("type", [
+  z.object({
+    ...threadTimelineSessionOptionBaseShape,
+    type: z.literal("select"),
+    value: z.string(),
+    pendingValue: z.string().nullable(),
+    values: z.array(
+      z.object({
+        id: z.string().min(1),
+        label: z.string().min(1),
+        description: z.string().nullable(),
+        group: z.string().nullable(),
+      }),
+    ),
+  }),
+  z.object({
+    ...threadTimelineSessionOptionBaseShape,
+    type: z.literal("boolean"),
+    value: z.boolean(),
+    pendingValue: z.boolean().nullable(),
+  }),
+]);
+export type ThreadTimelineSessionOption = z.infer<
+  typeof threadTimelineSessionOptionSchema
+>;
+
 export const threadTimelineResponseSchema = z.object({
   rows: z.array(timelineRowSchema),
   contextBoundarySeq: z.number().int().nonnegative().nullable(),
@@ -1104,6 +1163,10 @@ export const threadTimelineResponseSchema = z.object({
   activeBackgroundCommands: z.array(timelineWorkflowWorkRowSchema),
   pendingTodos: threadTimelinePendingTodosSchema.nullable(),
   goal: threadTimelineGoalSchema.nullable(),
+  providerCommands: z
+    .array(providerCommandSchema.omit({ pluginId: true }))
+    .nullable(),
+  sessionOptions: z.array(threadTimelineSessionOptionSchema).nullable(),
   modelFallback: threadTimelineModelFallbackSchema.nullable(),
   contextWindowUsage: threadContextWindowUsageSchema.optional(),
   timelinePage: timelinePageMetadataSchema,
@@ -1113,6 +1176,25 @@ export const threadTimelineResponseSchema = z.object({
 export type ThreadTimelineResponse = z.infer<
   typeof threadTimelineResponseSchema
 >;
+
+export const threadTimelineSignalSchema = z
+  .object({
+    type: z.literal("thread-timeline"),
+    target: threadTimelineSubscriptionTargetSchema,
+    afterSequence: z.number().int().nonnegative().nullable(),
+    timeline: threadTimelineResponseSchema,
+  })
+  .strict();
+export type ThreadTimelineSignal = z.infer<typeof threadTimelineSignalSchema>;
+
+export const threadTimelineSignalLenientSchema = z.object({
+  type: z.literal("thread-timeline"),
+  target: threadTimelineSubscriptionTargetSchema,
+  afterSequence: z.number().int().nonnegative().nullable(),
+  timeline: z.custom<ThreadTimelineResponse>(
+    (value) => typeof value === "object" && value !== null,
+  ),
+});
 
 export const threadConversationOutlineAttachmentSummarySchema = z
   .object({

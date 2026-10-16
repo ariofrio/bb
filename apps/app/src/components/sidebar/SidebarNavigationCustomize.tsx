@@ -14,15 +14,17 @@ export function SidebarNavigationCustomize({
   const model = useSidebarNavigationModel();
   const items = useMemo<SidebarVisibilityItem[]>(
     () =>
-      model.state.items.map((item) => ({
-        id: item.id,
-        title: item.label,
-        icon: <SidebarNavigationIcon icon={item.icon} />,
-        ...(item.isDisabled ? { disabled: true } : {}),
-      })),
+      model.state.items
+        .filter((item) => item.action.kind !== "new-thread")
+        .map((item) => ({
+          id: item.id,
+          title: item.label,
+          icon: <SidebarNavigationIcon icon={item.icon} />,
+          ...(item.isDisabled ? { disabled: true } : {}),
+        })),
     [model.state.items],
   );
-  const { arrangement, state } = model;
+  const { arrangement } = model;
   return (
     <div
       className="flex min-h-0 flex-1 flex-col"
@@ -35,13 +37,7 @@ export function SidebarNavigationCustomize({
         variant="compact"
         items={items}
         visibleIds={arrangement.visibleKeys}
-        onActivate={(item, event) =>
-          state.actions.activate(item.id, {
-            openInSplit: event.metaKey || event.ctrlKey,
-          })
-        }
         onDone={() => onClose(true)}
-        onExit={() => onClose(false)}
         onReorder={arrangement.moveAny}
         onVisibleChange={arrangement.setVisible}
       />
