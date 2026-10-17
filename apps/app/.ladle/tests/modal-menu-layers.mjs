@@ -3,7 +3,7 @@ await page.setViewport({ width: 1280, height: 900 });
 if (!page.url().includes("ui--modal-menu-layers--nested-overlays")) {
   throw new Error("Open the Nested overlays story in preview mode first");
 }
-await page.waitForSelector('[aria-label="Outside input"]');
+await page.waitForSelector('[aria-label="Outside input"]', { timeout: 30_000 });
 await page.evaluate(() => {
   const root = document.createElement("div");
   root.id = "root";

@@ -9,7 +9,6 @@
 
 @layer base {
   #root {
-    isolation: isolate;
     pointer-events: auto;
   }
 
@@ -17,7 +16,7 @@
     content: "";
     position: fixed;
     inset: 0;
-    z-index: 2147483647;
+    z-index: 49;
     pointer-events: auto;
   }
 

@@ -7,7 +7,9 @@ if (
     "Open the Outside click dismissal story in preview mode first",
   );
 }
-await page.waitForSelector('[aria-label="Outside composer"]');
+await page.waitForSelector('[aria-label="Outside composer"]', {
+  timeout: 30_000,
+});
 await page.evaluate(() => document.fonts.ready.then(() => true));
 const cdp = await page.createCDPSession();
 const backgroundSize = 1200;

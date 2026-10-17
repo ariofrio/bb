@@ -1,4 +1,7 @@
 import { useState } from "react";
+import { appToast } from "@/components/ui/app-toast";
+import { CompactSecondaryPanelShelf } from "@/components/secondary-panel/CompactSecondaryPanelShelf";
+import { AppUpdateRestartingOverlay } from "@/components/app-update/AppUpdateHost";
 import {
   Dialog,
   DialogContent,
@@ -73,5 +76,59 @@ export function NestedOverlays() {
         </DialogContent>
       </Dialog>
     </div>
+  );
+}
+
+export function AppLayers() {
+  const [shelfOpen, setShelfOpen] = useState(true);
+  const [dialogOpen, setDialogOpen] = useState(false);
+  const [updating, setUpdating] = useState(false);
+  return (
+    <>
+      <CompactSecondaryPanelShelf
+        open={shelfOpen}
+        onClose={() => setShelfOpen(false)}
+        srLabel="Layer fixture shelf"
+      >
+        <button
+          type="button"
+          aria-label="Show layer toast"
+          onClick={() =>
+            appToast.success("Layer fixture toast", { duration: Infinity })
+          }
+        >
+          Show layer toast
+        </button>
+        <button
+          type="button"
+          aria-label="Open layer dialog"
+          onClick={() => setDialogOpen(true)}
+        >
+          Open layer dialog
+        </button>
+      </CompactSecondaryPanelShelf>
+      <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
+        <DialogContent aria-label="Layer fixture dialog">
+          <DialogTitle>Layer fixture dialog</DialogTitle>
+          <DialogDescription>
+            App overlay stacking regression.
+          </DialogDescription>
+          <button
+            type="button"
+            aria-label="Show update overlay"
+            onClick={() => setUpdating(true)}
+          >
+            Show update overlay
+          </button>
+        </DialogContent>
+      </Dialog>
+      {updating ? (
+        <AppUpdateRestartingOverlay
+          onDismiss={() => setUpdating(false)}
+          patienceMs={300_000}
+          targetRevision="fixture"
+        />
+      ) : null}
+    </>
   );
 }
