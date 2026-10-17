@@ -1,7 +1,26 @@
 @import "@fontsource-variable/inter";
 @import "@/components/ui/theme.css";
 
+@property --removed-body-scroll-bar-size {
+  syntax: "<length>";
+  inherits: true;
+  initial-value: 0px;
+}
+
 @layer base {
+  #root {
+    isolation: isolate;
+    pointer-events: auto;
+  }
+
+  body[style*="pointer-events: none"] > #root::after {
+    content: "";
+    position: fixed;
+    inset: 0;
+    z-index: 2147483647;
+    pointer-events: auto;
+  }
+
   /*
    * Keep the real app shell from becoming a second scroll container. These
    * selectors are class-scoped because Ladle imports app.css but does not use
