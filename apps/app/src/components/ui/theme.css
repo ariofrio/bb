@@ -904,6 +904,12 @@
   body {
     @apply bg-background text-foreground;
     font-family: var(--font-sans);
+    /*
+     * Keep this explicit default even with app.css's @property registration.
+     * Chromium stores the registered initial value separately; without this
+     * declaration, scroll locks add/remove an inherited-variable entry and
+     * restyle descendants even though the effective value stays 0px.
+     */
     --removed-body-scroll-bar-size: 0px;
   }
 

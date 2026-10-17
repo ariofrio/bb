@@ -1,7 +1,38 @@
 @import "@fontsource-variable/inter";
 @import "@/components/ui/theme.css";
 
+/*
+ * Scroll locks add/remove a body declaration for this inherited length. Typing
+ * it lets Chromium recognize equal values and skip descendant restyles.
+ */
+@property --removed-body-scroll-bar-size {
+  syntax: "<length>";
+  inherits: true;
+  initial-value: 0px;
+}
+
 @layer base {
+  /*
+   * Radix modal layers set body pointer-events to none. Stop that inherited
+   * change at #root to avoid restyling the app, then use a transparent shield
+   * to consume outside clicks: the first click dismisses without activating
+   * the control underneath. Layer 49 stays below portaled overlays at 50
+   * (APP_OVERLAY_LAYER). Do not isolate #root: app and portaled overlays must
+   * keep sharing the existing stacking order. The inline body style is
+   * Radix's lock signal.
+   */
+  #root {
+    pointer-events: auto;
+  }
+
+  body[style*="pointer-events: none"] > #root::after {
+    content: "";
+    position: fixed;
+    inset: 0;
+    z-index: 49;
+    pointer-events: auto;
+  }
+
   /*
    * Keep the real app shell from becoming a second scroll container. These
    * selectors are class-scoped because Ladle imports app.css but does not use
