@@ -8,6 +8,15 @@
 }
 
 @layer base {
+  /*
+   * Radix modal layers set body pointer-events to none. Stop that inherited
+   * change at #root to avoid restyling the app, then use a transparent shield
+   * to consume outside clicks: the first click dismisses without activating
+   * the control underneath. Layer 49 stays below portaled overlays at 50
+   * (APP_OVERLAY_LAYER). Do not isolate #root: app and portaled overlays must
+   * keep sharing the existing stacking order. The inline body style is
+   * Radix's lock signal.
+   */
   #root {
     pointer-events: auto;
   }
