@@ -4,9 +4,6 @@
 /*
  * Scroll locks add/remove a body declaration for this inherited length. Typing
  * it lets Chromium recognize equal values and skip descendant restyles.
- * Keep theme.css's explicit body default too: the registered initial value is
- * stored separately, so the lock would otherwise add/remove an inherited-map
- * entry even though the effective value remains 0px.
  */
 @property --removed-body-scroll-bar-size {
   syntax: "<length>";
