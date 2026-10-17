@@ -904,6 +904,10 @@
   body {
     @apply bg-background text-foreground;
     font-family: var(--font-sans);
+    /*
+     * Keep this explicit default alongside app.css's @property registration;
+     * Chromium otherwise propagates the lock's insertion/removal to descendants.
+     */
     --removed-body-scroll-bar-size: 0px;
   }
 
