@@ -1,5 +1,6 @@
 import { useMemo } from "react";
 import { atom, useAtomValue } from "jotai";
+import { selectAtom } from "jotai/utils";
 import { useIsCompactViewport } from "@bb/shared-ui/hooks/use-compact-viewport";
 import { splitLayoutAtom } from "@/lib/split-layout/atoms";
 import {
@@ -36,15 +37,6 @@ export function indicatorSplitLayoutAtom(
   isCompact: boolean,
 ): typeof NULL_LAYOUT_ATOM | typeof splitLayoutAtom {
   return enabled && !isCompact ? splitLayoutAtom : NULL_LAYOUT_ATOM;
-}
-
-function useSplitLayoutForIndicator(enabled: boolean): {
-  layout: SplitLayout | null;
-  isCompact: boolean;
-} {
-  const isCompact = useIsCompactViewport();
-  const layout = useAtomValue(indicatorSplitLayoutAtom(enabled, isCompact));
-  return { layout, isCompact };
 }
 
 function buildSplitIndicator(
@@ -95,15 +87,53 @@ export function resolvePaneContentSplitIndicator({
   return buildSplitIndicator(layout, new Set([pane.paneId]));
 }
 
+function sameMiniMapSlot(a: MiniMapSlot, b: MiniMapSlot): boolean {
+  return (
+    a.paneId === b.paneId &&
+    a.isMe === b.isMe &&
+    a.isFocused === b.isFocused &&
+    a.rect.x === b.rect.x &&
+    a.rect.y === b.rect.y &&
+    a.rect.w === b.rect.w &&
+    a.rect.h === b.rect.h
+  );
+}
+
+function sameSplitIndicator(
+  a: PaneContentSplitIndicator,
+  b: PaneContentSplitIndicator,
+): boolean {
+  if (a === b) return true;
+  if (a.isOpenInSplit !== b.isOpenInSplit) return false;
+  if (a.miniMap === null || b.miniMap === null) return a.miniMap === b.miniMap;
+  return (
+    a.miniMap.length === b.miniMap.length &&
+    a.miniMap.every((slot, index) => {
+      const other = b.miniMap?.[index];
+      return other !== undefined && sameMiniMapSlot(slot, other);
+    })
+  );
+}
+
 export function usePaneContentSplitIndicator(
   content: PaneContent,
   enabled: boolean,
 ): PaneContentSplitIndicator {
-  const { layout, isCompact } = useSplitLayoutForIndicator(enabled);
-
-  return useMemo<PaneContentSplitIndicator>(
+  const isCompact = useIsCompactViewport();
+  const indicatorAtom = useMemo(
     () =>
-      resolvePaneContentSplitIndicator({ content, enabled, isCompact, layout }),
-    [content, enabled, isCompact, layout],
+      selectAtom(
+        indicatorSplitLayoutAtom(enabled, isCompact),
+        (layout) =>
+          resolvePaneContentSplitIndicator({
+            content,
+            enabled,
+            isCompact,
+            layout,
+          }),
+        sameSplitIndicator,
+      ),
+    [content, enabled, isCompact],
   );
+  return useAtomValue(indicatorAtom);
 }
