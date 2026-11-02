@@ -131,7 +131,6 @@ function install(
   return installNpmRevision({
     dataDir,
     fetchImpl: release.fetchImpl,
-    npmCliPath: null,
     onLine: () => undefined,
     onStep: () => undefined,
     releaseRepository: REPOSITORY,
@@ -209,7 +208,6 @@ describe("installNpmRevision from a fork release", () => {
       installNpmRevision({
         dataDir,
         fetchImpl,
-        npmCliPath: null,
         onLine: () => undefined,
         onStep: () => undefined,
         releaseRepository: REPOSITORY,
