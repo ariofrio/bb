@@ -517,7 +517,7 @@ jobs:
     needs:
       - publish
       - publish-nightly
-    runs-on: macos-15
+    runs-on: macos-latest
     timeout-minutes: 45
     outputs:
       version: ${{ steps.nightly_version.outputs.version }}
