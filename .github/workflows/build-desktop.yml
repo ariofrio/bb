@@ -32,7 +32,7 @@ concurrency:
 jobs:
   macos:
     name: macOS arm64 desktop artifacts
-    runs-on: macos-26
+    runs-on: macos-latest
     timeout-minutes: 45
     outputs:
       has_signing_secrets: ${{ steps.signing.outputs.has_signing_secrets }}
